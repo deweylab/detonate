@@ -10,9 +10,9 @@
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 #include "deweylab/bio/formats/fasta.hh"
-#include "deweylab/bio/alphabet/AmbiguousNucleotide.hh"
-#include "deweylab/util/stl.hh"
-#include "deweylab/util/string.hh"
+//#include "deweylab/bio/alphabet/AmbiguousNucleotide.hh"
+//#include "deweylab/util/stl.hh"
+//#include "deweylab/util/string.hh"
 #include "blast.hh"
 #include "pslx.hh"
 #include "pairset.hh"
@@ -525,7 +525,7 @@ int main(int argc, const char **argv)
       parse_options(vm, fake_argc, fake_argv);
       argc = fake_argc;
       argv = fake_argv;
-    } else if (1) {
+    } else if (0) {
       int fake_argc = 15;
       const char *fake_argv[] = {
         "summarize",
