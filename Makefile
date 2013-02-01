@@ -1,5 +1,4 @@
 # LINUX
-DEWEYLAB      = /ua/nathanae/opt/libdeweylabnf
 BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
 BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
 UNIT_TEST_DLL = libboost_unit_test_framework.so
@@ -16,8 +15,9 @@ CC = /usr/bin/g++
 DEBUG =
 CFLAGS = -O3 -fopenmp -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
-INCLUDE = -I$(BOOST_INCLUDE) -I$(DEWEYLAB)/include
-LIBS = -L$(BOOST_LIB) -Wl,-rpath,$(BOOST_LIB) -lboost_program_options -lboost_random -L$(DEWEYLAB)/lib -Wl,-rpath,$(DEWEYLAB)/lib -ldeweylabnf
+INCLUDE = -I$(BOOST_INCLUDE)
+#LIBS = -L$(BOOST_LIB) -Wl,-rpath,$(BOOST_LIB) -lboost_program_options -lboost_random
+LIBS = $(BOOST_LIB)/libboost_program_options.a $(BOOST_LIB)/libboost_random.a
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL)
 
 summarize: summarize.cpp
