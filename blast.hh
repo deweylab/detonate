@@ -28,7 +28,7 @@ public:
   double      frac_indel()    const { return 1.0 * gaps()   * (qframe() == 0 ? 1 : 3) / qlen(); }
   typedef detail::blast_alignment_input_stream input_stream_type;
   typedef detail::blast_alignment_segments     segments_type;
-  segments_type segments() const; // defined below
+  segments_type segments(const std::string& a, const std::string& b) const; // defined below
 
   // For use by blast-specific algorithms:
   inline  int         qlen  ()        const { return lazy_csv.at<int>        ( 1); }
@@ -220,7 +220,7 @@ namespace detail
 
 } // namespace detail
 
-blast_alignment::segments_type blast_alignment::segments() const
+blast_alignment::segments_type blast_alignment::segments(const std::string& /*a*/, const std::string& /*b*/) const
 {
   return blast_alignment::segments_type(*this);
 }

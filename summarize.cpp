@@ -14,7 +14,7 @@
 //#include "deweylab/util/stl.hh"
 //#include "deweylab/util/string.hh"
 #include "blast.hh"
-#include "pslx.hh"
+#include "psl.hh"
 #include "pairset.hh"
 #include "mask.hh"
 
@@ -49,10 +49,10 @@ void open_or_throw(std::ifstream& ifs, const std::string& filename)
     throw std::runtime_error("Could not open file '" + filename + "'.");
 }
 
-void read_fasta_names_and_sizes(const std::string& filename,
-                                std::vector<size_t>& sizes,
-                                std::vector<std::string>& names,
-                                std::map<std::string, size_t>& names_to_idxs)
+void read_fasta_names_and_seqs(const std::string& filename,
+                               std::vector<std::string>& seqs,
+                               std::vector<std::string>& names,
+                               std::map<std::string, size_t>& names_to_idxs)
 {
   std::ifstream ifs;
   open_or_throw(ifs, filename);
@@ -63,7 +63,7 @@ void read_fasta_names_and_sizes(const std::string& filename,
     assert(names_to_idxs.count(rec.id) == 0);
     names_to_idxs[rec.id] = idx;
     names.push_back(rec.id);
-    sizes.push_back(rec.sequence.size());
+    seqs.push_back(rec.sequence);
     assert(names[names_to_idxs[rec.id]] == rec.id);
     ++idx;
   }
@@ -95,7 +95,7 @@ void read_transcript_expression(const std::string& filename,
   }
 }
 
-void compute_nucl_expression(const std::vector<size_t>& A_sizes,
+void compute_nucl_expression(const std::vector<std::string>& A,
                              const std::vector<double>& tau_A,
                              std::vector<double>& nu_A)
 {
@@ -104,7 +104,7 @@ void compute_nucl_expression(const std::vector<size_t>& A_sizes,
   assert(nu_A.size() == n);
 
   for (size_t i = 0; i < n; ++i)
-    nu_A[i] = tau_A[i] * A_sizes[i];
+    nu_A[i] = tau_A[i] * A[i].size();
 
   double denom = 0;
   for (size_t i = 0; i < n; ++i)
@@ -122,7 +122,7 @@ struct BestTuple
   BestTuple() : frac_identity(-1.0) {}
 };
 
-inline bool is_good_enough(const pslx_alignment& al) { return al.frac_identity() > 0.95; }
+inline bool is_good_enough(const psl_alignment& al) { return al.frac_identity() > 0.95; }
 inline bool is_good_enough(const blast_alignment& al) { return al.evalue() < 1e-5; }
 
 // For each a in A, figure out which alignment from a -> b (for some b in B) is
@@ -216,10 +216,10 @@ template<typename PairSetType, typename AlignmentType>
 void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
                              std::vector<double>& b_frac_ones,
                              const std::vector<std::vector<const AlignmentType *> >& best_to_B,
-                             const std::vector<size_t>&                              A_sizes,
+                             const std::vector<std::string>&                         A,
                              const std::vector<double>&                              nu_A,
                              const std::vector<double>&                              tau_A,
-                             const std::vector<size_t>&                              B_sizes,
+                             const std::vector<std::string>&                         B,
                              const std::vector<double>&                              nu_B,
                              const std::vector<double>&                              tau_B,
                              const std::map<std::string, size_t>&                    A_names_to_idxs)
@@ -240,23 +240,23 @@ void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
     for (int b_pre_idx = 0; b_pre_idx < static_cast<int>(nu_B.size()); ++b_pre_idx) {
 
       size_t b_idx = perm[b_pre_idx];
-      PairSetType b_pairset(B_sizes[b_idx]);
-      mask b_mask(B_sizes[b_idx]);
+      PairSetType b_pairset(B[b_idx].size());
+      mask b_mask(B[b_idx].size());
 
       BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
 
         size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
-        PairSetType a_pairset(A_sizes[a_idx]);
-        mask a_mask(A_sizes[a_idx]);
+        PairSetType a_pairset(A[a_idx].size());
+        mask a_mask(A[a_idx].size());
 
-        BOOST_FOREACH(const alignment_segment& seg, al->segments()) {
+        BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
           a_pairset.add_square(seg.a_start, seg.a_end); a_pairset.remove_all_pairs(seg.a_mismatches);
           b_pairset.add_square(seg.b_start, seg.b_end); b_pairset.remove_all_pairs(seg.b_mismatches);
           a_mask.add_interval(seg.a_start, seg.a_end); a_mask.remove(seg.a_mismatches);
           b_mask.add_interval(seg.b_start, seg.b_end); b_mask.remove(seg.b_mismatches);             
         }
 
-        int a_num_total_bases = A_sizes[a_idx];
+        int a_num_total_bases = A[a_idx].size();
         int a_num_total_pairs = a_num_total_bases * (a_num_total_bases + 1) / 2;
         double a_frac_ones = 1.0 * a_mask.num_ones() / a_num_total_bases;
         private_pair_precis += (1.0 * a_pairset.size() / a_num_total_pairs) * nu_A[a_idx];
@@ -265,7 +265,7 @@ void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
 
       }
 
-      int b_num_total_bases = B_sizes[b_idx];
+      int b_num_total_bases = B[b_idx].size();
       int b_num_total_pairs = b_num_total_bases * (b_num_total_bases + 1) / 2;
       b_frac_ones[b_idx] = (1.0 * b_mask.num_ones()) / b_num_total_bases;
       //std::cout << (1.0 * b_mask.num_ones()) / (1.0 * b_num_total_bases) << std::endl;
@@ -293,7 +293,10 @@ template<typename AlignmentType>
 void induce_prot_expression(std::vector<double>&                                    tau_B,
                             const std::vector<std::vector<const AlignmentType *> >& best_to_B,
                             const std::vector<double>&                              tau_A,
-                            const std::map<std::string, size_t>&                    A_names_to_idxs)
+                            const std::map<std::string, size_t>&                    A_names_to_idxs,
+                            const std::vector<std::string>&                         A,
+                            const std::vector<std::string>&                         B)
+
 {
   // Let IAC(c,p) be the interval of the contig c that is aligned to protein c (an interval of nucleotides)
   // Let IAP(c,p) be the interval of the protein p that is aligned to contig c (an interval of amino acids)
@@ -309,7 +312,7 @@ void induce_prot_expression(std::vector<double>&                                
     BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
       size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
       size_t IAC_size = 0;
-      BOOST_FOREACH(const alignment_segment& seg, al->segments()) {
+      BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
         size_t a_start = seg.a_start, a_end = seg.a_end;
         size_t b_start = seg.b_start, b_end = seg.b_end;
         if (a_start > a_end) std::swap(a_start, a_end);
@@ -343,7 +346,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
     ("induce-B-expr",                                "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
     ("A-to-B", po::value<std::string>()->required(), "The alignments of A to B.")
-    ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'pslx'.")
+    ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
   ;
 
@@ -363,8 +366,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
       throw po::error("Either --B-expr or --induce-B-expr is required.");
 
     if (vm["alignment-type"].as<std::string>() != "blast" &&
-        vm["alignment-type"].as<std::string>() != "pslx")
-      throw po::error("Option --alignment-type needs to be 'blast' or 'pslx'.");
+        vm["alignment-type"].as<std::string>() != "psl")
+      throw po::error("Option --alignment-type needs to be 'blast' or 'psl'.");
 
     if (vm.count("induce-B-expr") && vm["alignment-type"].as<std::string>() != "blast")
       throw po::error("Option --induce-B-expr only makes sense if --alignment-type=blast, i.e., if A is of nucleotide type and B is of protein type.");
@@ -383,13 +386,13 @@ void main_1(const boost::program_options::variables_map& vm)
 
   // Read the sequences and make sequence names-to-idxs maps
   std::cerr << "Reading the sequences" << std::endl;
-  std::vector<size_t> A_sizes, B_sizes;
+  std::vector<std::string> A, B;
   std::vector<std::string> A_names, B_names;
   std::map<std::string, size_t> A_names_to_idxs, B_names_to_idxs;
-  read_fasta_names_and_sizes(vm["A-seqs"].as<std::string>(), A_sizes, A_names, A_names_to_idxs);
-  read_fasta_names_and_sizes(vm["B-seqs"].as<std::string>(), B_sizes, B_names, B_names_to_idxs);
-  size_t A_card = A_sizes.size();
-  size_t B_card = B_sizes.size();
+  read_fasta_names_and_seqs(vm["A-seqs"].as<std::string>(), A, A_names, A_names_to_idxs);
+  read_fasta_names_and_seqs(vm["B-seqs"].as<std::string>(), B, B_names, B_names_to_idxs);
+  size_t A_card = A.size();
+  size_t B_card = B.size();
 
   std::cerr << "Reading alignments and filtering them by A" << std::endl;
   std::vector<BestTuple<AlignmentType> > best_from_A(A_card);
@@ -410,8 +413,8 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing uniform nucleotide-level expression" << std::endl;
   std::vector<double> unif_nu_A(A_card), unif_nu_B(B_card);
-  compute_nucl_expression(A_sizes, unif_tau_A, unif_nu_A);
-  compute_nucl_expression(B_sizes, unif_tau_B, unif_nu_B);
+  compute_nucl_expression(A, unif_tau_A, unif_nu_A);
+  compute_nucl_expression(B, unif_tau_B, unif_nu_B);
 
   std::cerr << "Reading transcript-level expression for A" << std::endl;
   std::vector<double> tau_A(A_card), tau_B(B_card);
@@ -419,7 +422,7 @@ void main_1(const boost::program_options::variables_map& vm)
   read_transcript_expression(A_expr_fname, tau_A, A_names_to_idxs);
   if (vm.count("induce-B-expr")) {
     std::cerr << "Inducing transcript-level expression for B" << std::endl;
-    induce_prot_expression(tau_B, best_to_B, tau_A, A_names_to_idxs);
+    induce_prot_expression(tau_B, best_to_B, tau_A, A_names_to_idxs, A, B);
   } else {
     std::cerr << "Reading transcript-level expression for B" << std::endl;
     std::string B_expr_fname = vm["B-expr"].as<std::string>();
@@ -428,8 +431,8 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing nucleotide-level expression" << std::endl;
   std::vector<double> nu_A(A_card), nu_B(B_card);
-  compute_nucl_expression(A_sizes, tau_A, nu_A);
-  compute_nucl_expression(B_sizes, tau_B, nu_B);
+  compute_nucl_expression(A, tau_A, nu_A);
+  compute_nucl_expression(B, tau_B, nu_B);
 
   std::cout << "summarize_version\t1" << std::endl;
 
@@ -438,7 +441,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing weighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A_sizes,      nu_A,      tau_A, B_sizes,      nu_B,      tau_B, A_names_to_idxs);
+  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A,      nu_A,      tau_A, B,      nu_B,      tau_B, A_names_to_idxs);
   print_stats(pair, "weighted_clustered_pair");
   print_stats(nucl, "weighted_clustered_nucl");
   print_stats(tran, "weighted_clustered_tran");
@@ -446,7 +449,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing unweighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A_sizes, unif_nu_A, unif_tau_A, B_sizes, unif_nu_B, unif_tau_B, A_names_to_idxs);
+  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
   print_stats(pair, "unweighted_clustered_pair");
   print_stats(nucl, "unweighted_clustered_nucl");
   print_stats(tran, "unweighted_clustered_tran");
@@ -454,7 +457,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing weighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A_sizes,      nu_A,      tau_A, B_sizes,      nu_B,      tau_B, A_names_to_idxs);
+  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A,      nu_A,      tau_A, B,      nu_B,      tau_B, A_names_to_idxs);
   print_stats(pair, "weighted_filtered_pair");
   print_stats(nucl, "weighted_filtered_nucl");
   print_stats(tran, "weighted_filtered_tran");
@@ -462,7 +465,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing unweighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A_sizes, unif_nu_A, unif_tau_A, B_sizes, unif_nu_B, unif_tau_B, A_names_to_idxs);
+  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
   print_stats(pair, "unweighted_filtered_pair");
   print_stats(nucl, "unweighted_filtered_nucl");
   print_stats(tran, "unweighted_filtered_tran");
@@ -503,8 +506,8 @@ int main(int argc, const char **argv)
         "--B-seqs", "ensembl_sim_oases_default/cc_0.fa",
         "--A-expr", "ensembl_sim_oases_default/oases_default_expression/expression.isoforms.results",
         "--B-expr", "ensembl_sim_oases_default/cc_0_expression/expression.isoforms.results",
-        "--A-to-B", "ensembl_sim_oases_default/oases_default_to_cc_0.pslx",
-        "--alignment-type", "pslx",
+        "--A-to-B", "ensembl_sim_oases_default/oases_default_to_cc_0.psl",
+        "--alignment-type", "psl",
         "--plot-output", "plot.tmp"
       };
       parse_options(vm, fake_argc, fake_argv);
@@ -518,8 +521,8 @@ int main(int argc, const char **argv)
         "--B-seqs", "../test_3/B.fa",
         "--A-expr", "../test_3/A_expression/expression.isoforms.results",
         "--B-expr", "../test_3/B_expression/expression.isoforms.results",
-        "--A-to-B", "../test_3/A_to_B.pslx",
-        "--alignment-type", "pslx",
+        "--A-to-B", "../test_3/A_to_B.psl",
+        "--alignment-type", "psl",
         "--plot-output", "plot.tmp"
       };
       parse_options(vm, fake_argc, fake_argv);
@@ -533,8 +536,8 @@ int main(int argc, const char **argv)
         "--B-seqs", "../test_3/A.fa",
         "--A-expr", "../test_3/A_expression/expression.isoforms.results",
         "--B-expr", "../test_3/A_expression/expression.isoforms.results",
-        "--A-to-B", "../test_3/A_to_A.pslx",
-        "--alignment-type", "pslx",
+        "--A-to-B", "../test_3/A_to_A.psl",
+        "--alignment-type", "psl",
         "--plot-output", "plot.tmp"
       };
       parse_options(vm, fake_argc, fake_argv);
@@ -546,8 +549,8 @@ int main(int argc, const char **argv)
     std::string alignment_type = vm["alignment-type"].as<std::string>();
     if (alignment_type == "blast")
       main_1<blast_alignment>(vm);
-    else if (alignment_type == "pslx")
-      main_1<pslx_alignment>(vm);
+    else if (alignment_type == "psl")
+      main_1<psl_alignment>(vm);
 
   } catch (const std::exception& x) {
     std::cerr << "Exception: " << x.what() << std::endl;

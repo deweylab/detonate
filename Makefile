@@ -18,16 +18,17 @@ LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
 #LIBS = -L$(BOOST_LIB) -Wl,-rpath,$(BOOST_LIB) -lboost_program_options -lboost_random
 LIBS = $(BOOST_LIB)/libboost_program_options.a $(BOOST_LIB)/libboost_random.a
-TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL)
+TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 summarize: summarize.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) summarize.cpp $(LIBS) -o summarize
 
-test: test_lazycsv test_line_stream test_blast test_pslx test_pairset test_mask
+test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask
 	./test_lazycsv
 	./test_line_stream
 	./test_blast
 	./test_pslx
+	./test_psl
 	./test_pairset
 	./test_mask
 
@@ -42,6 +43,9 @@ test_blast: test_blast.cpp
 
 test_pslx: test_pslx.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_pslx.cpp $(LIBS) $(TEST_LIBS) -o test_pslx
+
+test_psl: test_psl.cpp
+	$(CC) $(CFLAGS) $(INCLUDE) test_psl.cpp $(LIBS) $(TEST_LIBS) -o test_psl
 
 test_pairset: test_pairset.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_pairset.cpp $(LIBS) $(TEST_LIBS) -o test_pairset

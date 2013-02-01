@@ -8,16 +8,16 @@
 
 namespace detail
 {
-  class pslx_alignment_input_stream;
-  class pslx_alignment_segments;
+  class psl_alignment_input_stream;
+  class psl_alignment_segments;
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// pslx_alignment represents a single pslx alignment. It realizes the
+// psl_alignment represents a single psl alignment. It realizes the
 // Alignment concept.
 ////////////////////////////////////////////////////////////////////////////
 
-class pslx_alignment
+class psl_alignment
 {
 public:
   // Realization of Alignment concept
@@ -26,8 +26,8 @@ public:
   std::string b_name()        const { return t_name(); }
   double      frac_identity() const { return 1.0 * num_identity() / num_total(); }
   double      frac_indel()    const { return 1.0 * num_indel() / num_total(); }
-  typedef detail::pslx_alignment_input_stream input_stream_type;
-  typedef detail::pslx_alignment_segments     segments_type;
+  typedef detail::psl_alignment_input_stream input_stream_type;
+  typedef detail::psl_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below
 
   // For use by psl-specific algorithms:
@@ -53,15 +53,13 @@ public:
   std::vector<int>         block_sizes  () const { return parse_vector<int>        (18); } // Comma-separated list of sizes of each block
   std::vector<int>         q_starts     () const { return parse_vector<int>        (19); } // Comma-separated list of starting positions of each block in query
   std::vector<int>         t_starts     () const { return parse_vector<int>        (20); } // Comma-separated list of starting positions of each block in target
-  std::vector<std::string> q_segs       () const { return parse_vector<std::string>(21); } // Comma-separated list of segments in query
-  std::vector<std::string> t_segs       () const { return parse_vector<std::string>(22); } // Comma-separated list of segments in query
 
   int num_total()    const { return q_size() - n_count(); } // subtract n_count b/c 'n' doesn't count as a match even if it is one
   int num_identity() const { return matches() + rep_matches(); }
   int num_indel()    const { return q_base_insert() + t_base_insert(); }
 
 private:
-  lazycsv<23, '\t'> lazy_csv;
+  lazycsv<21, '\t'> lazy_csv;
 
   template<typename T>
   inline std::vector<T> parse_vector(size_t col) const
@@ -82,17 +80,36 @@ private:
 
 namespace detail
 {
+  char complement(char c)
+  {
+    switch (c)
+    {
+      case 'A': return 'T';
+      case 'T': return 'A';
+      case 'C': return 'G';
+      case 'G': return 'C';
+      case 'N': return 'N';
+      case 'a': return 't';
+      case 't': return 'a';
+      case 'c': return 'g';
+      case 'g': return 'c';
+      case 'n': return 'n';
+      default:
+        throw std::runtime_error("Cannot complement invalid nucleotide.");
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////
-  // pslx_alignment_input_stream is an input stream that produces
-  // pslx_alignment objects, one per line of the input stream.
+  // psl_alignment_input_stream is an input stream that produces
+  // psl_alignment objects, one per line of the input stream.
   ////////////////////////////////////////////////////////////////////////////
 
-  class pslx_alignment_input_stream
+  class psl_alignment_input_stream
   {
   public:
-    pslx_alignment_input_stream(std::istream& is) : is(is), ls(is) { skip_header(); }
+    psl_alignment_input_stream(std::istream& is) : is(is), ls(is) { skip_header(); }
 
-    pslx_alignment_input_stream& operator>>(pslx_alignment& al)
+    psl_alignment_input_stream& operator>>(psl_alignment& al)
     {
       if (ls >> line)
         al.parse_line(line);
@@ -130,34 +147,31 @@ namespace detail
   };
 
   ////////////////////////////////////////////////////////////////////////////
-  // pslx_alignment_segment_iterator is a forward iterator over alignment
-  // segments of a pslx alignment. This class should never be instantiated
+  // psl_alignment_segment_iterator is a forward iterator over alignment
+  // segments of a psl alignment. This class should never be instantiated
   // directly by the end user. Instead, use the segments method of the
-  // Alignment concept to get a pslx_alignment_segments proxy, and use that
+  // Alignment concept to get a psl_alignment_segments proxy, and use that
   // proxy's begin and end methods to get an iterator pair.
   ////////////////////////////////////////////////////////////////////////////
 
-  struct pslx_alignment_segment_iterator
-    : public boost::iterator_facade<pslx_alignment_segment_iterator,
+  struct psl_alignment_segment_iterator
+    : public boost::iterator_facade<psl_alignment_segment_iterator,
                                     const alignment_segment,
                                     std::forward_iterator_tag>
   {
-    pslx_alignment_segment_iterator() : at_end(true) { /* std::cout << "in default constructor" << std::endl; */ }
+    psl_alignment_segment_iterator() : at_end(true) { /* std::cout << "in default constructor" << std::endl; */ }
 
-    pslx_alignment_segment_iterator(const pslx_alignment& al_)
+    psl_alignment_segment_iterator(const psl_alignment& al_, const std::string& a, const std::string& b)
     : at_end(false),
       al(&al_),
       i(0),
       block_sizes(al->block_sizes()),
       a_starts(al->q_starts()), b_starts(al->t_starts()),
-      a_segs  (al->q_segs  ()), b_segs  (al->t_segs  ()) ,
-      a_length(al->q_size()),
+      a(&a), b(&b),
       a_is_rc(al->strand() == "-")
     {
       assert(a_starts.size() == block_sizes.size());
       assert(b_starts.size() == block_sizes.size());
-      assert(a_segs  .size() == block_sizes.size());
-      assert(b_segs  .size() == block_sizes.size());
       assert(al->strand() == "-" || al->strand() == "+");
       increment();
     }
@@ -176,7 +190,7 @@ namespace detail
       }
 
       // segment start and end
-      seg.a_start = a_is_rc ? (a_length - 1) - a_starts[i] : a_starts[i];
+      seg.a_start = a_is_rc ? (a->size() - 1) - a_starts[i] : a_starts[i];
       seg.a_end   = a_is_rc ? seg.a_start - (block_sizes[i] - 1)
                             : seg.a_start + (block_sizes[i] - 1);
       seg.b_start = b_starts[i];
@@ -187,8 +201,10 @@ namespace detail
       seg.b_mismatches.clear();
       int a_pos = seg.a_start;
       int b_pos = seg.b_start;
-      for (size_t j = 0; j < a_segs[i].size(); ++j) {
-        if (a_segs[i][j] != b_segs[i][j]) {
+      for (int j = 0; j < block_sizes[i]; ++j) {
+        char a_char = a_is_rc ? complement((*a)[a_pos]) : (*a)[a_pos];
+        char b_char = (*b)[b_pos];
+        if (a_char != b_char) {
           seg.a_mismatches.push_back(a_pos);
           seg.b_mismatches.push_back(b_pos);
         }
@@ -208,7 +224,7 @@ namespace detail
       i += 1;
     }
 
-    bool equal(const pslx_alignment_segment_iterator& other) const
+    bool equal(const psl_alignment_segment_iterator& other) const
     {
       if (!at_end && other.at_end)
         return false;
@@ -223,38 +239,39 @@ namespace detail
     // BOOKKEEPING DATA
 
     bool at_end;
-    const pslx_alignment *al;
+    const psl_alignment *al;
     alignment_segment seg;
 
     size_t i;
     std::vector<int>         block_sizes;
     std::vector<int>         a_starts, b_starts;
-    std::vector<std::string> a_segs,   b_segs;
-    size_t                   a_length;
+    //std::vector<std::string> a_segs,   b_segs;
+    const std::string        *a,       *b;
     bool                     a_is_rc;
   };
 
   ////////////////////////////////////////////////////////////////////////////
-  // pslx_alignment_segments is a proxy class, which looks like a standard
+  // psl_alignment_segments is a proxy class, which looks like a standard
   // container that can be iterated over.
   ////////////////////////////////////////////////////////////////////////////
 
-  class pslx_alignment_segments
+  class psl_alignment_segments
   {
   public:
-    pslx_alignment_segments(const pslx_alignment& al) : al(al) {}
-    typedef const alignment_segment&        const_reference;
-    typedef pslx_alignment_segment_iterator const_iterator;
-    const_iterator begin() const { return pslx_alignment_segment_iterator(al); }
-    const_iterator end()   const { return pslx_alignment_segment_iterator(); }
+    psl_alignment_segments(const psl_alignment& al, const std::string& a, const std::string& b) : al(al), a(a), b(b) {}
+    typedef const alignment_segment&       const_reference;
+    typedef psl_alignment_segment_iterator const_iterator;
+    const_iterator begin() const { return psl_alignment_segment_iterator(al, a, b); }
+    const_iterator end()   const { return psl_alignment_segment_iterator(); }
 
   private:
-    const pslx_alignment& al;
+    const psl_alignment& al;
+    const std::string& a, b;
   };
 
 } // namespace detail
 
-pslx_alignment::segments_type pslx_alignment::segments(const std::string& /*a*/, const std::string& /*b*/) const
+psl_alignment::segments_type psl_alignment::segments(const std::string& a, const std::string& b) const
 {
-  return pslx_alignment::segments_type(*this);
+  return psl_alignment::segments_type(*this, a, b);
 }

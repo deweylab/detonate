@@ -18,23 +18,6 @@ BOOST_AUTO_TEST_CASE(alignment_concept)
   BOOST_CHECK_EQUAL(al.frac_indel(), 1.0*106*3/3219);
 }
 
-
-#if 0
-BOOST_AUTO_TEST_CASE(realistic_usage)
-{
-  std::string line = "comp12_c1_seq1	3219	gi|301621625|gb|XP_002940146|	1125	2211	2618	954	1105	"
-    "LHTDAIHRGGGQIIPTARR-CLYACVLTAQPRLMEPIYLVEIQCPEQVVGGIYGVLNRKRGHVFEESQVMGTPIFVVKAYLPVNESFGFTADLRSNTGGQAFPQCVFDHWQILPGDP----------------SDPSGRPAQVVAETRKRKGL	"
-    "LLTDCYGPFSGQLIATMKEACRYAFQVKPQ-RLMAAMYTCEIMATAEVLGRVYGVLSKREGRVLLEEMKEGTDMFIIKAVLPVAESFGFADEIRKRTSGLASPQLVFSHWEVISSDPFWVPTTEEEYLHFGEKADSENQARKYMNSVRKRKGL	"
-    "2e-21	 102	253	153	37.91	58	77	80	3	18	52.29	3	0";
-  size_t num_segs = 0;
-  BOOST_FOREACH(const alignment_segment& seg, blast_alignment::segments_type(al)) {
-    std::cout << seg << std::endl;
-    ++num_segs;
-  }
-  BOOST_CHECK_EQUAL(num_segs, 3ul);
-}
-#endif
-
 BOOST_AUTO_TEST_CASE(one_interval)
 {
   blast_alignment al;
@@ -44,7 +27,7 @@ BOOST_AUTO_TEST_CASE(one_interval)
   // Check non-segment parts of alignment concept
   // todo
 
-  blast_alignment::segments_type segs = al.segments();
+  blast_alignment::segments_type segs = al.segments("", "");
   blast_alignment::segments_type::const_iterator it = segs.begin(), end = segs.end();
   BOOST_CHECK_EQUAL(it != end, true);
   BOOST_CHECK_EQUAL(it->a_start, 478ul);
@@ -73,7 +56,7 @@ BOOST_AUTO_TEST_CASE(several_intervals)
   // 0         1         2         3         4         5         6                         7         8         9
     "2e-11	68.9	167	110	39.09	43	49	61	2	18	55.45	-3	0";
   al.parse_line(line);
-  blast_alignment::segments_type segs = al.segments();
+  blast_alignment::segments_type segs = al.segments("", "");
   blast_alignment::segments_type::const_iterator it = segs.begin(), end = segs.end();
   BOOST_CHECK_EQUAL(it != end, true);
   BOOST_CHECK_EQUAL(it->a_start, 3078ul);

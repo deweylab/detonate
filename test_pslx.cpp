@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(single_interval_realistic_usage)
   std::string line = "32	1	0	0	0	0	0	0	+	Locus_54_Transcript_14/14_Confidence_0.000_Length_639	639	460	493	Locus_51_Transcript_1/5_Confidence_0.800_Length_1299	1299	1235	1268	1	33,	460,	1235,	aaaaaagaaaaaaaaaaaaaaaaaaaaaaaaaa,	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,";
   al.parse_line(line);
   size_t i = 0;
-  BOOST_FOREACH(const alignment_segment& seg, al.segments()) {
+  BOOST_FOREACH(const alignment_segment& seg, al.segments("", "")) {
     BOOST_CHECK_EQUAL(seg.a_start, 460ul);
     BOOST_CHECK_EQUAL(seg.a_end,   460ul + 33 - 1);
     BOOST_CHECK_EQUAL(seg.b_start, 1235ul);
@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE(several_intervals_forward_strand)
     "ccccccccccccccccc,ccccccccccccccccccccccccccccccccccccccccccccccc,cgcgcc,ccccccccc,\t" // a segment seqs
     "ccccccccccccccccc,gcccccccccccccccccccccccccccccccccccccccccccccc,cccccc,ccccccccc,";  // b segment seqs
   al.parse_line(line);
-  pslx_alignment::segments_type segs = al.segments();
+  pslx_alignment::segments_type segs = al.segments("", "");
   pslx_alignment::segments_type::const_iterator it = segs.begin(), end = segs.end();
   size_t block_sizes[] = {17,47,6,9};
   size_t a_starts[] = {268,286,335,348};
@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(several_intervals_reverse_strand)
     "ggggt,gggg,ggggggggggggggggggggggggggggggggg,gtggtg,\t" // a segment seqs
     "ggggg,tggg,ggggggggggggggggggggggggggggggggg,gggtgg,";  // b segment seqs
   al.parse_line(line);
-  pslx_alignment::segments_type segs = al.segments();
+  pslx_alignment::segments_type segs = al.segments("", "");
   pslx_alignment::segments_type::const_iterator it = segs.begin(), end = segs.end();
   size_t block_sizes[] = {5,4,33,6};
   size_t a_starts[] = {639-(134+1),639-(141+1),639-(146+1),639-(183+1)};
