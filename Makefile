@@ -1,13 +1,12 @@
 # LINUX
-BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
-BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
-UNIT_TEST_DLL = libboost_unit_test_framework.so
+#BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
+#BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
+#UNIT_TEST_DLL = libboost_unit_test_framework.so
 
 # MAC
-#DEWEYLAB      = /Users/nathanae/Documents/fall12/cd/libdeweylab-git-install
-#BOOST_INCLUDE = /opt/local/include
-#BOOST_LIB     = /opt/local/lib
-#UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
+BOOST_INCLUDE = /opt/local/include
+BOOST_LIB     = /opt/local/lib
+UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
 
 CC = /usr/bin/g++
 #DEBUG = -g3 -fno-inline -O0
@@ -16,8 +15,8 @@ DEBUG =
 CFLAGS = -O3 -fopenmp -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
-#LIBS = -L$(BOOST_LIB) -Wl,-rpath,$(BOOST_LIB) -lboost_program_options -lboost_random
-LIBS = $(BOOST_LIB)/libboost_program_options.a $(BOOST_LIB)/libboost_random.a
+#LIBS = $(BOOST_LIB)/libboost_program_options.a $(BOOST_LIB)/libboost_random.a
+LIBS = $(BOOST_LIB)/libboost_program_options-mt.a $(BOOST_LIB)/libboost_random-mt.a
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 summarize: summarize.cpp
@@ -29,7 +28,7 @@ test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset t
 	./test_blast
 	./test_pslx
 	./test_psl
-	./test_pairset
+	./test_pairset --show_progress
 	./test_mask
 
 test_lazycsv: test_lazycsv.cpp

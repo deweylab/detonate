@@ -212,7 +212,7 @@ std::vector<size_t> make_random_permutation(size_t n)
   return x;
 }
 
-template<typename PairSetType, typename AlignmentType>
+template<typename PairsetType, typename AlignmentType>
 void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
                              std::vector<double>& b_frac_ones,
                              const std::vector<std::vector<const AlignmentType *> >& best_to_B,
@@ -240,20 +240,20 @@ void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
     for (int b_pre_idx = 0; b_pre_idx < static_cast<int>(nu_B.size()); ++b_pre_idx) {
 
       size_t b_idx = perm[b_pre_idx];
-      PairSetType b_pairset(B[b_idx].size());
+      PairsetType b_pairset(B[b_idx].size());
       mask b_mask(B[b_idx].size());
 
       BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
 
         size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
-        PairSetType a_pairset(A[a_idx].size());
+        PairsetType a_pairset(A[a_idx].size());
         mask a_mask(A[a_idx].size());
 
         BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
-          a_pairset.add_square(seg.a_start, seg.a_end); a_pairset.remove_all_pairs(seg.a_mismatches);
-          b_pairset.add_square(seg.b_start, seg.b_end); b_pairset.remove_all_pairs(seg.b_mismatches);
-          a_mask.add_interval(seg.a_start, seg.a_end); a_mask.remove(seg.a_mismatches);
-          b_mask.add_interval(seg.b_start, seg.b_end); b_mask.remove(seg.b_mismatches);             
+          a_pairset.add_square_with_exceptions(seg.a_start, seg.a_end, seg.a_mismatches.begin(), seg.a_mismatches.end());
+          b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+          a_mask.add_interval_with_exceptions(seg.a_start, seg.a_end, seg.a_mismatches.begin(), seg.a_mismatches.end());
+          b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
         }
 
         int a_num_total_bases = A[a_idx].size();
@@ -441,7 +441,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing weighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A,      nu_A,      tau_A, B,      nu_B,      tau_B, A_names_to_idxs);
+  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A,      nu_A,      tau_A, B,      nu_B,      tau_B, A_names_to_idxs);
   print_stats(pair, "weighted_clustered_pair");
   print_stats(nucl, "weighted_clustered_nucl");
   print_stats(tran, "weighted_clustered_tran");
@@ -449,7 +449,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing unweighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
+  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
   print_stats(pair, "unweighted_clustered_pair");
   print_stats(nucl, "unweighted_clustered_nucl");
   print_stats(tran, "unweighted_clustered_tran");
@@ -457,7 +457,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing weighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A,      nu_A,      tau_A, B,      nu_B,      tau_B, A_names_to_idxs);
+  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A,      nu_A,      tau_A, B,      nu_B,      tau_B, A_names_to_idxs);
   print_stats(pair, "weighted_filtered_pair");
   print_stats(nucl, "weighted_filtered_nucl");
   print_stats(tran, "weighted_filtered_tran");
@@ -465,7 +465,7 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing unweighted stats" << std::endl;
   tic;
-  compute_alignment_stats<big_matrix_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
+  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
   print_stats(pair, "unweighted_filtered_pair");
   print_stats(nucl, "unweighted_filtered_nucl");
   print_stats(tran, "unweighted_filtered_tran");
@@ -487,11 +487,11 @@ int main(int argc, const char **argv)
       int fake_argc = 14;
       const char *fake_argv[] = {
         "summarize",
-        "--A-seqs", "../test_3/axolotl_trinity_default/trinity_default.fa",
-        "--B-seqs", "../test_3/axolotl_trinity_default/xtrop.fa",
-        "--A-expr", "../test_3/axolotl_trinity_default/trinity_default_expression/expression.isoforms.results",
+        "--A-seqs", "../summarize_nucl/test_3/axolotl_trinity_default/trinity_default.fa",
+        "--B-seqs", "../summarize_nucl/test_3/axolotl_trinity_default/xtrop.fa",
+        "--A-expr", "../summarize_nucl/test_3/axolotl_trinity_default/trinity_default_expression/expression.isoforms.results",
         "--induce-B-expr",
-        "--A-to-B", "../test_3/axolotl_trinity_default/test6_extra.out",
+        "--A-to-B", "../summarize_nucl/test_3/axolotl_trinity_default/test6_extra.out",
         "--alignment-type", "blast",
         "--plot-output", "plot.tmp"
       };
@@ -502,11 +502,11 @@ int main(int argc, const char **argv)
       int fake_argc = 15;
       const char *fake_argv[] = {
         "summarize",
-        "--A-seqs", "ensembl_sim_oases_default/oases_default.fa",
-        "--B-seqs", "ensembl_sim_oases_default/cc_0.fa",
-        "--A-expr", "ensembl_sim_oases_default/oases_default_expression/expression.isoforms.results",
-        "--B-expr", "ensembl_sim_oases_default/cc_0_expression/expression.isoforms.results",
-        "--A-to-B", "ensembl_sim_oases_default/oases_default_to_cc_0.psl",
+        "--A-seqs", "../summarize_nucl/ensembl_sim_oases_default/oases_default.fa",
+        "--B-seqs", "../summarize_nucl/ensembl_sim_oases_default/cc_0.fa",
+        "--A-expr", "../summarize_nucl/ensembl_sim_oases_default/oases_default_expression/expression.isoforms.results",
+        "--B-expr", "../summarize_nucl/ensembl_sim_oases_default/cc_0_expression/expression.isoforms.results",
+        "--A-to-B", "../summarize_nucl/ensembl_sim_oases_default/oases_default_to_cc_0.psl",
         "--alignment-type", "psl",
         "--plot-output", "plot.tmp"
       };
@@ -517,11 +517,11 @@ int main(int argc, const char **argv)
       int fake_argc = 15;
       const char *fake_argv[] = {
         "summarize",
-        "--A-seqs", "../test_3/A.fa",
-        "--B-seqs", "../test_3/B.fa",
-        "--A-expr", "../test_3/A_expression/expression.isoforms.results",
-        "--B-expr", "../test_3/B_expression/expression.isoforms.results",
-        "--A-to-B", "../test_3/A_to_B.psl",
+        "--A-seqs", "../summarize_nucl/test_3/A.fa",
+        "--B-seqs", "../summarize_nucl/test_3/B.fa",
+        "--A-expr", "../summarize_nucl/test_3/A_expression/expression.isoforms.results",
+        "--B-expr", "../summarize_nucl/test_3/B_expression/expression.isoforms.results",
+        "--A-to-B", "../summarize_nucl/test_3/A_to_B.psl",
         "--alignment-type", "psl",
         "--plot-output", "plot.tmp"
       };
@@ -532,11 +532,11 @@ int main(int argc, const char **argv)
       int fake_argc = 15;
       const char *fake_argv[] = {
         "summarize",
-        "--A-seqs", "../test_3/A.fa",
-        "--B-seqs", "../test_3/A.fa",
-        "--A-expr", "../test_3/A_expression/expression.isoforms.results",
-        "--B-expr", "../test_3/A_expression/expression.isoforms.results",
-        "--A-to-B", "../test_3/A_to_A.psl",
+        "--A-seqs", "../summarize_nucl/test_3/A.fa",
+        "--B-seqs", "../summarize_nucl/test_3/A.fa",
+        "--A-expr", "../summarize_nucl/test_3/A_expression/expression.isoforms.results",
+        "--B-expr", "../summarize_nucl/test_3/A_expression/expression.isoforms.results",
+        "--A-to-B", "../summarize_nucl/test_3/A_to_A.psl",
         "--alignment-type", "psl",
         "--plot-output", "plot.tmp"
       };
