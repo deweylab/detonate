@@ -91,7 +91,7 @@ void read_transcript_expression(const std::string& filename,
       getline(ss, col[i], '\t');
     assert(names_to_idxs.count(col[0]) != 0);
     size_t idx = names_to_idxs.find(col[0])->second;
-    expr[idx] = boost::lexical_cast<double>(col[5]);
+    expr[idx] = boost::lexical_cast<double>(col[5]) / 1000000.0;
   }
 }
 
