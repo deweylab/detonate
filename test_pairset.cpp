@@ -46,6 +46,21 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(crossovers, PairsetType, test_types)
   BOOST_CHECK_EQUAL(ps.size(), choose_2(50+1) + choose_2(40+1) + choose_2(25+1) - choose_2(10+1) - choose_2(5+1));
 }
 
+BOOST_AUTO_TEST_CASE_TEMPLATE(multiple_exceptions, PairsetType, test_types)
+{
+  PairsetType ps(5);
+  BOOST_CHECK_EQUAL(ps.size(), 0ul);
+
+  size_t two_exceptions[2] = {1,3};
+  ps.add_square_with_exceptions(0, 4, two_exceptions, two_exceptions+2);
+  BOOST_CHECK_EQUAL(ps.size(), choose_2(5-2+1));
+
+  size_t one_exception[1] = {1};
+  ps.add_square_with_exceptions(1, 4, one_exception, one_exception+1);
+  BOOST_CHECK_EQUAL(ps.size(), choose_2(5-2+1) + 3);
+}
+
+
 BOOST_AUTO_TEST_CASE_TEMPLATE(random_squares, PairsetType, test_types)
 {
   size_t num_tests = 100;
@@ -79,13 +94,6 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(random_squares, PairsetType, test_types)
       for (size_t i = 0; i < num_exceptions; ++i)
         exceptions.insert(exceptions_dist(rng));
 
-      /*
-      std::cout << "Adding square lo=" << lo << ", hi=" << hi << ", exceptions=";
-      BOOST_FOREACH(size_t x, exceptions)
-        std::cout << x << " ";
-      std::cout << std::endl;
-      */
-        
       ps.add_square_with_exceptions(lo, hi, exceptions.begin(), exceptions.end());
       bf.add_square_with_exceptions(lo, hi, exceptions.begin(), exceptions.end());
 

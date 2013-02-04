@@ -22,9 +22,9 @@
 //
 // - void add_square_with_exceptions(size_t lo, size_t hi, ConstIterator
 //       exceptions_begin, ConstIterator exceptions_end) - adds all pairs
-//       between (lo,lo) and (hi,hi), except all pairs (x,y) such that x and y
-//       are exceptions. Note that the iterators are over exceptional
-//       coordinates, not pairs.
+//       between (lo,lo) and (hi,hi), except all pairs (i,x) or (x,i) such that
+//       x is an exception and i is between lo and hi. Note that the iterators
+//       are over exceptional coordinates, not pairs.
 
 class brute_force_pairset
 {
@@ -40,10 +40,14 @@ public:
       std::swap(lo, hi);
 
     std::set<std::pair<size_t,size_t> > exceptions;
-    for (ConstIterator x = exceptions_begin; x != exceptions_end; ++x)
-      for (ConstIterator y = exceptions_begin; y != exceptions_end; ++y)
-        if (*x <= *y)
-          exceptions.insert(std::make_pair(*x, *y));
+    for (ConstIterator x = exceptions_begin; x != exceptions_end; ++x) {
+      for (size_t i = lo; i <= hi; ++i) {
+        if (*x <= i)
+          exceptions.insert(std::make_pair(*x, i));
+        else
+          exceptions.insert(std::make_pair(i, *x));
+      }
+    }
 
     for (size_t i = lo; i <= hi; ++i)
       for (size_t j = i; j <= hi; ++j)
@@ -75,7 +79,7 @@ public:
 
     for (size_t i = lo; i <= hi; ++i)
       for (size_t j = i; j <= hi; ++j)
-        if (exceptions.count(i) == 0 || exceptions.count(j) == 0)
+        if (exceptions.count(i) == 0 && exceptions.count(j) == 0)
           assign(i, j, true);
   }
 
@@ -225,8 +229,8 @@ public:
     for (std::set<detail::coord>::const_iterator it = excepted_pairs.begin(), end = excepted_pairs.end(); it != end;) {
       if (lo <= it->x && it->x <= hi &&     // (x,y) is in the new square,
           lo <= it->y && it->y <= hi &&     // and
-          (exceptions.count(it->x) == 0 ||  // (x,y) is not a new exception
-           exceptions.count(it->y) == 0)) {
+          exceptions.count(it->x) == 0 &&   // (x,y) is not a new exception
+          exceptions.count(it->y) == 0) {
         excepted_pairs.erase(it++);
       } else {
         ++it;
@@ -236,25 +240,31 @@ public:
     // Add any new exceptions that are not covered by an old square to the main
     // list. Skip old exceptions, since no change would be made by adding them
     // again.
-    BOOST_FOREACH(size_t x, exceptions) {
-      BOOST_FOREACH(size_t y, exceptions) {
-        if (x <= y) {
-          if (excepted_pairs.count(detail::coord(x, y))) // already an exception
-            continue;
-          else {
-            // check if the exception is covered by some square
-            bool is_covered = false;
-            BOOST_FOREACH(const detail::rect& sq, squares) {
-              if (sq.lo.x <= x && x <= sq.hi.x &&
-                  sq.lo.y <= y && y <= sq.hi.y) {
-                is_covered = true;
-                break;
-              }
+    for (ConstIterator i = exceptions_begin; i != exceptions_end; ++i) {
+      for (size_t j = lo; j <= hi; ++j) {
+        size_t x, y;
+        if (*i <= j) {
+          x = *i;
+          y =  j;
+        } else {
+          x =  j;
+          y = *i;
+        }
+        if (excepted_pairs.count(detail::coord(x, y))) // already an exception
+          continue;
+        else {
+          // check if the exception is covered by some square
+          bool is_covered = false;
+          BOOST_FOREACH(const detail::rect& sq, squares) {
+            if (sq.lo.x <= x && x <= sq.hi.x &&
+                sq.lo.y <= y && y <= sq.hi.y) {
+              is_covered = true;
+              break;
             }
-            // if not, then the exception is truly an exception, so add it
-            if (!is_covered)
-              excepted_pairs.insert(detail::coord(x, y));
           }
+          // if not, then the exception is truly an exception, so add it
+          if (!is_covered)
+            excepted_pairs.insert(detail::coord(x, y));
         }
       }
     }
