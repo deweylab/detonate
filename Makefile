@@ -19,7 +19,7 @@ INCLUDE = -I$(BOOST_INCLUDE)
 LIBS = $(BOOST_LIB)/libboost_program_options-mt.a $(BOOST_LIB)/libboost_random-mt.a
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
-summarize: summarize.cpp
+summarize: summarize.cpp summarize_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize.cpp $(LIBS) -o summarize
 
 test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask
