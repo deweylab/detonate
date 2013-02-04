@@ -11,13 +11,16 @@ struct alignment_segment
 
 std::ostream& operator<<(std::ostream& out, const alignment_segment& seg)
 {
-  out << "([" << seg.a_start << ", " << seg.a_end << "] ->"
-      << " [" << seg.b_start << ", " << seg.b_end << "], { ";
+  out << "(a_start=" << seg.a_start
+      << ", a_end=" << seg.a_end
+      << ", b_start=" << seg.b_start
+      << ", b_end=" << seg.b_end
+      << ", a_mismatches=( ";
   BOOST_FOREACH(size_t x, seg.a_mismatches)
     out << x << " ";
-  out << "} -> { ";
+  out << "), b_mismatches=( ";
   BOOST_FOREACH(size_t x, seg.b_mismatches)
     out << x << " ";
-  out << "}";
+  out << ")";
   return out;
 }

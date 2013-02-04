@@ -120,7 +120,10 @@ struct BestTuple
   BestTuple() : frac_identity(-1.0) {}
 };
 
-inline bool is_good_enough(const psl_alignment& al) { return al.frac_identity() > 0.95; }
+template<typename T>
+inline bool is_good_enough(const T& al) { return al.frac_identity() > 0.95; }
+
+template<>
 inline bool is_good_enough(const blast_alignment& al) { return al.evalue() < 1e-5; }
 
 // For each a in A, figure out which alignment from a -> b (for some b in B) is

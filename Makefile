@@ -52,6 +52,12 @@ test_pairset: test_pairset.cpp
 test_mask: test_mask.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_mask.cpp $(LIBS) $(TEST_LIBS) -o test_mask
 
+test_read_cluster_filter_alignments: test_read_cluster_filter_alignments.cpp
+	g++ -std=c++11 $(CFLAGS) $(INCLUDE) test_read_cluster_filter_alignments.cpp $(LIBS) $(TEST_LIBS) -o test_read_cluster_filter_alignments
+
+test_compute_alignment_stats: test_compute_alignment_stats.cpp
+	g++ -std=c++11 $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
+
 # OLD
 
 redux2: redux2.cpp
