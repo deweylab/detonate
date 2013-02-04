@@ -7,9 +7,8 @@
 #include "pairset.hh"
 
 typedef boost::mpl::list<brute_force_pairset, big_matrix_pairset, smart_pairset> test_types;
-//typedef boost::mpl::list<brute_force_pairset, big_matrix_pairset> test_types;
 
-size_t choose_2(size_t n) { return n*(n+1)/2; }
+size_t choose_2(size_t n) { return n*(n-1)/2; }
 
 static size_t no_exceptions[0] = {};
 
@@ -29,7 +28,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(simple, PairsetType, test_types)
   BOOST_CHECK_EQUAL(ps.size(), 1ul);
 
   ps.add_square_with_exceptions(0, 4, no_exceptions, no_exceptions);
-  BOOST_CHECK_EQUAL(ps.size(), choose_2(5));
+  BOOST_CHECK_EQUAL(ps.size(), choose_2(5+1));
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(crossovers, PairsetType, test_types)
@@ -38,13 +37,13 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(crossovers, PairsetType, test_types)
   BOOST_CHECK_EQUAL(ps.size(), 0ul);
 
   ps.add_square_with_exceptions(0, 50-1, no_exceptions, no_exceptions);
-  BOOST_CHECK_EQUAL(ps.size(), choose_2(50));
+  BOOST_CHECK_EQUAL(ps.size(), choose_2(50+1));
 
   ps.add_square_with_exceptions(60, 100-1, no_exceptions, no_exceptions);
-  BOOST_CHECK_EQUAL(ps.size(), choose_2(50) + choose_2(40));
+  BOOST_CHECK_EQUAL(ps.size(), choose_2(50+1) + choose_2(40+1));
 
   ps.add_square_with_exceptions(40, 65-1, no_exceptions, no_exceptions);
-  BOOST_CHECK_EQUAL(ps.size(), choose_2(50) + choose_2(40) + choose_2(25) - choose_2(10) - choose_2(5));
+  BOOST_CHECK_EQUAL(ps.size(), choose_2(50+1) + choose_2(40+1) + choose_2(25+1) - choose_2(10+1) - choose_2(5+1));
 }
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(random_squares, PairsetType, test_types)

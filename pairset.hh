@@ -102,7 +102,7 @@ private:
 
 namespace detail
 {
-  inline size_t choose_2(size_t n) { return n*(n+1)/2; }
+  inline size_t choose_2(size_t n) { return n*(n-1)/2; }
 
   struct coord
   {
@@ -190,16 +190,16 @@ public:
     }
 
     // Count how many pairs each rectangle contributes. On the "diagonal
-    // square" of the rectangle, it contributes n choose 2 pairs, where n is
-    // the side length of the diagonal square. On the rest of the rectangle, it
-    // contributes n*m pairs, where n and m are the side lengths of the rest of
-    // the rectangle.
+    // square" of the rectangle, it contributes (n+1) choose 2 pairs, where n
+    // is the side length of the diagonal square. On the rest of the rectangle,
+    // it contributes n*m pairs, where n and m are the side lengths of the rest
+    // of the rectangle.
     size_t sz = 0;
     for (A = rects.begin(); A != end; ++A) {
       size_t diagonal_side_length = A->hi.x - A->lo.x + 1;
       size_t remainder_side_length_1 = A->lo.x - A->lo.y;
       size_t remainder_side_length_2 = diagonal_side_length;
-      sz += detail::choose_2(diagonal_side_length) + remainder_side_length_1*remainder_side_length_2;
+      sz += detail::choose_2(diagonal_side_length+1) + remainder_side_length_1*remainder_side_length_2;
     }
 
     // Subtract the exceptions
