@@ -30,6 +30,8 @@ test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset t
 	./test_psl
 	./test_pairset --show_progress
 	./test_mask
+	./test_read_cluster_filter_alignments
+	./test_compute_alignment_stats
 
 test_lazycsv: test_lazycsv.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_lazycsv.cpp $(LIBS) $(TEST_LIBS) -o test_lazycsv
