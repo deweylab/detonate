@@ -131,14 +131,11 @@ inline bool is_good_enough(const blast_alignment& al) { return al.evalue() < 1e-
 // Preconditions:
 // - best_from_A needs to be default-initialized of size A.size()
 template<typename AlignmentType>
-void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentType> >& best_from_A, 
-                                               const std::string&                      A_to_B_fname,
-                                               const std::map<std::string, size_t>&    A_names_to_idxs)
+void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentType> >&    best_from_A, 
+                                               typename AlignmentType::input_stream_type& input_stream,
+                                               const std::map<std::string, size_t>&       A_names_to_idxs)
 {
   AlignmentType al;
-  std::ifstream ifs;
-  open_or_throw(ifs, A_to_B_fname);
-  typename AlignmentType::input_stream_type input_stream(ifs);
   while (input_stream >> al) {
     size_t a_idx = A_names_to_idxs.find(al.a_name())->second;
     BestTuple<AlignmentType>& bt = best_from_A[a_idx];
@@ -396,8 +393,13 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Reading alignments and filtering them by A" << std::endl;
   std::vector<BestTuple<AlignmentType> > best_from_A(A_card);
-  std::string A_to_B_fname = vm["A-to-B"].as<std::string>();
-  tic; read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_fname, A_names_to_idxs); toc;
+  {
+    std::string fname = vm["A-to-B"].as<std::string>();
+    std::ifstream ifs;
+    open_or_throw(ifs, fname);
+    typename AlignmentType::input_stream_type input_stream(ifs);
+    tic; read_alignments_and_filter_by_best_from_A(best_from_A, input_stream, A_names_to_idxs); toc;
+  }
 
   std::cerr << "Clustering alignments by B" << std::endl;
   std::vector<std::vector<const AlignmentType *> > best_to_B(B_card);
