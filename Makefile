@@ -19,6 +19,9 @@ INCLUDE = -I$(BOOST_INCLUDE)
 LIBS = $(BOOST_LIB)/libboost_program_options-mt.a $(BOOST_LIB)/libboost_random-mt.a
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
+summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
+
 summarize: summarize.cpp summarize_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize.cpp $(LIBS) -o summarize
 
