@@ -8,109 +8,11 @@
 #include <omp.h>
 #include <boost/program_options.hpp>
 #include <boost/foreach.hpp>
-#include <boost/random/random_device.hpp>
-#include <boost/random/uniform_int_distribution.hpp>
-#include "deweylab/bio/formats/fasta.hh"
 #include "blast.hh"
 #include "psl.hh"
 #include "pairset.hh"
 #include "mask.hh"
-
-// need to define "clock_t start" before tic
-#define tic start = clock();
-#define toc std::cerr << "Done in " << 1.0*(clock() - start)/CLOCKS_PER_SEC << " seconds." << std::endl;
-
-struct Stats
-{
-  double precis, recall, F1;
-  void update_F1()
-  {
-    if (precis == 0.0 && recall == 0.0)
-      F1 = 0.0;
-    else
-      F1 = 2*precis*recall/(precis+recall);
-  }
-};
-
-void print_stats(const Stats& stats, const std::string& prefix)
-{
-  std::cout << prefix << "_precision\t" << stats.precis << std::endl;
-  std::cout << prefix << "_recall\t"    << stats.recall << std::endl;
-  std::cout << prefix << "_F1\t"        << stats.F1     << std::endl;
-}
-
-void open_or_throw(std::ifstream& ifs, const std::string& filename)
-{
-  ifs.clear();
-  ifs.open(filename.c_str());
-  if (!ifs)
-    throw std::runtime_error("Could not open file '" + filename + "'.");
-}
-
-void read_fasta_names_and_seqs(const std::string& filename,
-                               std::vector<std::string>& seqs,
-                               std::vector<std::string>& names,
-                               std::map<std::string, size_t>& names_to_idxs)
-{
-  std::ifstream ifs;
-  open_or_throw(ifs, filename);
-  deweylab::bio::formats::fasta::InputStream is(ifs);
-  deweylab::bio::formats::fasta::Record rec;
-  size_t idx = 0;
-  while (is >> rec) {
-    assert(names_to_idxs.count(rec.id) == 0);
-    names_to_idxs[rec.id] = idx;
-    names.push_back(rec.id);
-    seqs.push_back(rec.sequence);
-    assert(names[names_to_idxs[rec.id]] == rec.id);
-    ++idx;
-  }
-}
-
-void read_transcript_expression(const std::string& filename,
-                                std::vector<double>& expr,
-                                const std::map<std::string, size_t>& names_to_idxs)
-{
-  std::ifstream ifs;
-  open_or_throw(ifs, filename);
-  std::string line;
-  std::vector<std::string> col(8);
-  { // header
-    getline(ifs, line);
-    std::stringstream ss(line);
-    for (size_t i = 0; i < 8; ++i)
-      getline(ss, col[i], '\t');
-    assert(col[0] == "transcript_id");
-    assert(col[5] == "TPM");
-  }
-  while (getline(ifs, line)) {
-    std::stringstream ss(line);
-    for (size_t i = 0; i < 8; ++i)
-      getline(ss, col[i], '\t');
-    assert(names_to_idxs.count(col[0]) != 0);
-    size_t idx = names_to_idxs.find(col[0])->second;
-    expr[idx] = boost::lexical_cast<double>(col[5]) / 1000000.0;
-  }
-}
-
-void compute_nucl_expression(const std::vector<std::string>& A,
-                             const std::vector<double>& tau_A,
-                             std::vector<double>& nu_A)
-{
-  size_t n = tau_A.size();
-  assert(tau_A.size() == n);
-  assert(nu_A.size() == n);
-
-  for (size_t i = 0; i < n; ++i)
-    nu_A[i] = tau_A[i] * A[i].size();
-
-  double denom = 0;
-  for (size_t i = 0; i < n; ++i)
-    denom += nu_A[i];
-
-  for (size_t i = 0; i < n; ++i)
-    nu_A[i] /= denom;
-}
+#include "util.hh"
 
 template<typename AlignmentType>
 struct BestTuple
@@ -193,21 +95,6 @@ void filter_by_best_alignment_to_B(std::vector<std::vector<const AlignmentType *
       }
     }
   }
-}
-
-std::vector<size_t> make_random_permutation(size_t n)
-{
-  std::vector<size_t> x(n);
-  for (size_t i = 0; i < n; ++i)
-    x[i] = i;
-  boost::random::random_device rng;
-  boost::random::uniform_int_distribution<> index_dist(0, n - 1);
-  for (size_t k = 0; k < n*10; ++k) {
-    size_t i = index_dist(rng);
-    size_t j = index_dist(rng);
-    std::swap(x[i], x[j]);
-  }
-  return x;
 }
 
 template<typename PairsetType, typename AlignmentType>
@@ -342,7 +229,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-seqs", po::value<std::string>()->required(), "The oracleset sequences, in FASTA format.")
     ("A-expr", po::value<std::string>()->required(), "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
     ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
-    ("induce-B-expr",                                "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("induce-B-expr",                                "Induce oracleset expression from assembly expression and alignments.")
     ("A-to-B", po::value<std::string>()->required(), "The alignments of A to B.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
