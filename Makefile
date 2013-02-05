@@ -1,11 +1,13 @@
 # LINUX
 #BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
 #BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
+#BOOST_SUFFIX  = .a
 #UNIT_TEST_DLL = libboost_unit_test_framework.so
 
 # MAC
 BOOST_INCLUDE = /opt/local/include
 BOOST_LIB     = /opt/local/lib
+BOOST_SUFFIX  = -mt.a
 UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
 
 CC = /usr/bin/g++
@@ -15,9 +17,10 @@ DEBUG =
 CFLAGS = -O3 -fopenmp -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
-#LIBS = $(BOOST_LIB)/libboost_program_options.a $(BOOST_LIB)/libboost_random.a
-LIBS = $(BOOST_LIB)/libboost_program_options-mt.a $(BOOST_LIB)/libboost_random-mt.a
+LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
+
+all: summarize_kmer summarize
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
