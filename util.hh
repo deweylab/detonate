@@ -11,25 +11,6 @@
 #define tic start = clock();
 #define toc std::cerr << "Done in " << 1.0*(clock() - start)/CLOCKS_PER_SEC << " seconds." << std::endl;
 
-struct Stats
-{
-  double precis, recall, F1;
-  void update_F1()
-  {
-    if (precis == 0.0 && recall == 0.0)
-      F1 = 0.0;
-    else
-      F1 = 2*precis*recall/(precis+recall);
-  }
-};
-
-void print_stats(const Stats& stats, const std::string& prefix)
-{
-  std::cout << prefix << "_precision\t" << stats.precis << std::endl;
-  std::cout << prefix << "_recall\t"    << stats.recall << std::endl;
-  std::cout << prefix << "_F1\t"        << stats.F1     << std::endl;
-}
-
 void open_or_throw(std::ifstream& ifs, const std::string& filename)
 {
   ifs.clear();

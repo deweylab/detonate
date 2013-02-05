@@ -14,6 +14,25 @@
 #include "mask.hh"
 #include "util.hh"
 
+struct Stats
+{
+  double precis, recall, F1;
+  void update_F1()
+  {
+    if (precis == 0.0 && recall == 0.0)
+      F1 = 0.0;
+    else
+      F1 = 2*precis*recall/(precis+recall);
+  }
+};
+
+void print_stats(const Stats& stats, const std::string& prefix)
+{
+  std::cout << prefix << "_precision\t" << stats.precis << std::endl;
+  std::cout << prefix << "_recall\t"    << stats.recall << std::endl;
+  std::cout << prefix << "_F1\t"        << stats.F1     << std::endl;
+}
+
 template<typename AlignmentType>
 struct BestTuple
 {
