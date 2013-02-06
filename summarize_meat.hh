@@ -42,7 +42,7 @@ struct BestTuple
 };
 
 template<typename T>
-inline bool is_good_enough(const T& al) { return al.frac_identity() > 0.95; }
+inline bool is_good_enough(const T& al) { return al.frac_identity() > 0.95 && al.frac_indel() == 0.0; }
 
 template<>
 inline bool is_good_enough(const blast_alignment& al) { return al.evalue() < 1e-5; }
@@ -172,7 +172,6 @@ void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
       int b_num_total_bases = B[b_idx].size();
       int b_num_total_pairs = b_num_total_bases * (b_num_total_bases + 1) / 2;
       b_frac_ones[b_idx] = (1.0 * b_mask.num_ones()) / b_num_total_bases;
-      //std::cout << (1.0 * b_mask.num_ones()) / (1.0 * b_num_total_bases) << std::endl;
       private_pair_recall += (1.0 * b_pairset.size() / b_num_total_pairs) * nu_B[b_idx];
       private_nucl_recall += b_frac_ones[b_idx] * nu_B[b_idx];
       if (b_frac_ones[b_idx] >= 0.95) private_tran_recall += tau_B[b_idx];
@@ -343,7 +342,7 @@ void main_1(const boost::program_options::variables_map& vm)
   compute_nucl_expression(A, tau_A, nu_A);
   compute_nucl_expression(B, tau_B, nu_B);
 
-  std::cout << "summarize_version\t1" << std::endl;
+  std::cout << "summarize_version\t2" << std::endl;
 
   Stats pair, nucl, tran;
   std::vector<double> b_frac_ones(B_card);
