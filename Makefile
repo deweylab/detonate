@@ -1,14 +1,18 @@
 # LINUX
-#BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
-#BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
-#BOOST_SUFFIX  = .a
-#UNIT_TEST_DLL = libboost_unit_test_framework.so
+ifeq ($(shell uname), Linux)
+  BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
+  BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
+  BOOST_SUFFIX  = .a
+  UNIT_TEST_DLL = libboost_unit_test_framework.so
+endif
 
 # MAC
-BOOST_INCLUDE = /opt/local/include
-BOOST_LIB     = /opt/local/lib
-BOOST_SUFFIX  = -mt.a
-UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
+ifeq ($(shell uname), Darwin)
+  BOOST_INCLUDE = /opt/local/include
+  BOOST_LIB     = /opt/local/lib
+  BOOST_SUFFIX  = -mt.a
+  UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
+endif
 
 CC = /usr/bin/g++
 #DEBUG = -g3 -fno-inline -O0
