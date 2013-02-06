@@ -9,6 +9,7 @@
 #include <boost/program_options.hpp>
 #include <boost/foreach.hpp>
 #include <sparsehash/sparse_hash_map>
+//#include <sparsehash/dense_hash_map>
 #include "blast.hh"
 #include "psl.hh"
 #include "pairset.hh"
@@ -84,6 +85,7 @@ struct KmerStats
   typedef KmerKey key_type;
   typedef KmerInfo value_type;
   typedef google::sparse_hash_map<key_type, value_type> container_type;
+  //typedef google::dense_hash_map<key_type, value_type> container_type;
 };
 
 void count_kmers(
@@ -142,6 +144,11 @@ compute_kmer_stats(
     size_t kmerlen)
 {
   KmerStats::container_type stats;
+  /*{
+    std::string empty = "";
+    KmerKey empty_key(empty.begin(), empty.end());
+    stats.set_empty_key(empty_key);
+  }*/
   count_kmers(stats, 0, A, A_rc, tau_A, kmerlen);
   count_kmers(stats, 1, B, B_rc, tau_B, kmerlen);
   normalize_kmer_distributions(stats);
@@ -295,10 +302,10 @@ void main_1(const boost::program_options::variables_map& vm)
   std::cout << "summarize_kmer_version\t1" << std::endl;
 
   size_t readlen = vm["readlen"].as<size_t>();
-  compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_half", readlen/2);
+  //compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_half", readlen/2);
   compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen);
-  compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_double", readlen*2);
-  compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_half", readlen/2);
+  //compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_double", readlen*2);
+  //compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_half", readlen/2);
   compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", readlen);
-  compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_double", readlen*2);
+  //compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_double", readlen*2);
 }
