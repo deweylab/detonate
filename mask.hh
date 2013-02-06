@@ -12,6 +12,8 @@ public:
   template<typename ConstIterator>
   void add_interval_with_exceptions(size_t start, size_t end, ConstIterator exceptions_begin, ConstIterator exceptions_end)
   {
+    if (start > end)
+      std::swap(start, end);
     std::set<size_t> exceptions(exceptions_begin, exceptions_end);
     for (size_t i = start; i <= end; ++i) {
       if (exceptions.count(i) == 0) {

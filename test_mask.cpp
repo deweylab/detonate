@@ -39,3 +39,21 @@ BOOST_AUTO_TEST_CASE(crossover)
   m.add_interval_with_exceptions(40, 75-1, no_exceptions, no_exceptions);
   BOOST_CHECK_EQUAL(m.num_ones(), 80ul);
 }
+
+BOOST_AUTO_TEST_CASE(reverse)
+{
+  mask f(100), r(100);
+  BOOST_CHECK_EQUAL(f.num_ones(), 0ul);
+  BOOST_CHECK_EQUAL(r.num_ones(), 0ul);
+
+  f.add_interval_with_exceptions(0,   50-1, no_exceptions, no_exceptions);
+  r.add_interval_with_exceptions(50-1,   0, no_exceptions, no_exceptions);
+  BOOST_CHECK_EQUAL(f.num_ones(), 50ul);
+  BOOST_CHECK_EQUAL(r.num_ones(), 50ul);
+
+  size_t two_exceptions[2] = {78, 80};
+  f.add_interval_with_exceptions(75,   90-1, two_exceptions, two_exceptions+2);
+  r.add_interval_with_exceptions(90-1,   75, two_exceptions, two_exceptions+2);
+  BOOST_CHECK_EQUAL(f.num_ones(), 50ul + 13);
+  BOOST_CHECK_EQUAL(r.num_ones(), 50ul + 13);
+}
