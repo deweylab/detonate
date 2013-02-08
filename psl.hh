@@ -95,7 +95,7 @@ namespace detail
       case 'g': return 'c';
       case 'n': return 'n';
       default:
-        throw std::runtime_error("Cannot complement invalid nucleotide.");
+        throw std::runtime_error("Cannot complement invalid nucleotide '" + std::string(c) + "'.");
     }
   }
 
