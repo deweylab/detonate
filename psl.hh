@@ -25,6 +25,7 @@ public:
   std::string a_name()        const { return q_name(); }
   std::string b_name()        const { return t_name(); }
   double      frac_identity() const { return 1.0 * num_identity() / num_total(); }
+  double      frac_identity_reverse() const { return 1.0 * num_identity() / num_total_reverse(); } // XXX tmp
   double      frac_indel()    const { return 1.0 * num_indel() / num_total(); }
   typedef detail::psl_alignment_input_stream input_stream_type;
   typedef detail::psl_alignment_segments     segments_type;
@@ -57,6 +58,7 @@ public:
   int num_total()    const { return q_size() - n_count(); } // subtract n_count b/c 'n' doesn't count as a match even if it is one
   int num_identity() const { return matches() + rep_matches(); }
   int num_indel()    const { return q_base_insert() + t_base_insert(); }
+  int num_total_reverse()    const { return t_size() - n_count(); } // subtract n_count b/c 'n' doesn't count as a match even if it is one // XXX tmp
 
 private:
   lazycsv<21, '\t'> lazy_csv;
