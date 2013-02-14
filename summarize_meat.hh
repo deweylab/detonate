@@ -36,14 +36,15 @@ void print_stats(const Stats& stats, const std::string& prefix)
 template<typename AlignmentType>
 struct BestTuple
 {
-  double frac_identity, frac_indel;
+  double frac_identity, frac_identity_reverse, frac_indel;
   AlignmentType al;
   BestTuple() : frac_identity(-1.0) {}
 };
 
 template<typename T>
 //inline bool is_good_enough(const T& al) { return al.frac_identity() >= 0.95 && al.frac_indel() == 0.0; }
-inline bool is_good_enough(const T& al) { return (al.frac_identity() >= 0.95 || al.frac_identity_reverse() >= 0.95) && al.frac_indel() == 0.0; }
+//inline bool is_good_enough(const T& al) { return (al.frac_identity() >= 0.95 || al.frac_identity_reverse() >= 0.95) && al.frac_indel() == 0.0; }
+inline bool is_good_enough(const T& al) { return true; }
 
 template<>
 inline bool is_good_enough(const blast_alignment& al) { return al.evalue() <= 1e-5; }
@@ -64,11 +65,14 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
     BestTuple<AlignmentType>& bt = best_from_A[a_idx];
     if (is_good_enough(al)) {
       double frac_identity = al.frac_identity();
+      double frac_identity_reverse = al.frac_identity_reverse();
       double frac_indel    = al.frac_indel();
       // relies on default init of bt.frac_identity to -1.0
       if (frac_identity > bt.frac_identity
-          || (frac_identity == bt.frac_identity && frac_indel < bt.frac_indel)) {
+          || (frac_identity == bt.frac_identity && frac_identity_reverse > bt.frac_identity_reverse)
+          || (frac_identity == bt.frac_identity && frac_identity_reverse == bt.frac_identity_reverse && frac_indel < bt.frac_indel)) {
         bt.frac_identity = frac_identity;
+        bt.frac_identity_reverse = frac_identity_reverse;
         bt.frac_indel    = frac_indel;
         bt.al            = al;
       }
@@ -110,8 +114,12 @@ void filter_by_best_alignment_to_B(std::vector<std::vector<const AlignmentType *
         best_to_B[b_idx].push_back(&(it->al));
       else {
         assert(best_to_B[b_idx].size() == 1);
-        if (best_to_B[b_idx][0]->frac_identity() < it->frac_identity)
+        const AlignmentType *al = best_to_B[b_idx][0];
+        if (al->frac_identity() < it->frac_identity
+            || (al->frac_identity() == it->frac_identity && al->frac_identity_reverse() < it->frac_identity_reverse)
+            || (al->frac_identity() == it->frac_identity && al->frac_identity_reverse() == it->frac_identity_reverse && al->frac_indel() > it->frac_indel)) {
           best_to_B[b_idx][0] = &(it->al);
+        }
       }
     }
   }
@@ -370,7 +378,7 @@ void main_1(const boost::program_options::variables_map& vm)
   compute_nucl_expression(A, tau_A, nu_A);
   compute_nucl_expression(B, tau_B, nu_B);
 
-  std::cout << "summarize_version\t2" << std::endl;
+  std::cout << "summarize_version\t4" << std::endl;
 
   Stats pair, nucl, tran;
   std::vector<double> b_frac_ones(B_card);
@@ -391,7 +399,6 @@ void main_1(const boost::program_options::variables_map& vm)
   print_stats(tran, "unweighted_clustered_tran");
   //toc;
 
-  /*
   //std::cerr << "Computing weighted stats" << std::endl;
   //tic;
   compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A, nu_A, tau_A, B, nu_B, tau_B, A_names_to_idxs);
@@ -407,7 +414,6 @@ void main_1(const boost::program_options::variables_map& vm)
   print_stats(nucl, "unweighted_filtered_nucl");
   print_stats(tran, "unweighted_filtered_tran");
   //toc;
-  */
 
   std::ofstream plot_out(vm["plot-output"].as<std::string>().c_str());
   for (size_t b_idx = 0; b_idx < b_frac_ones.size(); ++b_idx)

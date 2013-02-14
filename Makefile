@@ -4,6 +4,7 @@ ifeq ($(shell uname), Linux)
   BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
   BOOST_SUFFIX  = .a
   UNIT_TEST_DLL = libboost_unit_test_framework.so
+  CC11          = /u/deweylab/sw/gcc-4.7.2/arch/x86_64-redhat-linux-gnu/bin/g++
 endif
 
 # MAC
@@ -32,7 +33,7 @@ summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 summarize: summarize.cpp summarize_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize.cpp $(LIBS) -o summarize
 
-test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask
+test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats
 	./test_lazycsv
 	./test_line_stream
 	./test_blast
@@ -65,10 +66,10 @@ test_mask: test_mask.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_mask.cpp $(LIBS) $(TEST_LIBS) -o test_mask
 
 test_read_cluster_filter_alignments: test_read_cluster_filter_alignments.cpp
-	g++ -std=c++11 $(CFLAGS) $(INCLUDE) test_read_cluster_filter_alignments.cpp $(LIBS) $(TEST_LIBS) -o test_read_cluster_filter_alignments
+	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_read_cluster_filter_alignments.cpp $(LIBS) $(TEST_LIBS) -o test_read_cluster_filter_alignments
 
 test_compute_alignment_stats: test_compute_alignment_stats.cpp
-	g++ -std=c++11 $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
+	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
 
 # OLD
 
