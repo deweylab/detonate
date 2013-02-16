@@ -24,9 +24,10 @@ public:
   void parse_line(const std::string& line) { lazy_csv.parse_line(line); }
   std::string a_name()        const { return q_name(); }
   std::string b_name()        const { return t_name(); }
-  double      frac_identity() const { return 1.0 * num_identity() / num_total(); }
-  double      frac_identity_reverse() const { return 1.0 * num_identity() / num_total_reverse(); } // XXX tmp
-  double      frac_indel()    const { return 1.0 * num_indel() / num_total(); }
+  double      frac_identity_wrt_a() const { return 1.0 * num_identity() / a_length(); }
+  double      frac_identity_wrt_b() const { return 1.0 * num_identity() / b_length(); }
+  double      frac_indel_wrt_a()    const { return 1.0 * num_indel()    / a_length(); }
+  double      frac_indel_wrt_b()    const { return 1.0 * num_indel()    / b_length(); }
   typedef detail::psl_alignment_input_stream input_stream_type;
   typedef detail::psl_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below
@@ -55,10 +56,18 @@ public:
   std::vector<int>         q_starts     () const { return parse_vector<int>        (19); } // Comma-separated list of starting positions of each block in query
   std::vector<int>         t_starts     () const { return parse_vector<int>        (20); } // Comma-separated list of starting positions of each block in target
 
-  int num_total()    const { return q_size() - n_count(); } // subtract n_count b/c 'n' doesn't count as a match even if it is one
   int num_identity() const { return matches() + rep_matches(); }
   int num_indel()    const { return q_base_insert() + t_base_insert(); }
-  int num_total_reverse()    const { return t_size() - n_count(); } // subtract n_count b/c 'n' doesn't count as a match even if it is one // XXX tmp
+  #if (N_POLICY == 1)
+  int a_length()     const { return q_size() - n_count(); }
+  int b_length()     const { return t_size() - n_count(); }
+  #elif (N_POLICY == 2)
+  int a_length()     const { return q_size(); }
+  int b_length()     const { return t_size(); }
+  #else
+  #error "need to define N_POLICY"
+  #endif
+
 
 private:
   lazycsv<21, '\t'> lazy_csv;

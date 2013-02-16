@@ -24,13 +24,13 @@ public:
   void parse_line(const std::string& line) { lazy_csv.parse_line(line); }
   std::string a_name()        const { return lazy_csv.at<std::string>(0); }
   std::string b_name()        const { return lazy_csv.at<std::string>(2); }
-  double      frac_identity() const { return 1.0 * nident() * (qframe() == 0 ? 1 : 3) / qlen(); }
-  double      frac_indel()    const { return 1.0 * gaps()   * (qframe() == 0 ? 1 : 3) / qlen(); }
+  double      frac_identity_wrt_a() const { return 1.0 * nident() * (qframe() == 0 ? 1 : 3) / qlen(); }
+  double      frac_identity_wrt_b() const { return 1.0 * nident() * (sframe() == 0 ? 1 : 3) / slen(); }
+  double      frac_indel_wrt_a()    const { return 1.0 * gaps()   * (qframe() == 0 ? 1 : 3) / qlen(); }
+  double      frac_indel_wrt_b()    const { return 1.0 * gaps()   * (sframe() == 0 ? 1 : 3) / slen(); }
   typedef detail::blast_alignment_input_stream input_stream_type;
   typedef detail::blast_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below
-
-  double      frac_identity_reverse() const { return 1.0 * nident() / slen(); }
 
   // For use by blast-specific algorithms:
   inline  int         qlen  ()        const { return lazy_csv.at<int>        ( 1); }

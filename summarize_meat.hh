@@ -33,21 +33,87 @@ void print_stats(const Stats& stats, const std::string& prefix)
   std::cout << prefix << "_F1\t"        << stats.F1     << std::endl;
 }
 
+struct stats_tuple
+{
+  double pair, nucl, tran;
+};
+
+double compute_F1(double precis, double recall)
+{
+  if (precis == 0.0 && recall == 0.0)
+    return 0.0;
+  else
+    return 2*precis*recall/(precis+recall);
+}
+
+void print_stats(const stats_tuple& precis, const stats_tuple& recall, const std::string& prefix)
+{
+  std::cout << prefix << "_pair_precision\t" << precis.pair                          << std::endl;
+  std::cout << prefix << "_pair_recall\t"    << recall.pair                          << std::endl;
+  std::cout << prefix << "_pair_F1\t"        << compute_F1(precis.pair, recall.pair) << std::endl;
+
+  std::cout << prefix << "_nucl_precision\t" << precis.nucl                          << std::endl;
+  std::cout << prefix << "_nucl_recall\t"    << recall.nucl                          << std::endl;
+  std::cout << prefix << "_nucl_F1\t"        << compute_F1(precis.nucl, recall.nucl) << std::endl;
+
+  std::cout << prefix << "_tran_precision\t" << precis.tran                          << std::endl;
+  std::cout << prefix << "_tran_recall\t"    << recall.tran                          << std::endl;
+  std::cout << prefix << "_tran_F1\t"        << compute_F1(precis.tran, recall.tran) << std::endl;
+}
+
 template<typename AlignmentType>
 struct BestTuple
 {
-  double frac_identity, frac_identity_reverse, frac_indel;
+  double frac_identity_wrt_a;
+  double frac_identity_wrt_b;
+  double frac_indel_wrt_a;
+  double frac_indel_wrt_b;
   AlignmentType al;
-  BestTuple() : frac_identity(-1.0) {}
+  bool is_empty;
+  BestTuple() : is_empty(true) {}
 };
 
 template<typename T>
-//inline bool is_good_enough(const T& al) { return al.frac_identity() >= 0.95 && al.frac_indel() == 0.0; }
-//inline bool is_good_enough(const T& al) { return (al.frac_identity() >= 0.95 || al.frac_identity_reverse() >= 0.95) && al.frac_indel() == 0.0; }
-inline bool is_good_enough(const T& al) { return true; }
+inline bool is_good_enough(const T& al)
+{
+  #if (GOOD_POLICY == 1)
+  return al.frac_identity_wrt_a() >= 0.95 && al.frac_indel_wrt_a() <= 0.0;
+  #elif (GOOD_POLICY == 2)
+  return (al.frac_identity_wrt_a() >= 0.95 && al.frac_indel_wrt_a() <= 0.0) ||
+         (al.frac_identity_wrt_b() >= 0.95 && al.frac_indel_wrt_b() <= 0.0);
+  #elif (GOOD_POLICY == 3)
+  return al.frac_identity_wrt_a() >= 0.95 || al.frac_identity_wrt_b() >= 0.95;
+  #else
+  #error "need to define GOOD_POLICY"
+  #endif
+}
 
 template<>
 inline bool is_good_enough(const blast_alignment& al) { return al.evalue() <= 1e-5; }
+
+// is al better than ref?
+template<typename T, typename S>
+inline bool is_better(const T& al, const S& ref)
+{
+  #if (BETTER_POLICY == 1)
+  return (al.frac_identity_wrt_a() > ref.frac_identity_wrt_a
+          || (al.frac_identity_wrt_a() == ref.frac_identity_wrt_a && al.frac_indel_wrt_a() == ref.frac_indel_wrt_a));
+  #elif (BETTER_POLICY == 2)
+  double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
+  double d2 = -(al.frac_indel_wrt_a()  - ref.frac_indel_wrt_a);
+  double d3 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
+  double d4 = -(al.frac_indel_wrt_b()  - ref.frac_indel_wrt_b);
+  return d1 > 0 || (d1 == 0 && d2 > 0)
+                || (d1 == 0 && d2 == 0 && d3 > 0)
+                || (d1 == 0 && d2 == 0 && d3 == 0 && d4 > 0);
+  #elif (BETTER_POLICY == 3)
+  double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
+  double d2 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
+  return d1 > 0 || (d1 == 0 && d2 > 0);
+  #else
+  #error "need to define BETTER_POLICY"
+  #endif
+}
 
 // For each a in A, figure out which alignment from a -> b (for some b in B) is
 // best.
@@ -64,20 +130,27 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
     size_t a_idx = A_names_to_idxs.find(al.a_name())->second;
     BestTuple<AlignmentType>& bt = best_from_A[a_idx];
     if (is_good_enough(al)) {
-      double frac_identity = al.frac_identity();
-      double frac_identity_reverse = al.frac_identity_reverse();
-      double frac_indel    = al.frac_indel();
-      // relies on default init of bt.frac_identity to -1.0
-      if (frac_identity > bt.frac_identity
-          || (frac_identity == bt.frac_identity && frac_identity_reverse > bt.frac_identity_reverse)
-          || (frac_identity == bt.frac_identity && frac_identity_reverse == bt.frac_identity_reverse && frac_indel < bt.frac_indel)) {
-        bt.frac_identity = frac_identity;
-        bt.frac_identity_reverse = frac_identity_reverse;
-        bt.frac_indel    = frac_indel;
-        bt.al            = al;
+      if (bt.is_empty || is_better(al, bt)) {
+        bt.frac_identity_wrt_a = al.frac_identity_wrt_a();
+        bt.frac_identity_wrt_b = al.frac_identity_wrt_b();
+        bt.frac_indel_wrt_a    = al.frac_indel_wrt_a();
+        bt.frac_indel_wrt_b    = al.frac_indel_wrt_b();
+        bt.al                  = al;
+        bt.is_empty            = false;
       }
     }
   }
+}
+
+template<typename AlignmentType>
+void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentType> >&    best_from_A, 
+                                               const std::string&                         fname,
+                                               const std::map<std::string, size_t>&       A_names_to_idxs)
+{
+  std::ifstream ifs;
+  open_or_throw(ifs, fname);
+  typename AlignmentType::input_stream_type input_stream(ifs);
+  read_alignments_and_filter_by_best_from_A(best_from_A, input_stream, A_names_to_idxs);
 }
 
 // For each b in B, collect all the best alignments from a's that have b as
@@ -92,11 +165,10 @@ void cluster_best_alignments_to_B(std::vector<std::vector<const AlignmentType *>
                                   const std::vector<BestTuple<AlignmentType> >&     best_from_A,
                                   const std::map<std::string, size_t>&              B_names_to_idxs)
 {
-  typename std::vector<BestTuple<AlignmentType> >::const_iterator it;
-  for (it = best_from_A.begin(); it != best_from_A.end(); ++it) {
-    if (it->frac_identity >= 0) { // the purpose here is to exclude default-constructed BestTuples, i.e., non-alignments
-      size_t b_idx = B_names_to_idxs.find(it->al.b_name())->second;
-      best_to_B[b_idx].push_back(&(it->al));
+  BOOST_FOREACH(const BestTuple<AlignmentType>& bt, best_from_A) {
+    if (!bt.is_empty) {
+      size_t b_idx = B_names_to_idxs.find(bt.al.b_name())->second;
+      best_to_B[b_idx].push_back(&(bt.al));
     }
   }
 }
@@ -106,99 +178,84 @@ void filter_by_best_alignment_to_B(std::vector<std::vector<const AlignmentType *
                                    const std::vector<BestTuple<AlignmentType> >&     best_from_A,
                                    const std::map<std::string, size_t>&              B_names_to_idxs)
 {
-  typename std::vector<BestTuple<AlignmentType> >::const_iterator it;
-  for (it = best_from_A.begin(); it != best_from_A.end(); ++it) {
-    if (it->frac_identity >= 0) { // the purpose here is to exclude default-constructed BestTuples, i.e., non-alignments
-      size_t b_idx = B_names_to_idxs.find(it->al.b_name())->second;
+  BOOST_FOREACH(const BestTuple<AlignmentType>& bt, best_from_A) {
+    if (!bt.is_empty) {
+      size_t b_idx = B_names_to_idxs.find(bt.al.b_name())->second;
       if (best_to_B[b_idx].size() == 0)
-        best_to_B[b_idx].push_back(&(it->al));
+        best_to_B[b_idx].push_back(&(bt.al));
       else {
         assert(best_to_B[b_idx].size() == 1);
-        const AlignmentType *al = best_to_B[b_idx][0];
-        if (al->frac_identity() < it->frac_identity
-            || (al->frac_identity() == it->frac_identity && al->frac_identity_reverse() < it->frac_identity_reverse)
-            || (al->frac_identity() == it->frac_identity && al->frac_identity_reverse() == it->frac_identity_reverse && al->frac_indel() > it->frac_indel)) {
-          best_to_B[b_idx][0] = &(it->al);
-        }
+        const AlignmentType *old = best_to_B[b_idx][0];
+        if (!is_better(*old, bt)) // note: not exactly the same as is_better(bt, old) would be
+          best_to_B[b_idx][0] = &(bt.al);
       }
     }
   }
 }
 
 template<typename PairsetType, typename AlignmentType>
-void compute_alignment_stats(Stats& pair, Stats& nucl, Stats& tran,
-                             std::vector<double>& b_frac_ones,
-                             const std::vector<std::vector<const AlignmentType *> >& best_to_B,
-                             const std::vector<std::string>&                         A,
-                             const std::vector<double>&                              nu_A,
-                             const std::vector<double>&                              tau_A,
-                             const std::vector<std::string>&                         B,
-                             const std::vector<double>&                              nu_B,
-                             const std::vector<double>&                              tau_B,
-                             const std::map<std::string, size_t>&                    A_names_to_idxs)
+stats_tuple compute_alignment_stats(std::vector<double>& B_frac_ones,
+                                    const std::vector<std::vector<const AlignmentType *> >& best_to_B,
+                                    const std::vector<std::string>&                         A,
+                                    const std::vector<std::string>&                         B,
+                                    const std::vector<double>&                              tau_B,
+                                    const std::map<std::string, size_t>&                    A_names_to_idxs)
 {
-  std::vector<size_t> perm = make_random_permutation(nu_B.size()); // for better load balancing (in case e.g. seqs are ordered by length)
+  std::vector<size_t> perm = make_random_permutation(B.size()); // for better load balancing (in case e.g. seqs are ordered by length)
 
-  pair.precis = 0.0, pair.recall = 0.0,
-  nucl.precis = 0.0, nucl.recall = 0.0,
-  tran.precis = 0.0, tran.recall = 0.0;
+  double pair_recall_numer = 0.0, pair_recall_denom = 0.0,
+         nucl_recall_numer = 0.0, nucl_recall_denom = 0.0,
+         tran_recall = 0.0;
 
   #pragma omp parallel
   {
-    double private_pair_precis = 0.0, private_pair_recall = 0.0,
-           private_nucl_precis = 0.0, private_nucl_recall = 0.0,
-           private_tran_precis = 0.0, private_tran_recall = 0.0;
+    double private_pair_recall_numer = 0.0, private_pair_recall_denom = 0.0,
+           private_nucl_recall_numer = 0.0, private_nucl_recall_denom = 0.0,
+           private_tran_recall       = 0.0;
 
     #pragma omp for
-    for (int b_pre_idx = 0; b_pre_idx < static_cast<int>(nu_B.size()); ++b_pre_idx) {
+    for (int b_pre_idx = 0; b_pre_idx < static_cast<int>(B.size()); ++b_pre_idx) {
 
       size_t b_idx = perm[b_pre_idx];
       PairsetType b_pairset(B[b_idx].size());
       mask b_mask(B[b_idx].size());
 
       BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
-
         size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
-        PairsetType a_pairset(A[a_idx].size());
-        mask a_mask(A[a_idx].size());
-
         BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
-          a_pairset.add_square_with_exceptions(seg.a_start, seg.a_end, seg.a_mismatches.begin(), seg.a_mismatches.end());
           b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
-          a_mask.add_interval_with_exceptions(seg.a_start, seg.a_end, seg.a_mismatches.begin(), seg.a_mismatches.end());
           b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
         }
-
-        int a_num_total_bases = A[a_idx].size();
-        int a_num_total_pairs = a_num_total_bases * (a_num_total_bases + 1) / 2;
-        double a_frac_ones = 1.0 * a_mask.num_ones() / a_num_total_bases;
-        private_pair_precis += (1.0 * a_pairset.size() / a_num_total_pairs) * nu_A[a_idx];
-        private_nucl_precis += a_frac_ones * nu_A[a_idx];
-        if (a_frac_ones >= 0.95) private_tran_precis += tau_A[a_idx];
       }
 
-      int b_num_total_bases = B[b_idx].size();
-      int b_num_total_pairs = b_num_total_bases * (b_num_total_bases + 1) / 2;
-      b_frac_ones[b_idx] = (1.0 * b_mask.num_ones()) / b_num_total_bases;
-      private_pair_recall += (1.0 * b_pairset.size() / b_num_total_pairs) * nu_B[b_idx];
-      private_nucl_recall += b_frac_ones[b_idx] * nu_B[b_idx];
-      if (b_frac_ones[b_idx] >= 0.95) private_tran_recall += tau_B[b_idx];
-      //if (b_frac_ones[b_idx] > 0) private_tran_recall += tau_B[b_idx];
+      private_pair_recall_numer += tau_B[b_idx] * b_pairset.size();
+      private_pair_recall_denom += tau_B[b_idx] * B[b_idx].size() * (B[b_idx].size() + 1) / 2;
+
+      private_nucl_recall_numer += tau_B[b_idx] * b_mask.num_ones();
+      private_nucl_recall_denom += tau_B[b_idx] * B[b_idx].size();
+
+      B_frac_ones[b_idx] = (1.0 * b_mask.num_ones()) / B[b_idx].size();
+      if (B_frac_ones[b_idx] >= 0.95)
+        private_tran_recall += tau_B[b_idx];
 
     }
 
     #pragma omp critical
     {
-      pair.precis += private_pair_precis; pair.recall += private_pair_recall;
-      nucl.precis += private_nucl_precis; nucl.recall += private_nucl_recall;
-      tran.precis += private_tran_precis; tran.recall += private_tran_recall;
+      pair_recall_numer += private_pair_recall_numer;
+      pair_recall_denom += private_pair_recall_denom;
+      nucl_recall_numer += private_nucl_recall_numer;
+      nucl_recall_denom += private_nucl_recall_denom;
+      tran_recall += private_tran_recall;
     }
 
   } // omp parallel
 
-  pair.update_F1();
-  nucl.update_F1();
-  tran.update_F1();
+  stats_tuple recall;
+  recall.pair = pair_recall_numer / pair_recall_denom;
+  recall.nucl = nucl_recall_numer / nucl_recall_denom;
+  recall.tran = tran_recall;
+  return recall;
 }
 
 template<typename AlignmentType>
@@ -258,6 +315,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
     ("induce-B-expr",                                "Induce oracleset expression from assembly expression and alignments.")
     ("A-to-B", po::value<std::string>()->required(), "The alignments of A to B.")
+    ("B-to-A", po::value<std::string>()->required(), "The alignments of B to A.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
   ;
@@ -294,9 +352,9 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 template<typename AlignmentType>
 void main_1(const boost::program_options::variables_map& vm)
 {
-  clock_t start;
+  //clock_t start;
 
-  //std::cerr << "Reading the sequences" << std::endl;
+  std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
   std::vector<std::string> A_names, B_names;
   std::map<std::string, size_t> A_names_to_idxs, B_names_to_idxs;
@@ -305,117 +363,69 @@ void main_1(const boost::program_options::variables_map& vm)
   size_t A_card = A.size();
   size_t B_card = B.size();
 
-  //std::cerr << "Reading alignments and filtering them by A" << std::endl;
-  std::vector<BestTuple<AlignmentType> > best_from_A(A_card);
-  {
-    std::string fname = vm["A-to-B"].as<std::string>();
-    std::ifstream ifs;
-    open_or_throw(ifs, fname);
-    typename AlignmentType::input_stream_type input_stream(ifs);
-    //tic;
-    read_alignments_and_filter_by_best_from_A(best_from_A, input_stream, A_names_to_idxs);
-    //toc;
+  std::cerr << "Reading alignments and filtering them by A" << std::endl;
+  std::vector<BestTuple<AlignmentType> > best_from_A(A_card), best_from_B(B_card);
+  read_alignments_and_filter_by_best_from_A(best_from_A, vm["A-to-B"].as<std::string>(), A_names_to_idxs);
+  read_alignments_and_filter_by_best_from_A(best_from_B, vm["B-to-A"].as<std::string>(), B_names_to_idxs);
+
+  std::cerr << "Clustering alignments by B" << std::endl;
+  std::vector<std::vector<const AlignmentType *> > clustered_best_to_B(B_card), clustered_best_to_A(A_card);
+  cluster_best_alignments_to_B(clustered_best_to_B, best_from_A, B_names_to_idxs);
+  cluster_best_alignments_to_B(clustered_best_to_A, best_from_B, A_names_to_idxs);
+
+  std::cerr << "Filtering alignments by B" << std::endl;
+  std::vector<std::vector<const AlignmentType *> > filtered_best_to_B(B_card), filtered_best_to_A(A_card);
+  filter_by_best_alignment_to_B(filtered_best_to_B, best_from_A, B_names_to_idxs);
+  filter_by_best_alignment_to_B(filtered_best_to_A, best_from_B, A_names_to_idxs);
+
+  std::cerr << "Reading transcript-level expression for A" << std::endl;
+  std::vector<double> real_tau_A(A_card), real_tau_B(B_card);
+  std::string A_expr_fname = vm["A-expr"].as<std::string>();
+  read_transcript_expression(A_expr_fname, real_tau_A, A_names_to_idxs);
+  if (vm.count("induce-B-expr")) {
+    std::cerr << "Inducing transcript-level expression for B" << std::endl;
+    induce_prot_expression(real_tau_B, clustered_best_to_B, real_tau_A, A_names_to_idxs, A, B);
+  } else {
+    std::cerr << "Reading transcript-level expression for B" << std::endl;
+    std::string B_expr_fname = vm["B-expr"].as<std::string>();
+    read_transcript_expression(B_expr_fname, real_tau_B, B_names_to_idxs);
   }
 
-  //std::cerr << "Clustering alignments by B" << std::endl;
-  std::vector<std::vector<const AlignmentType *> > best_to_B(B_card);
-  cluster_best_alignments_to_B(best_to_B, best_from_A, B_names_to_idxs);
-
-  /*
-  for (size_t a_idx = 0; a_idx < A.size(); ++a_idx) {
-    std::cerr << a_idx << "\t";
-    if (best_from_A[a_idx].frac_identity >= 0) {
-      std::cerr << B_names_to_idxs[best_from_A[a_idx].al.b_name()] << ",";
-      std::cerr << best_from_A[a_idx].frac_identity << ",";
-      std::cerr << best_from_A[a_idx].al.frac_identity_reverse() << ",";
-      std::cerr << best_from_A[a_idx].frac_indel << ",";
-    }
-    std::cerr << std::endl;
-  }
-  */
-
-  /*
-  for (size_t b_idx = 0; b_idx < B.size(); ++b_idx) {
-    std::cerr << b_idx << "\t";
-    std::vector<size_t> tmp;
-    BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx])
-      tmp.push_back(A_names_to_idxs[al->a_name()]);
-    sort(tmp.begin(), tmp.end());
-    BOOST_FOREACH(size_t a_idx, tmp)
-      std::cerr << a_idx << " ";
-    std::cerr << std::endl;
-  }
-  */
-
-  //std::cerr << "Filtering alignments by B" << std::endl;
-  std::vector<std::vector<const AlignmentType *> > single_best_to_B(B_card);
-  filter_by_best_alignment_to_B(single_best_to_B, best_from_A, B_names_to_idxs);
-
-  //std::cerr << "Computing uniform transcript-level expression" << std::endl;
+  std::cerr << "Computing uniform transcript-level expression" << std::endl;
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  //std::cerr << "Computing uniform nucleotide-level expression" << std::endl;
-  std::vector<double> unif_nu_A(A_card), unif_nu_B(B_card);
-  compute_nucl_expression(A, unif_tau_A, unif_nu_A);
-  compute_nucl_expression(B, unif_tau_B, unif_nu_B);
+  std::cout << "summarize_version\t5" << std::endl;
 
-  //std::cerr << "Reading transcript-level expression for A" << std::endl;
-  std::vector<double> tau_A(A_card), tau_B(B_card);
-  std::string A_expr_fname = vm["A-expr"].as<std::string>();
-  read_transcript_expression(A_expr_fname, tau_A, A_names_to_idxs);
+  stats_tuple recall, precis;
+  std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
+
+  std::cerr << "Computing weighted clustered stats" << std::endl;
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, real_tau_B, A_names_to_idxs);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, real_tau_A, B_names_to_idxs);
+  print_stats(precis, recall, "weighted_clustered");
+
+  std::cerr << "Computing unweighted clustered stats" << std::endl;
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
+  print_stats(precis, recall, "unweighted_clustered");
+
   if (vm.count("induce-B-expr")) {
-    //std::cerr << "Inducing transcript-level expression for B" << std::endl;
-    induce_prot_expression(tau_B, best_to_B, tau_A, A_names_to_idxs, A, B);
-  } else {
-    //std::cerr << "Reading transcript-level expression for B" << std::endl;
-    std::string B_expr_fname = vm["B-expr"].as<std::string>();
-    read_transcript_expression(B_expr_fname, tau_B, B_names_to_idxs);
+    std::cerr << "Inducing transcript-level expression for B with filtered stats" << std::endl;
+    induce_prot_expression(real_tau_B, filtered_best_to_B, real_tau_A, A_names_to_idxs, A, B);
   }
 
-  //std::cerr << "Computing nucleotide-level expression" << std::endl;
-  std::vector<double> nu_A(A_card), nu_B(B_card);
-  compute_nucl_expression(A, tau_A, nu_A);
-  compute_nucl_expression(B, tau_B, nu_B);
+  std::cerr << "Computing weighted filtered stats" << std::endl;
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, real_tau_B, A_names_to_idxs);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, real_tau_A, B_names_to_idxs);
+  print_stats(precis, recall, "weighted_filtered");
 
-  std::cout << "summarize_version\t4" << std::endl;
-
-  Stats pair, nucl, tran;
-  std::vector<double> b_frac_ones(B_card);
-
-  //std::cerr << "Computing weighted stats" << std::endl;
-  //tic;
-  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A, nu_A, tau_A, B, nu_B, tau_B, A_names_to_idxs);
-  print_stats(pair, "weighted_clustered_pair");
-  print_stats(nucl, "weighted_clustered_nucl");
-  print_stats(tran, "weighted_clustered_tran");
-  //toc;
-
-  //std::cerr << "Computing unweighted stats" << std::endl;
-  //tic;
-  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
-  print_stats(pair, "unweighted_clustered_pair");
-  print_stats(nucl, "unweighted_clustered_nucl");
-  print_stats(tran, "unweighted_clustered_tran");
-  //toc;
-
-  //std::cerr << "Computing weighted stats" << std::endl;
-  //tic;
-  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A, nu_A, tau_A, B, nu_B, tau_B, A_names_to_idxs);
-  print_stats(pair, "weighted_filtered_pair");
-  print_stats(nucl, "weighted_filtered_nucl");
-  print_stats(tran, "weighted_filtered_tran");
-  //toc;
-
-  //std::cerr << "Computing unweighted stats" << std::endl;
-  //tic;
-  compute_alignment_stats<smart_pairset>(pair, nucl, tran, b_frac_ones, single_best_to_B, A, unif_nu_A, unif_tau_A, B, unif_nu_B, unif_tau_B, A_names_to_idxs);
-  print_stats(pair, "unweighted_filtered_pair");
-  print_stats(nucl, "unweighted_filtered_nucl");
-  print_stats(tran, "unweighted_filtered_tran");
-  //toc;
+  std::cerr << "Computing unweighted filtered stats" << std::endl;
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
+  print_stats(precis, recall, "unweighted_filtered");
 
   std::ofstream plot_out(vm["plot-output"].as<std::string>().c_str());
-  for (size_t b_idx = 0; b_idx < b_frac_ones.size(); ++b_idx)
-    plot_out << b_frac_ones[b_idx] << std::endl;
+  BOOST_FOREACH(double x, B_frac_ones)
+    plot_out << x << std::endl;
 }
