@@ -83,6 +83,8 @@ inline bool is_good_enough(const T& al)
          (al.frac_identity_wrt_b() >= 0.95 && al.frac_indel_wrt_b() <= 0.0);
   #elif (GOOD_POLICY == 3)
   return al.frac_identity_wrt_a() >= 0.95 || al.frac_identity_wrt_b() >= 0.95;
+  #elif (GOOD_POLICY == 4)
+  return true;
   #else
   #error "need to define GOOD_POLICY"
   #endif
@@ -109,6 +111,10 @@ inline bool is_better(const T& al, const S& ref)
   #elif (BETTER_POLICY == 3)
   double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
   double d2 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
+  return d1 > 0 || (d1 == 0 && d2 > 0);
+  #elif (BETTER_POLICY == 4)
+  double d1 = al.num_identity() - ref.al.num_identity();
+  double d2 = al.num_indel()    - ref.al.num_indel();
   return d1 > 0 || (d1 == 0 && d2 > 0);
   #else
   #error "need to define BETTER_POLICY"

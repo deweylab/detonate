@@ -32,24 +32,10 @@ summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 
 summarize: summarize.cpp summarize_meat.hh
 	#$(CC) $(CFLAGS) $(INCLUDE) summarize.cpp $(LIBS) -o summarize
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=1 -DBETTER_POLICY=1 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_1_1_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=1 -DBETTER_POLICY=1 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_1_1_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=1 -DBETTER_POLICY=2 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_1_2_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=1 -DBETTER_POLICY=2 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_1_2_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=1 -DBETTER_POLICY=3 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_1_3_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=1 -DBETTER_POLICY=3 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_1_3_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=2 -DBETTER_POLICY=1 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_2_1_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=2 -DBETTER_POLICY=1 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_2_1_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=2 -DBETTER_POLICY=2 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_2_2_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=2 -DBETTER_POLICY=2 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_2_2_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=2 -DBETTER_POLICY=3 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_2_3_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=2 -DBETTER_POLICY=3 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_2_3_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=3 -DBETTER_POLICY=1 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_3_1_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=3 -DBETTER_POLICY=1 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_3_1_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=3 -DBETTER_POLICY=2 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_3_2_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=3 -DBETTER_POLICY=2 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_3_2_2
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=3 -DBETTER_POLICY=3 -DN_POLICY=1 summarize.cpp $(LIBS) -o summarize_3_3_1
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=3 -DBETTER_POLICY=3 -DN_POLICY=2 summarize.cpp $(LIBS) -o summarize_3_3_2
+	$(foreach gp, 1 2 3 4, \
+	  $(foreach bp, 1 2 3 4, \
+	    $(foreach np, 1 2, \
+		  $(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np);)))
 
 test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats
 	./test_lazycsv
