@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 #include <boost/random/random_device.hpp>
+#include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 #include "deweylab/bio/formats/fasta.hh"
 
@@ -89,7 +90,8 @@ std::vector<size_t> make_random_permutation(size_t n)
   std::vector<size_t> x(n);
   for (size_t i = 0; i < n; ++i)
     x[i] = i;
-  boost::random::random_device rng;
+  //boost::random::random_device rng;
+  boost::random::mt19937 rng;
   boost::random::uniform_int_distribution<> index_dist(0, n - 1);
   for (size_t k = 0; k < n*10; ++k) {
     size_t i = index_dist(rng);
