@@ -148,6 +148,27 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
   }
 }
 
+// Preconditions:
+// - best_from_A should be of size 0
+template<typename AlignmentType>
+void read_alignments_without_filtering(std::vector<BestTuple<AlignmentType> >&    best_from_A, 
+                                       typename AlignmentType::input_stream_type& input_stream)
+{
+  AlignmentType al;
+  while (input_stream >> al) {
+    if (is_good_enough(al)) {
+      BestTuple<AlignmentType> bt;
+      bt.frac_identity_wrt_a = al.frac_identity_wrt_a();
+      bt.frac_identity_wrt_b = al.frac_identity_wrt_b();
+      bt.frac_indel_wrt_a    = al.frac_indel_wrt_a();
+      bt.frac_indel_wrt_b    = al.frac_indel_wrt_b();
+      bt.al                  = al;
+      bt.is_empty            = false;
+      best_from_A.push_back(bt);
+    }
+  }
+}
+
 // For each b in B, collect all the best alignments from a's that have b as
 // target. The purpose here is to facilitate (i) make parallel processing and
 // (ii) reduced memory usage later on.
@@ -365,6 +386,13 @@ void main_1(const boost::program_options::variables_map& vm)
   read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs);
   read_alignments_and_filter_by_best_from_A(best_from_B, B_to_A_is, B_names_to_idxs);
 
+  std::cerr << "Reading alignments without filtering them by A" << std::endl;
+  std::vector<BestTuple<AlignmentType> > all_from_A, all_from_B;
+  typename AlignmentType::input_stream_type A_to_B_is2(open_or_throw(vm["A-to-B"].as<std::string>()));
+  typename AlignmentType::input_stream_type B_to_A_is2(open_or_throw(vm["B-to-A"].as<std::string>()));
+  read_alignments_without_filtering(all_from_A, A_to_B_is2);
+  read_alignments_without_filtering(all_from_B, B_to_A_is2);
+
   std::cerr << "Clustering alignments by B" << std::endl;
   std::vector<std::vector<const AlignmentType *> > clustered_best_to_B(B_card), clustered_best_to_A(A_card);
   cluster_best_alignments_to_B(clustered_best_to_B, best_from_A, B_names_to_idxs);
@@ -374,6 +402,11 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<std::vector<const AlignmentType *> > filtered_best_to_B(B_card), filtered_best_to_A(A_card);
   filter_by_best_alignment_to_B(filtered_best_to_B, best_from_A, B_names_to_idxs);
   filter_by_best_alignment_to_B(filtered_best_to_A, best_from_B, A_names_to_idxs);
+
+  std::cerr << "Clustering 'all' alignments by B" << std::endl;
+  std::vector<std::vector<const AlignmentType *> > jumbled_to_B(B_card), jumbled_to_A(A_card);
+  cluster_best_alignments_to_B(jumbled_to_B, all_from_A, B_names_to_idxs);
+  cluster_best_alignments_to_B(jumbled_to_A, all_from_B, A_names_to_idxs);
 
   std::cerr << "Reading transcript-level expression for A" << std::endl;
   std::vector<double> real_tau_A(A_card), real_tau_B(B_card);
@@ -392,7 +425,7 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  std::cout << "summarize_version\t5" << std::endl;
+  std::cout << "summarize_version\t6" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
@@ -406,6 +439,16 @@ void main_1(const boost::program_options::variables_map& vm)
   recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
   precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
   print_stats(precis, recall, "unweighted_clustered");
+
+  std::cerr << "Computing weighted jumbled stats" << std::endl;
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, real_tau_B, A_names_to_idxs);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, real_tau_A, B_names_to_idxs);
+  print_stats(precis, recall, "weighted_jumbled");
+
+  std::cerr << "Computing unweighted jumbled stats" << std::endl;
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, unif_tau_B, A_names_to_idxs);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, unif_tau_A, B_names_to_idxs);
+  print_stats(precis, recall, "unweighted_jumbled");
 
   if (vm.count("induce-B-expr")) {
     std::cerr << "Inducing transcript-level expression for B with filtered stats" << std::endl;
