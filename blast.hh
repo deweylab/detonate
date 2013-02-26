@@ -64,7 +64,7 @@ namespace detail
   class blast_alignment_input_stream
   {
   public:
-    blast_alignment_input_stream(std::istream& is) : ls(is) {}
+    blast_alignment_input_stream(boost::shared_ptr<std::istream> is) : ls(is) {}
 
     blast_alignment_input_stream& operator>>(blast_alignment& al)
     {

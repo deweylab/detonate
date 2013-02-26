@@ -118,7 +118,7 @@ namespace detail
   class psl_alignment_input_stream
   {
   public:
-    psl_alignment_input_stream(std::istream& is) : is(is), ls(is) { skip_header(); }
+    psl_alignment_input_stream(boost::shared_ptr<std::istream> is) : is(is), ls(is) { skip_header(); }
 
     psl_alignment_input_stream& operator>>(psl_alignment& al)
     {
@@ -131,22 +131,22 @@ namespace detail
     inline bool operator!() { return !ls; }
 
   private:
-    std::istream& is;
+    boost::shared_ptr<std::istream> is;
     line_stream ls;
     std::string line;
 
     void skip_header()
     {
       std::string line;
-      getline(is, line);
+      getline(*is, line);
       check(line, "psLayout version 3");
-      getline(is, line);
+      getline(*is, line);
       check(line, "");
-      getline(is, line);
+      getline(*is, line);
       check(line, "match\tmis- \trep. \tN's\tQ gap\tQ gap\tT gap\tT gap\tstrand\tQ        \tQ   \tQ    \tQ  \tT        \tT   \tT    \tT  \tblock\tblockSizes \tqStarts\t tStarts");
-      getline(is, line);
+      getline(*is, line);
       check(line, "     \tmatch\tmatch\t   \tcount\tbases\tcount\tbases\t      \tname     \tsize\tstart\tend\tname     \tsize\tstart\tend\tcount");
-      getline(is, line);
+      getline(*is, line);
       check(line, "---------------------------------------------------------------------------------------------------------------------------------------------------------------");
     }
 

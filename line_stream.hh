@@ -3,24 +3,25 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-using namespace std;
+#include <boost/shared_ptr.hpp>
+using namespace std; // XXX?
 
 class line_stream
 {
 public:
-  line_stream(std::istream& istrm) : istrm(istrm) {}
+  line_stream(boost::shared_ptr<std::istream> istrm) : istrm(istrm) {}
 
   line_stream& operator>>(std::string& line)
   {
-    getline(istrm, line);
+    getline(*istrm, line);
     if (line.size() == 0)
-      istrm.peek(); // set EOF bit in istrm if next read will be EOF
+      istrm->peek(); // set EOF bit in istrm if next read will be EOF
     return *this;
   }
 
-  inline operator bool() { return istrm; }
-  inline bool operator!() { return !istrm; }
+  inline operator bool() { return *istrm; }
+  inline bool operator!() { return !*istrm; }
 
 private:
-  std::istream& istrm;
+  boost::shared_ptr<std::istream> istrm;
 };

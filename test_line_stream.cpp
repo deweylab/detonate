@@ -12,7 +12,7 @@ BOOST_AUTO_TEST_CASE(realistic_usage)
 {
   string s = "line 1\nline 2\nline 3";
   const char *results[] = {"line 1", "line 2", "line 3"};
-  istringstream iss(s);
+  boost::shared_ptr<istringstream> iss(new istringstream(s));
   line_stream ls(iss);
   string line;
   size_t i = 0;
@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(realistic_usage)
 BOOST_AUTO_TEST_CASE(basic_no_trailing_eol)
 {
   string s = "line 1\nline 2\nline 3";
-  istringstream iss(s);
+  boost::shared_ptr<istringstream> iss(new istringstream(s));
   line_stream ls(iss);
   string line;
   ls >> line;
@@ -41,7 +41,7 @@ BOOST_AUTO_TEST_CASE(basic_no_trailing_eol)
 BOOST_AUTO_TEST_CASE(basic_with_trailing_eol)
 {
   string s = "line 1\nline 2\nline 3\n";
-  istringstream iss(s);
+  boost::shared_ptr<istringstream> iss(new istringstream(s));
   line_stream ls(iss);
   string line;
   ls >> line;
@@ -58,7 +58,7 @@ BOOST_AUTO_TEST_CASE(basic_with_trailing_eol)
 BOOST_AUTO_TEST_CASE(no_lines)
 {
   string s = "";
-  istringstream iss(s);
+  boost::shared_ptr<istringstream> iss(new istringstream(s));
   line_stream ls(iss);
   string line;
   ls >> line;
@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(no_lines)
 BOOST_AUTO_TEST_CASE(just_newline)
 {
   string s = "\n";
-  istringstream iss(s);
+  boost::shared_ptr<istringstream> iss(new istringstream(s));
   line_stream ls(iss);
   string line;
   ls >> line;

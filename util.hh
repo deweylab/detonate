@@ -12,12 +12,12 @@
 #define tic start = clock();
 #define toc std::cerr << "Done in " << 1.0*(clock() - start)/CLOCKS_PER_SEC << " seconds." << std::endl;
 
-void open_or_throw(std::ifstream& ifs, const std::string& filename)
+boost::shared_ptr<std::ifstream> open_or_throw(const std::string& filename)
 {
-  ifs.clear();
-  ifs.open(filename.c_str());
-  if (!ifs)
+  boost::shared_ptr<std::ifstream> ifs(new std::ifstream(filename.c_str()));
+  if (!*ifs)
     throw std::runtime_error("Could not open file '" + filename + "'.");
+  return ifs;
 }
 
 void read_fasta_names_and_seqs(const std::string& filename,
@@ -25,9 +25,8 @@ void read_fasta_names_and_seqs(const std::string& filename,
                                std::vector<std::string>& names,
                                std::map<std::string, size_t>& names_to_idxs)
 {
-  std::ifstream ifs;
-  open_or_throw(ifs, filename);
-  deweylab::bio::formats::fasta::InputStream is(ifs);
+  boost::shared_ptr<std::ifstream> ifs = open_or_throw(filename);
+  deweylab::bio::formats::fasta::InputStream is(*ifs);
   deweylab::bio::formats::fasta::Record rec;
   size_t idx = 0;
   while (is >> rec) {
@@ -44,19 +43,18 @@ void read_transcript_expression(const std::string& filename,
                                 std::vector<double>& expr,
                                 const std::map<std::string, size_t>& names_to_idxs)
 {
-  std::ifstream ifs;
-  open_or_throw(ifs, filename);
+  boost::shared_ptr<std::ifstream> ifs = open_or_throw(filename);
   std::string line;
   std::vector<std::string> col(8);
   { // header
-    getline(ifs, line);
+    getline(*ifs, line);
     std::stringstream ss(line);
     for (size_t i = 0; i < 8; ++i)
       getline(ss, col[i], '\t');
     assert(col[0] == "transcript_id");
     assert(col[5] == "TPM");
   }
-  while (getline(ifs, line)) {
+  while (getline(*ifs, line)) {
     std::stringstream ss(line);
     for (size_t i = 0; i < 8; ++i)
       getline(ss, col[i], '\t');

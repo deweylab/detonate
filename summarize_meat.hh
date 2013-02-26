@@ -148,17 +148,6 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
   }
 }
 
-template<typename AlignmentType>
-void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentType> >&    best_from_A, 
-                                               const std::string&                         fname,
-                                               const std::map<std::string, size_t>&       A_names_to_idxs)
-{
-  std::ifstream ifs;
-  open_or_throw(ifs, fname);
-  typename AlignmentType::input_stream_type input_stream(ifs);
-  read_alignments_and_filter_by_best_from_A(best_from_A, input_stream, A_names_to_idxs);
-}
-
 // For each b in B, collect all the best alignments from a's that have b as
 // target. The purpose here is to facilitate (i) make parallel processing and
 // (ii) reduced memory usage later on.
@@ -371,8 +360,10 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Reading alignments and filtering them by A" << std::endl;
   std::vector<BestTuple<AlignmentType> > best_from_A(A_card), best_from_B(B_card);
-  read_alignments_and_filter_by_best_from_A(best_from_A, vm["A-to-B"].as<std::string>(), A_names_to_idxs);
-  read_alignments_and_filter_by_best_from_A(best_from_B, vm["B-to-A"].as<std::string>(), B_names_to_idxs);
+  typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
+  typename AlignmentType::input_stream_type B_to_A_is(open_or_throw(vm["B-to-A"].as<std::string>()));
+  read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs);
+  read_alignments_and_filter_by_best_from_A(best_from_B, B_to_A_is, B_names_to_idxs);
 
   std::cerr << "Clustering alignments by B" << std::endl;
   std::vector<std::vector<const AlignmentType *> > clustered_best_to_B(B_card), clustered_best_to_A(A_card);
