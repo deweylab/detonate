@@ -14,8 +14,10 @@ BOOST_AUTO_TEST_CASE(alignment_concept)
 
   BOOST_CHECK_EQUAL(al.a_name(), "comp12_c1_seq1");
   BOOST_CHECK_EQUAL(al.b_name(), "gi|301621625|gb|XP_002940146|");
-  BOOST_CHECK_EQUAL(al.frac_identity(), 1.0*130*3/3219);
-  BOOST_CHECK_EQUAL(al.frac_indel(), 1.0*106*3/3219);
+  BOOST_CHECK_EQUAL(al.frac_identity_wrt_a(), 1.0*130*3/3219);
+  BOOST_CHECK_EQUAL(al.frac_indel_wrt_a(), 1.0*106*3/3219);
+  BOOST_CHECK_EQUAL(al.frac_identity_wrt_b(), 1.0*130/1125);
+  BOOST_CHECK_EQUAL(al.frac_indel_wrt_b(), 1.0*106/1125);
 }
 
 BOOST_AUTO_TEST_CASE(one_interval)
