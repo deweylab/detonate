@@ -25,6 +25,7 @@ INCLUDE = -I$(BOOST_INCLUDE)
 LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
+.PHONY: all
 all: summarize summarize_kmer
 
 summarize_jobs := $(foreach gp, 1 2 3 4, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
@@ -33,8 +34,8 @@ bp = $(word 2,$(subst _, ,$*))
 np = $(word 3,$(subst _, ,$*))
 
 .PHONY: summarize
-summarize: ${summarize_jobs} summarize.cpp summarize_meat.hh
-${summarize_jobs}: summarize_%:
+summarize: ${summarize_jobs}
+${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
