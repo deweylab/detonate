@@ -25,19 +25,24 @@ INCLUDE = -I$(BOOST_INCLUDE)
 LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
-all: summarize_kmer summarize
+all: summarize summarize_kmer
+
+summarize_jobs := $(foreach gp, 1 2 3 4, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
+gp = $(word 1,$(subst _, ,$*))
+bp = $(word 2,$(subst _, ,$*))
+np = $(word 3,$(subst _, ,$*))
+
+.PHONY: summarize
+summarize: ${summarize_jobs} summarize.cpp summarize_meat.hh
+${summarize_jobs}: summarize_%:
+	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
-summarize: summarize.cpp summarize_meat.hh
-	#$(CC) $(CFLAGS) $(INCLUDE) summarize.cpp $(LIBS) -o summarize
-	$(foreach gp, 1 2 3 4, \
-	  $(foreach bp, 1 2 3 4, \
-	    $(foreach np, 1 2, \
-		  $(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np);)))
+all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats
 
-test: test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats
+test: ${all_tests}
 	./test_lazycsv
 	./test_line_stream
 	./test_blast
@@ -75,32 +80,6 @@ test_read_cluster_filter_alignments: test_read_cluster_filter_alignments.cpp
 test_compute_alignment_stats: test_compute_alignment_stats.cpp
 	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
 
-# OLD
-
-redux2: redux2.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) redux2.cpp $(LIBS) -o redux2
-
-test_split: test_split.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) test_split.cpp $(LIBS) -o test_split
-
-redux: redux.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) redux.cpp $(LIBS) -o redux
-
-test_virtual: test_virtual.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) test_virtual.cpp $(LIBS) -o test_virtual
-
-test_boost_icl: test_boost_icl.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) test_boost_icl.cpp $(LIBS) -o test_boost_icl
-
-test_interval_for_blast: test_interval_for_blast.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) test_interval_for_blast.cpp $(LIBS) -o test_interval_for_blast
-
-test_parse: test_parse.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) test_parse.cpp $(LIBS) -o test_parse
-
-summarize_nucl_weighted_3: summarize_nucl_weighted_3.cpp psl.h
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_nucl_weighted_3.cpp $(LIBS) -o summarize_nucl_weighted_3
-
-summarize_nucl_weighted_2: summarize_nucl_weighted_2.cpp psl.h
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_nucl_weighted_2.cpp $(LIBS) -o summarize_nucl_weighted_2
-# DO NOT DELETE
+.PHONY:
+clean:
+	-rm -f ${summarize_jobs} summarize_kmer ${all_tests}
