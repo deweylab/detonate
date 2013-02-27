@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <iterator>
+#include <string>
 #include <vector>
 #include <list>
 #include <omp.h>
@@ -10,11 +11,8 @@
 #include <boost/foreach.hpp>
 #include <sparsehash/sparse_hash_map>
 //#include <sparsehash/dense_hash_map>
-#include "blast.hh"
-#include "psl.hh"
-#include "pairset.hh"
-#include "mask.hh"
 #include "util.hh"
+using namespace std;
 
 struct KmerInfo
 {
@@ -163,17 +161,21 @@ void print_kmer_stats(
   typedef std::pair<const KmerStats::key_type, KmerStats::value_type> X;
 
   {
-    double KL_A_to_M = 0, KL_B_to_M = 0; 
+    double KL_A_to_M = 0, KL_B_to_M = 0;
+    size_t num_shared = 0;
     BOOST_FOREACH(const X& x, stats) {
       const KmerInfo& i = x.second;
       double mean_prob = 0.5*(i.probs[0] + i.probs[1]);
       KL_A_to_M += i.probs[0] == 0 ? 0 : i.probs[0] * (log2(i.probs[0]) - log2(mean_prob));
       KL_B_to_M += i.probs[1] == 0 ? 0 : i.probs[1] * (log2(i.probs[1]) - log2(mean_prob));
+      if (i.probs[0] != 0 && i.probs[1] != 0)
+        ++num_shared;
     }
     double JS = 0.5*KL_A_to_M + 0.5*KL_B_to_M;
     cout << prefix << "_probs_KL_A_to_M_" << suffix << "\t" << KL_A_to_M << endl;
     cout << prefix << "_probs_KL_B_to_M_" << suffix << "\t" << KL_B_to_M << endl;
     cout << prefix << "_probs_JS_" << suffix << "\t" << JS << endl;
+    cout << prefix << "_num_shared_" << suffix << "\t" << num_shared << endl;
   }
 
   {
