@@ -113,8 +113,8 @@ inline bool is_better(const T& al, const S& ref)
   double d2 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
   return d1 > 0 || (d1 == 0 && d2 > 0);
   #elif (BETTER_POLICY == 4)
-  double d1 = al.num_identity() - ref.al.num_identity();
-  double d2 = al.num_indel()    - ref.al.num_indel();
+  double d1 = 1.0*al.num_identity() - 1.0*ref.al.num_identity();
+  double d2 = -(1.0*al.num_indel()  - 1.0*ref.al.num_indel());
   return d1 > 0 || (d1 == 0 && d2 > 0);
   #else
   #error "need to define BETTER_POLICY"
