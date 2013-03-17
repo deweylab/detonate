@@ -209,6 +209,205 @@ void filter_by_best_alignment_to_B(std::vector<std::vector<const AlignmentType *
   }
 }
 
+struct tran_recall_tag {};
+struct nucl_recall_tag {};
+struct pair_recall_tag {};
+
+template<typename AlignmentType>
+struct tagged_alignment
+{
+  size_t b_idx;
+  typename AlignmentType::segments_type segments;
+  double contribution;
+  bool is_deleted;
+};
+
+template<typename AlignmentType, typename RecallType>
+double compute_contribution<AlignmentType, pair_recall_tag>(typename AlignmentType::segments_type segments, double tau_b)
+{
+  smart_pairset b_pairset(B[b_idx].size());
+  BOOST_FOREACH(const alignment_segment& seg, segments)
+    b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+  return tau_B[b_idx] * b_pairset.size();
+}
+
+template<typename AlignmentType, typename RecallType>
+double compute_contribution<AlignmentType, nucl_recall_tag>(typename AlignmentType::segments_type segments, double tau_b)
+{
+  smart_pairset b_pairset(B[b_idx].size());
+  BOOST_FOREACH(const alignment_segment& seg, segments)
+    b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+  return tau_B[b_idx] * b_mask.num_ones();
+}
+
+template<typename AlignmentType, typename RecallType>
+double compute_contribution<AlignmentType, tran_recall_tag>(typename AlignmentType::segments_type segments, double tau_b)
+{
+  // Unclear what this implementation should be
+  smart_pairset b_pairset(B[b_idx].size());
+  BOOST_FOREACH(const alignment_segment& seg, segments)
+    b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+  return tau_B[b_idx] * b_mask.num_ones();
+}
+
+template<typename AlignmentType>
+struct compare_tagged_alignments
+{
+  bool operator()(const AlignmentType *l1, const AlignmentType *l2) const
+  {
+    return l1->contribution < l2->contribution;
+  }
+};
+
+template<typename AlignmentType, typename RecallType>
+struct result_struct;
+
+template<typename AlignmentType, typename RecallType>
+struct result_struct<AlignmentType, pair_recall_tag>
+{
+  double numer;
+  result_struct() : numer(0.0) {}
+  void add_contribution(const tagged_alignment<AlignmentType>& l) { numer += l.contribution; }
+
+  double get(const std::vector<std::string>& B,
+             const std::vector<double>&      tau_B)
+  {
+    double denom = 0.0;
+    for (size_t b_idx = 0; b_idx < B.size(); ++b_idx)
+      denom += tau_B[b_idx] * B[b_idx].size() * (B[b_idx].size() + 1) / 2;
+    return numer/denom;
+  }
+};
+
+template<typename AlignmentType, typename RecallType>
+struct result_struct<AlignmentType, nucl_recall_tag>
+{
+  double numer;
+  result_struct() : numer(0.0) {}
+  void add_contribution(const tagged_alignment<AlignmentType>& l) { numer += l.contribution; }
+
+  double get(const std::vector<std::string>& B,
+             const std::vector<double>&      tau_B)
+  {
+    double denom = 0.0;
+    for (size_t b_idx = 0; b_idx < B.size(); ++b_idx)
+      denom += tau_B[b_idx] * B[b_idx].size();
+    return numer/denom;
+  }
+};
+
+template<typename AlignmentType, typename RecallType>
+struct result_struct<AlignmentType, tran_recall_tag>
+{
+  std::vector<mask> B_mask;
+  std::vector<double> B_frac_ones;
+
+  result_struct(const std::vector<std::string>& B)
+  : B_frac_ones(B.size())
+  {
+    BOOST_FOREACH(const std::string& b, B)
+      B_mask.push_back(mask(b.size()));
+  }
+
+  void add_contribution(const tagged_alignment<AlignmentType>& l)
+  {
+    mask& m = B_mask[l.b_idx];
+    BOOST_FOREACH(const alignment_segment& seg, l.segments)
+      m.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+  }
+
+  double get(const std::vector<std::string>& B,
+             const std::vector<double>&      tau_B)
+  {
+    double recall = 0.0;
+    for (size_t b_idx = 0; b_idx < B.size(); ++b_idx) {
+      B_frac_ones[b_idx] = (1.0 * B_mask[b_idx].num_ones()) / B[b_idx].size();
+      if (B_frac_ones[b_idx] >= 0.95)
+        recall += tau_B[b_idx];
+    }
+    return recall;
+  }
+};
+
+// Preconditions:
+// - best_from_A should be of size 0
+template<typename AlignmentType, typename RecallType>
+void do_it_all(std::vector<std::vector<const AlignmentType *> >& best_to_B,
+               std::vector<AlignmentType>&                       mempool,
+               typename AlignmentType::input_stream_type&        input_stream,
+               const std::vector<std::string>&                   A,
+               const std::vector<std::string>&                   B,
+               const std::vector<double>&                        tau_B,
+               result_struct<RecallType>&                        result)
+{
+  typedef tagged_alignment<AlignmentType> TAT;
+
+  // Read alignments into a big vector L.
+  AlignmentType al;
+  TAT l;
+  std::vector<AlignmentType> L;
+  while (input_stream >> al) {
+    if (is_good_enough(al)) {
+      l.b_idx = B_names_to_idxs.find(l.al.b_name())->second;
+      l.segments = al.segments(A[a_idx], B[b_idx]);
+      l.contribution = compute_contribution<AlignmentType, RecallType>(l.segments, tau_B[l.b_idx]);
+      l.is_deleted = false;
+      L.push_back(l);
+    }
+  }
+
+  // Cluster alignments by their targets b in B.
+  size_t B_card = B_names_to_idxs.size();
+  std::vector<std::vector<const TAT *> > L_B(B_card);
+  BOOST_FOREACH(const TAT& l, L)
+    L_B[l.b_idx].push_back(&l);
+
+  // Make priority queue initially filled with all elements of L.
+  std::priority_queue<
+    const TAT *,
+    std::vector<const TAT *>,
+    compare_tagged_alignments<AlignmentType> > Q(L);
+
+  for (;;) {
+
+    // Pop l1 from Q.
+    const TAT *l1 = Q.front();
+    Q.pop();
+
+    // Record l1's contribution.
+    result.add_contribution(*l1);
+    l1->is_deleted = true;
+
+    // For each l2 in L_b that intersects l1:
+    BOOST_FOREACH(TAT* l2, L_B[l1->b_idx]) {
+      if (intersects(l1->segments, l2->segments)) {
+
+        // Mark l2 as deleted.
+        l2->is_deleted = true;
+
+        // Add a new alignment, l3, with segments "l2 - l1"
+        L.push_back(TAT());
+        TAT *l3 = &(L.back());
+        l3->b_idx = l2->b_idx;
+        l3->is_deleted = false;
+        l3->segments = subtract(l2->segments, l1->segments);
+        l3->contribution = compute_contribution<AlignmentType, RecallType>(l3->segments, tau_B[l3->b_idx]);
+
+        // If l3 is good enough, add it to Q. (Otherwise, get rid of it.)
+        //if (is_good_enough(l3))
+        if (true)
+          Q.push(l3);
+        else
+          L.pop_back();
+      }
+    }
+
+    // If Q is not empty, loop.
+    if (Q.empty())
+      break;
+  }
+}
+
 template<typename PairsetType, typename AlignmentType>
 stats_tuple compute_alignment_stats(std::vector<double>& B_frac_ones,
                                     const std::vector<std::vector<const AlignmentType *> >& best_to_B,
