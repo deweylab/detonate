@@ -209,68 +209,48 @@ void filter_by_best_alignment_to_B(std::vector<std::vector<const AlignmentType *
   }
 }
 
-struct tran_recall_tag {};
-struct nucl_recall_tag {};
-struct pair_recall_tag {};
-
 template<typename AlignmentType>
 struct tagged_alignment
 {
-  size_t b_idx;
-  typename AlignmentType::segments_type segments;
+  size_t a_idx, b_idx;
+  std::vector<alignment_segment> segments;
+  //typename AlignmentType::segments_type segments;
   double contribution;
   bool is_deleted;
 };
 
-template<typename AlignmentType, typename RecallType>
-double compute_contribution<AlignmentType, pair_recall_tag>(typename AlignmentType::segments_type segments, double tau_b)
-{
-  smart_pairset b_pairset(B[b_idx].size());
-  BOOST_FOREACH(const alignment_segment& seg, segments)
-    b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
-  return tau_B[b_idx] * b_pairset.size();
-}
-
-template<typename AlignmentType, typename RecallType>
-double compute_contribution<AlignmentType, nucl_recall_tag>(typename AlignmentType::segments_type segments, double tau_b)
-{
-  smart_pairset b_pairset(B[b_idx].size());
-  BOOST_FOREACH(const alignment_segment& seg, segments)
-    b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
-  return tau_B[b_idx] * b_mask.num_ones();
-}
-
-template<typename AlignmentType, typename RecallType>
-double compute_contribution<AlignmentType, tran_recall_tag>(typename AlignmentType::segments_type segments, double tau_b)
-{
-  // Unclear what this implementation should be
-  smart_pairset b_pairset(B[b_idx].size());
-  BOOST_FOREACH(const alignment_segment& seg, segments)
-    b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
-  return tau_B[b_idx] * b_mask.num_ones();
-}
-
 template<typename AlignmentType>
 struct compare_tagged_alignments
 {
-  bool operator()(const AlignmentType *l1, const AlignmentType *l2) const
+  bool operator()(const tagged_alignment<AlignmentType> *l1, const tagged_alignment<AlignmentType> *l2) const
   {
     return l1->contribution < l2->contribution;
   }
 };
 
-template<typename AlignmentType, typename RecallType>
-struct result_struct;
-
-template<typename AlignmentType, typename RecallType>
-struct result_struct<AlignmentType, pair_recall_tag>
+template<typename AlignmentType>
+struct pair_helper
 {
-  double numer;
-  result_struct() : numer(0.0) {}
-  void add_contribution(const tagged_alignment<AlignmentType>& l) { numer += l.contribution; }
+  const std::vector<std::string>& B;
+  const std::vector<double>&      tau_B;
+  double                          numer;
 
-  double get(const std::vector<std::string>& B,
-             const std::vector<double>&      tau_B)
+  pair_helper(const std::vector<std::string>& B,
+              const std::vector<double>&      tau_B)
+  : B(B), tau_B(tau_B), numer(0.0)
+  {}
+
+  double compute_contribution(const tagged_alignment<AlignmentType>& l) const
+  {
+    smart_pairset b_pairset(B[l.b_idx].size());
+    BOOST_FOREACH(const alignment_segment& seg, l.segments)
+      b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+    return tau_B[l.b_idx] * b_pairset.size();
+  }
+
+  void add_contribution_to_recall(const tagged_alignment<AlignmentType>& l) { numer += l.contribution; }
+
+  double get_recall()
   {
     double denom = 0.0;
     for (size_t b_idx = 0; b_idx < B.size(); ++b_idx)
@@ -279,15 +259,29 @@ struct result_struct<AlignmentType, pair_recall_tag>
   }
 };
 
-template<typename AlignmentType, typename RecallType>
-struct result_struct<AlignmentType, nucl_recall_tag>
+template<typename AlignmentType>
+struct nucl_helper
 {
-  double numer;
-  result_struct() : numer(0.0) {}
-  void add_contribution(const tagged_alignment<AlignmentType>& l) { numer += l.contribution; }
+  const std::vector<std::string>& B;
+  const std::vector<double>&      tau_B;
+  double                          numer;
 
-  double get(const std::vector<std::string>& B,
-             const std::vector<double>&      tau_B)
+  nucl_helper(const std::vector<std::string>& B,
+              const std::vector<double>&      tau_B)
+  : B(B), tau_B(tau_B), numer(0.0)
+  {}
+
+  double compute_contribution(const tagged_alignment<AlignmentType>& l) const
+  {
+    mask b_mask(B[l.b_idx].size());
+    BOOST_FOREACH(const alignment_segment& seg, l.segments)
+      b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+    return tau_B[l.b_idx] * b_mask.num_ones();
+  }
+
+  void add_contribution_to_recall(const tagged_alignment<AlignmentType>& l) { numer += l.contribution; }
+
+  double get_recall()
   {
     double denom = 0.0;
     for (size_t b_idx = 0; b_idx < B.size(); ++b_idx)
@@ -296,28 +290,38 @@ struct result_struct<AlignmentType, nucl_recall_tag>
   }
 };
 
-template<typename AlignmentType, typename RecallType>
-struct result_struct<AlignmentType, tran_recall_tag>
+template<typename AlignmentType>
+struct tran_helper
 {
-  std::vector<mask> B_mask;
-  std::vector<double> B_frac_ones;
+  const std::vector<std::string>& B;
+  const std::vector<double>&      tau_B;
+  std::vector<mask>               B_mask;
+  std::vector<double>             B_frac_ones;
 
-  result_struct(const std::vector<std::string>& B)
-  : B_frac_ones(B.size())
+  tran_helper(const std::vector<std::string>& B,
+              const std::vector<double>&      tau_B)
+  : B(B), tau_B(tau_B), B_frac_ones(B.size())
   {
     BOOST_FOREACH(const std::string& b, B)
       B_mask.push_back(mask(b.size()));
   }
 
-  void add_contribution(const tagged_alignment<AlignmentType>& l)
+  double compute_contribution(const tagged_alignment<AlignmentType>& l) const
+  {
+    mask b_mask(B[l.b_idx].size());
+    BOOST_FOREACH(const alignment_segment& seg, l.segments)
+      b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+    return tau_B[l.b_idx] * b_mask.num_ones();
+  }
+
+  void add_contribution_to_recall(const tagged_alignment<AlignmentType>& l)
   {
     mask& m = B_mask[l.b_idx];
     BOOST_FOREACH(const alignment_segment& seg, l.segments)
       m.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
   }
 
-  double get(const std::vector<std::string>& B,
-             const std::vector<double>&      tau_B)
+  double get_recall()
   {
     double recall = 0.0;
     for (size_t b_idx = 0; b_idx < B.size(); ++b_idx) {
@@ -331,26 +335,27 @@ struct result_struct<AlignmentType, tran_recall_tag>
 
 // Preconditions:
 // - best_from_A should be of size 0
-template<typename AlignmentType, typename RecallType>
-void do_it_all(std::vector<std::vector<const AlignmentType *> >& best_to_B,
-               std::vector<AlignmentType>&                       mempool,
+template<typename AlignmentType, typename HelperType>
+void do_it_all(HelperType&                                       helper,
                typename AlignmentType::input_stream_type&        input_stream,
                const std::vector<std::string>&                   A,
                const std::vector<std::string>&                   B,
-               const std::vector<double>&                        tau_B,
-               result_struct<RecallType>&                        result)
+               const std::map<std::string, size_t>&              A_names_to_idxs,
+               const std::map<std::string, size_t>&              B_names_to_idxs)
 {
   typedef tagged_alignment<AlignmentType> TAT;
 
   // Read alignments into a big vector L.
   AlignmentType al;
   TAT l;
-  std::vector<AlignmentType> L;
+  std::vector<TAT> L;
   while (input_stream >> al) {
     if (is_good_enough(al)) {
-      l.b_idx = B_names_to_idxs.find(l.al.b_name())->second;
-      l.segments = al.segments(A[a_idx], B[b_idx]);
-      l.contribution = compute_contribution<AlignmentType, RecallType>(l.segments, tau_B[l.b_idx]);
+      l.a_idx = A_names_to_idxs.find(al.a_name())->second;
+      l.b_idx = B_names_to_idxs.find(al.b_name())->second;
+      typename AlignmentType::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
+      l.segments.assign(segs.begin(), segs.end());
+      l.contribution = helper.compute_contribution(l);
       l.is_deleted = false;
       L.push_back(l);
     }
@@ -358,24 +363,25 @@ void do_it_all(std::vector<std::vector<const AlignmentType *> >& best_to_B,
 
   // Cluster alignments by their targets b in B.
   size_t B_card = B_names_to_idxs.size();
-  std::vector<std::vector<const TAT *> > L_B(B_card);
-  BOOST_FOREACH(const TAT& l, L)
+  std::vector<std::vector<TAT *> > L_B(B_card);
+  BOOST_FOREACH(TAT& l, L)
     L_B[l.b_idx].push_back(&l);
 
   // Make priority queue initially filled with all elements of L.
+  compare_tagged_alignments<AlignmentType> comparator;
   std::priority_queue<
-    const TAT *,
-    std::vector<const TAT *>,
-    compare_tagged_alignments<AlignmentType> > Q(L);
+    TAT *,
+    std::vector<TAT *>,
+    compare_tagged_alignments<AlignmentType> > Q(L.begin(), L.end(), comparator);
 
   for (;;) {
 
     // Pop l1 from Q.
-    const TAT *l1 = Q.front();
+    TAT *l1 = Q.top();
     Q.pop();
 
     // Record l1's contribution.
-    result.add_contribution(*l1);
+    helper.add_contribution_to_recall(*l1);
     l1->is_deleted = true;
 
     // For each l2 in L_b that intersects l1:
@@ -389,9 +395,9 @@ void do_it_all(std::vector<std::vector<const AlignmentType *> >& best_to_B,
         L.push_back(TAT());
         TAT *l3 = &(L.back());
         l3->b_idx = l2->b_idx;
-        l3->is_deleted = false;
         l3->segments = subtract(l2->segments, l1->segments);
-        l3->contribution = compute_contribution<AlignmentType, RecallType>(l3->segments, tau_B[l3->b_idx]);
+        l3->contribution = helper.compute_contribution(*l3);
+        l3->is_deleted = false;
 
         // If l3 is good enough, add it to Q. (Otherwise, get rid of it.)
         //if (is_good_enough(l3))
@@ -406,6 +412,40 @@ void do_it_all(std::vector<std::vector<const AlignmentType *> >& best_to_B,
     if (Q.empty())
       break;
   }
+}
+
+template<typename AlignmentType>
+stats_tuple do_it_all_wrapper(const std::string                    input_fname,
+                              const std::vector<std::string>&      A,
+                              const std::vector<std::string>&      B,
+                              const std::vector<double>&           tau_B,
+                              const std::map<std::string, size_t>& A_names_to_idxs,
+                              const std::map<std::string, size_t>& B_names_to_idxs)
+{
+  stats_tuple st;
+
+  {
+    pair_helper<AlignmentType> ph(B, tau_B);
+    typename AlignmentType::input_stream_type is(open_or_throw(input_fname));
+    do_it_all<AlignmentType>(ph, is, A, B, A_names_to_idxs, B_names_to_idxs);
+    st.pair = ph.get_recall();
+  }
+
+  {
+    nucl_helper<AlignmentType> nh(B, tau_B);
+    typename AlignmentType::input_stream_type is(open_or_throw(input_fname));
+    do_it_all<AlignmentType>(nh, is, A, B, A_names_to_idxs, B_names_to_idxs);
+    st.nucl = nh.get_recall();
+  }
+
+  {
+    tran_helper<AlignmentType> th(B, tau_B);
+    typename AlignmentType::input_stream_type is(open_or_throw(input_fname));
+    do_it_all<AlignmentType>(th, is, A, B, A_names_to_idxs, B_names_to_idxs);
+    st.tran = th.get_recall();
+  }
+
+  return st;
 }
 
 template<typename PairsetType, typename AlignmentType>
@@ -624,8 +664,18 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  std::cout << "summarize_version_7\t0" << std::endl;
+  std::cout << "summarize_version_8\t0" << std::endl;
 
+  stats_tuple recall, precis;
+  recall = do_it_all_wrapper<AlignmentType>(vm["A-to-B"].as<std::string>(), A, B, real_tau_B, A_names_to_idxs, B_names_to_idxs);
+  precis = do_it_all_wrapper<AlignmentType>(vm["B-to-A"].as<std::string>(), B, A, real_tau_A, B_names_to_idxs, A_names_to_idxs);
+  print_stats(precis, recall, "weighted_matched");
+
+  recall = do_it_all_wrapper<AlignmentType>(vm["A-to-B"].as<std::string>(), A, B, unif_tau_B, A_names_to_idxs, B_names_to_idxs);
+  precis = do_it_all_wrapper<AlignmentType>(vm["B-to-A"].as<std::string>(), B, A, unif_tau_A, B_names_to_idxs, A_names_to_idxs);
+  print_stats(precis, recall, "unweighted_matched");
+
+  #if 0
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
 
@@ -667,4 +717,6 @@ void main_1(const boost::program_options::variables_map& vm)
   std::ofstream plot_out(vm["plot-output"].as<std::string>().c_str());
   BOOST_FOREACH(double x, B_frac_ones)
     plot_out << x << std::endl;
+  #endif
+
 }

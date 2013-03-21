@@ -13,6 +13,7 @@ ifeq ($(shell uname), Darwin)
   BOOST_LIB     = /opt/local/lib
   BOOST_SUFFIX  = -mt.a
   UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
+  CC11          = g++
 endif
 
 CC = /usr/bin/g++
@@ -41,7 +42,7 @@ ${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
-all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats
+all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment
 
 test: ${all_tests}
 	./test_lazycsv
@@ -53,6 +54,7 @@ test: ${all_tests}
 	./test_mask
 	./test_read_cluster_filter_alignments
 	./test_compute_alignment_stats
+	./test_alignment_segment
 
 test_lazycsv: test_lazycsv.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_lazycsv.cpp $(LIBS) $(TEST_LIBS) -o test_lazycsv
@@ -80,6 +82,9 @@ test_read_cluster_filter_alignments: test_read_cluster_filter_alignments.cpp
 
 test_compute_alignment_stats: test_compute_alignment_stats.cpp
 	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
+
+test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
+	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_alignment_segment.cpp $(LIBS) $(TEST_LIBS) -o test_alignment_segment
 
 .PHONY:
 clean:
