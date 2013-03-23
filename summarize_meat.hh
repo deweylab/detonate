@@ -336,12 +336,12 @@ struct tran_helper
 // Preconditions:
 // - best_from_A should be of size 0
 template<typename AlignmentType, typename HelperType>
-void do_it_all(HelperType&                                       helper,
-               typename AlignmentType::input_stream_type&        input_stream,
-               const std::vector<std::string>&                   A,
-               const std::vector<std::string>&                   B,
-               const std::map<std::string, size_t>&              A_names_to_idxs,
-               const std::map<std::string, size_t>&              B_names_to_idxs)
+void do_it_all_2(HelperType&                                helper,
+                 typename AlignmentType::input_stream_type& input_stream,
+                 const std::vector<std::string>&            A,
+                 const std::vector<std::string>&            B,
+                 const std::map<std::string, size_t>&       A_names_to_idxs,
+                 const std::map<std::string, size_t>&       B_names_to_idxs)
 {
   typedef tagged_alignment<AlignmentType> TAT;
 
@@ -360,6 +360,12 @@ void do_it_all(HelperType&                                       helper,
       L.push_back(l);
     }
   }
+
+  // Cluster alignments by their targets a in A.
+  size_t A_card = A_names_to_idxs.size();
+  std::vector<std::vector<TAT *> > L_A(A_card);
+  BOOST_FOREACH(TAT& l, L)
+    L_A[l.a_idx].push_back(&l);
 
   // Cluster alignments by their targets b in B.
   size_t B_card = B_names_to_idxs.size();
@@ -384,9 +390,9 @@ void do_it_all(HelperType&                                       helper,
     helper.add_contribution_to_recall(*l1);
     l1->is_deleted = true;
 
-    // For each l2 in L_b that intersects l1:
+    // For each l2 in L_b whose coverage of b overlaps l's coverage of b:
     BOOST_FOREACH(TAT* l2, L_B[l1->b_idx]) {
-      if (intersects(l1->segments, l2->segments)) {
+      if (intersects<segment_ops_wrt_b>(l1->segments, l2->segments)) {
 
         // Mark l2 as deleted.
         l2->is_deleted = true;
@@ -395,7 +401,31 @@ void do_it_all(HelperType&                                       helper,
         L.push_back(TAT());
         TAT *l3 = &(L.back());
         l3->b_idx = l2->b_idx;
-        l3->segments = subtract(l2->segments, l1->segments);
+        l3->segments = subtract<segment_ops_wrt_b>(l2->segments, l1->segments);
+        l3->contribution = helper.compute_contribution(*l3);
+        l3->is_deleted = false;
+
+        // If l3 is good enough, add it to Q. (Otherwise, get rid of it.)
+        //if (is_good_enough(l3))
+        if (true)
+          Q.push(l3);
+        else
+          L.pop_back();
+      }
+    }
+
+    // For each l2 in L_a whose coverage of a overlaps l's coverage of a:
+    BOOST_FOREACH(TAT* l2, L_A[l1->a_idx]) {
+      if (intersects<segment_ops_wrt_a>(l1->segments, l2->segments)) {
+
+        // Mark l2 as deleted.
+        l2->is_deleted = true;
+
+        // Add a new alignment, l3, with segments "l2 - l1"
+        L.push_back(TAT());
+        TAT *l3 = &(L.back());
+        l3->a_idx = l2->a_idx;
+        l3->segments = subtract<segment_ops_wrt_a>(l2->segments, l1->segments);
         l3->contribution = helper.compute_contribution(*l3);
         l3->is_deleted = false;
 
@@ -411,6 +441,117 @@ void do_it_all(HelperType&                                       helper,
     // If Q is not empty, loop.
     if (Q.empty())
       break;
+  }
+}
+
+// Preconditions:
+// - best_from_A should be of size 0
+template<typename AlignmentType, typename HelperType>
+void do_it_all(HelperType&                                helper,
+               typename AlignmentType::input_stream_type& input_stream,
+               const std::vector<std::string>&            A,
+               const std::vector<std::string>&            B,
+               const std::map<std::string, size_t>&       A_names_to_idxs,
+               const std::map<std::string, size_t>&       B_names_to_idxs)
+{
+  typedef tagged_alignment<AlignmentType> TAT;
+
+  // Read alignments into a big vector L.
+  AlignmentType al;
+  TAT l;
+  std::vector<TAT> L;
+  size_t tmp_iter = 0, tmp_iter2 = 0;
+  while (input_stream >> al) {
+    std::cout << (++tmp_iter) << ", ";
+    if (is_good_enough(al)) {
+      std::cout << (++tmp_iter2) << std::endl;
+      l.a_idx = A_names_to_idxs.find(al.a_name())->second;
+      l.b_idx = B_names_to_idxs.find(al.b_name())->second;
+      typename AlignmentType::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
+      typename AlignmentType::segments_type::const_iterator it = segs.begin(), end = segs.end();
+      for (; it != end; ++it)
+        l.segments.push_back(*it);
+      //l.segments.assign(segs.begin(), segs.end());
+      l.contribution = helper.compute_contribution(l);
+      l.is_deleted = false;
+      L.push_back(l);
+    }
+  }
+
+  // Init vector of pointers to popped alignments.
+  std::vector<std::vector<TAT *> > popped_by_A(A.size());
+  std::vector<std::vector<TAT *> > popped_by_B(B.size());
+
+  // Make priority queue initially filled with all elements of L.
+  compare_tagged_alignments<AlignmentType> comparator;
+  std::priority_queue<
+    TAT *,
+    std::vector<TAT *>,
+    compare_tagged_alignments<AlignmentType> > Q(comparator);
+  BOOST_FOREACH(TAT& l1, L)
+    Q.push(&l1);
+
+  for ( ; !Q.empty(); ) {
+
+    // Pop l1 from Q.
+    TAT *l1 = Q.top();
+    Q.pop();
+
+    // Subtract all previous alignments from l1.
+    bool l1_has_changed = false;
+    typename std::vector<TAT *>::const_iterator
+        l2_a = popped_by_A[l1->a_idx].begin(), end_a = popped_by_A[l1->a_idx].end(),
+        l2_b = popped_by_B[l1->b_idx].begin(), end_b = popped_by_B[l1->b_idx].end();
+    for ( ; l2_a != end_a && l2_b != end_b; ) {
+
+      bool l2_b_was_popped_first;
+      if (l2_a != end_a && l2_b != end_b) {
+        // If *l2_a < *l2_b, i.e., the current alignment in popped_by_A has
+        // lower priority than the current alignment in popped_by_B, then *l2_b
+        // was popped before *l2_a.
+        l2_b_was_popped_first = comparator(*l2_a, *l2_b);
+      } else {
+        // Since we are still in the for loop (so one of the iterators is not
+        // at the end), and we got to this else (so one of the iterators is at
+        // the end), we just have to figure out which iterator is still not at
+        // the end.
+        l2_b_was_popped_first = (l2_b != end_b);
+      }
+
+      if (l2_b_was_popped_first) {
+        if (intersects<segment_ops_wrt_b>(l1->segments, (*l2_b)->segments)) {
+          subtract_in_place<segment_ops_wrt_b>(l1->segments, (*l2_b)->segments);
+          l1_has_changed = true;
+        }
+        ++l2_b;
+      } else {
+        if (intersects<segment_ops_wrt_a>(l1->segments, (*l2_a)->segments)) {
+          subtract_in_place<segment_ops_wrt_a>(l1->segments, (*l2_a)->segments);
+          l1_has_changed = true;
+        }
+        ++l2_a;
+      }
+
+    }
+
+    // If the alignment has changed, then put it back in the priority queue.
+    if (l1_has_changed) {
+
+      l1->contribution = helper.compute_contribution(*l1);
+      Q.push(l1);
+
+    // Otherwise, if the alignment has not changed, we actually process it.
+    } else {
+
+      // Record l1's contribution.
+      helper.add_contribution_to_recall(*l1);
+
+      // Add l1 to list of popped alignments.
+      popped_by_A[l1->a_idx].push_back(l1);
+      popped_by_B[l1->b_idx].push_back(l1);
+
+    }
+
   }
 }
 

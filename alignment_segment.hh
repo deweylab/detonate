@@ -184,8 +184,8 @@ bool intersects(const std::vector<alignment_segment>& segs2,
 }
 
 template<typename H>
-std::vector<alignment_segment> subtract(      std::vector<alignment_segment>  segs2, // copy
-                                        const std::vector<alignment_segment>& segs1)
+void subtract_in_place(      std::vector<alignment_segment>& segs2,
+                       const std::vector<alignment_segment>& segs1)
 {
   std::vector<alignment_segment>::iterator it;
   std::vector<alignment_segment> new_segs;
@@ -249,7 +249,12 @@ std::vector<alignment_segment> subtract(      std::vector<alignment_segment>  se
       segs2.push_back(seg3);
     new_segs.clear();
   }
-
-  return segs2;
 }
 
+template<typename H>
+std::vector<alignment_segment> subtract(      std::vector<alignment_segment>  segs2, // copy
+                                        const std::vector<alignment_segment>& segs1)
+{
+  subtract_in_place<H>(segs2, segs1);
+  return segs2;
+}
