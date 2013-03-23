@@ -178,14 +178,14 @@ namespace detail
       }
     }
 
+    // Note: We assume, but do not check, that the other iterator and this one
+    // are over the same alignment's segments.
     bool equal(const blast_alignment_segment_iterator& other) const
     {
-      if (!at_end && other.at_end)
-        return false;
-      else if (at_end && other.at_end)
-        return true;
+      if (at_end || other.at_end)
+        return at_end == other.at_end;
       else
-        throw std::runtime_error("General equal operator is not implemented.");
+        return i == other.i;
     }
 
     const alignment_segment& dereference() const { return seg; }

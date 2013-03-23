@@ -80,3 +80,51 @@ BOOST_AUTO_TEST_CASE(several_intervals)
   ++it;
   BOOST_CHECK_EQUAL(it == end, true);
 }
+
+BOOST_AUTO_TEST_CASE(iterator_equality)
+{
+  // The details of this alignment are irrelevant except that there are 3
+  // segments.
+  blast_alignment al;
+  std::string line = "comp12_c0_seq1	3219	gi|301610695|gb|XP_002934886|	636	3079	2756	23	116\t"
+  // 0         1         2           3         4         5         6         7         8         9         0
+  // 012345678901234567890123456789  012345678901234567890123456789012345678901234567890123456789012345678901234567
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIII--SSSSSSSSSSSSSSSSSSSSSSSSSSSSSFFFFFFFFFFFFFFFFDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\t"
+    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIILLSSSSSSSSSSSSSSSSSSSSSSSSSSSSS----------------DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\t"
+  // 0123456789012345678901234567890123456789012345678901234567890                123456789012345678901234567890123
+  // 0         1         2         3         4         5         6                         7         8         9
+    "2e-11	68.9	167	110	39.09	43	49	61	2	18	55.45	-3	0";
+  al.parse_line(line);
+  blast_alignment::segments_type segs = al.segments("", "");
+
+  // it1, it2 = seg 0, seg 0
+  blast_alignment::segments_type::const_iterator it1 = segs.begin(), it2 = segs.begin(), end = segs.end();
+  BOOST_CHECK(it1 == it2);
+  BOOST_CHECK(it1 != end);
+  BOOST_CHECK(it2 != end);
+
+  // it1, it2 = seg 1, seg 0
+  ++it1;
+  BOOST_CHECK(it1 != it2);
+  BOOST_CHECK(it1 != end);
+
+  // it1, it2 = seg 1, seg 1
+  ++it2;
+  BOOST_CHECK(it1 == it2);
+  BOOST_CHECK(it1 != end);
+
+  // it1, it2 = seg 2, seg 1
+  ++it1;
+  BOOST_CHECK(it1 != it2);
+  BOOST_CHECK(it1 != end);
+
+  // it1, it2 = seg 2, seg 2
+  ++it2;
+  BOOST_CHECK(it1 == it2);
+  BOOST_CHECK(it2 != end);
+
+  // it1, it2 = end, seg 2
+  ++it1;
+  BOOST_CHECK(it1 != it2);
+  BOOST_CHECK(it1 == end);
+}
