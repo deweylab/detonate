@@ -333,6 +333,7 @@ struct tran_helper
   }
 };
 
+#if 0
 // Preconditions:
 // - best_from_A should be of size 0
 template<typename AlignmentType, typename HelperType>
@@ -443,6 +444,19 @@ void do_it_all_2(HelperType&                                helper,
       break;
   }
 }
+#endif
+
+inline bool is_good_enough_for_do_it_all(const std::vector<alignment_segment>& segs)
+{
+  size_t len = 0;
+  BOOST_FOREACH(const alignment_segment& seg, segs) {
+    if (seg.a_end >= seg.a_start)
+      len += seg.a_end - seg.a_start + 1;
+    else
+      len += seg.a_start - seg.a_end + 1;
+  }
+  return len >= 30;
+}
 
 // Preconditions:
 // - best_from_A should be of size 0
@@ -456,26 +470,27 @@ void do_it_all(HelperType&                                helper,
 {
   typedef tagged_alignment<AlignmentType> TAT;
 
-  // Read alignments into a big vector L.
+  // Read alignments, perfom initial filtering, and convert the alignments to
+  // segments.
   AlignmentType al;
   TAT l;
   std::vector<TAT> L;
-  size_t tmp_iter = 0, tmp_iter2 = 0;
   while (input_stream >> al) {
-    std::cout << (++tmp_iter) << ", ";
     if (is_good_enough(al)) {
-      std::cout << (++tmp_iter2) << std::endl;
       l.a_idx = A_names_to_idxs.find(al.a_name())->second;
       l.b_idx = B_names_to_idxs.find(al.b_name())->second;
       typename AlignmentType::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
-      typename AlignmentType::segments_type::const_iterator it = segs.begin(), end = segs.end();
-      for (; it != end; ++it)
-        l.segments.push_back(*it);
-      //l.segments.assign(segs.begin(), segs.end());
-      l.contribution = helper.compute_contribution(l);
-      l.is_deleted = false;
-      L.push_back(l);
+      l.segments.assign(segs.begin(), segs.end());
+      if (is_good_enough_for_do_it_all(l.segments))
+        L.push_back(l);
     }
+  }
+
+  // Compute contributions.
+  #pragma omp parallel for
+  for (int i = 0; i < static_cast<int>(L.size()); ++i) {
+    TAT& l = L[i];
+    l.contribution = helper.compute_contribution(l);
   }
 
   // Init vector of pointers to popped alignments.
@@ -537,8 +552,10 @@ void do_it_all(HelperType&                                helper,
     // If the alignment has changed, then put it back in the priority queue.
     if (l1_has_changed) {
 
-      l1->contribution = helper.compute_contribution(*l1);
-      Q.push(l1);
+      if (is_good_enough_for_do_it_all(l1->segments)) {
+        l1->contribution = helper.compute_contribution(*l1);
+        Q.push(l1);
+      }
 
     // Otherwise, if the alignment has not changed, we actually process it.
     } else {

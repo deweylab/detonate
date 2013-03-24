@@ -220,3 +220,45 @@ BOOST_AUTO_TEST_CASE(forward_forward_split_1)
                          60,  60, 10, 10);
 }
 
+BOOST_AUTO_TEST_CASE(mismatches)
+{
+  VAS segs1 { {4, 6, 104, 106, {4, 5}, {104, 105}} };
+  VAS segs2 { {0, 5, 100, 105, {3, 5}, {103, 105}} };
+  BOOST_CHECK(intersects<segment_ops_wrt_b>(segs1, segs2));
+  BOOST_CHECK(intersects<segment_ops_wrt_a>(segs1, segs2));
+
+  VAS predb = subtract<segment_ops_wrt_b>(segs2, segs1);
+  VAS trutb { {0, 3, 100, 103, {3},    {103}     } };
+  BOOST_CHECK_EQUAL(predb, trutb);
+
+  VAS preda = subtract<segment_ops_wrt_a>(segs2, segs1);
+  VAS truta { {0, 3, 100, 103, {3},    {103}     } };
+  BOOST_CHECK_EQUAL(preda, truta);
+}
+
+BOOST_AUTO_TEST_CASE(multiple_segs)
+{
+  VAS segs1 { { 2,  3, 102, 103, {},     {}        },    // 1a
+              { 9, 10, 109, 110, {},     {}        },    // 1b
+              {11, 20, 111, 120, {},     {}        },    // 1c
+              {25, 26, 125, 126, {},     {}        } };  // 1d
+
+  VAS segs2 { { 0,  2, 100, 102, {0},    {100}     },    // 2a: clipped by 1a
+              { 3,  5, 103, 105, {3, 4}, {103, 104}},    // 2b: clipped by 1a
+              {10, 11, 110, 111, {},     {}        },    // 2c: removed by 1b and 1c together
+              {20, 30, 120, 130, {},     {}        } };  // 2d: clipped by 1c, then split by 1d
+
+  BOOST_CHECK(intersects<segment_ops_wrt_b>(segs1, segs2));
+
+  VAS trut  { { 0,  1, 100, 101, {0},    {100}     },    // 2a
+              { 4,  5, 104, 105, {4},    {104}     },    // 2b
+              /* empty */                                // 2c
+              {21, 24, 121, 124, {},     {}        },    // 2d, part 1
+              {27, 30, 127, 130, {},     {}        } };  // 2d, part 2
+
+  VAS predb = subtract<segment_ops_wrt_b>(segs2, segs1);
+  BOOST_CHECK_EQUAL(predb, trut);
+
+  VAS preda = subtract<segment_ops_wrt_a>(segs2, segs1);
+  BOOST_CHECK_EQUAL(preda, trut);
+}

@@ -45,6 +45,8 @@ struct segment_ops_wrt_b
 
   static inline size_t& a_start(alignment_segment& seg) { return seg.a_start; }
   static inline size_t& a_end  (alignment_segment& seg) { return seg.a_end  ; }
+
+  static inline std::vector<size_t>& mismatches(alignment_segment& seg) { return seg.b_mismatches; }
 };
 
 struct segment_ops_wrt_a
@@ -57,6 +59,8 @@ struct segment_ops_wrt_a
 
   static inline size_t& a_start(alignment_segment& seg) { return seg.b_start; }
   static inline size_t& a_end  (alignment_segment& seg) { return seg.b_end  ; }
+
+  static inline std::vector<size_t>& mismatches(alignment_segment& seg) { return seg.a_mismatches; }
 };
 
 template<typename H>
@@ -184,6 +188,21 @@ bool intersects(const std::vector<alignment_segment>& segs2,
 }
 
 template<typename H>
+void remove_extraneous_mismatches(std::vector<alignment_segment>& segs2)
+{
+  BOOST_FOREACH(alignment_segment& seg2, segs2) {
+    size_t l = H::l(seg2), r = H::r(seg2);
+    std::vector<size_t> new_mismatches;
+    new_mismatches.reserve(H::mismatches(seg2).size());
+    BOOST_FOREACH(size_t x, H::mismatches(seg2))
+      if (l <= x && x <= r)
+        new_mismatches.push_back(x);
+    std::swap(new_mismatches, H::mismatches(seg2));
+  }
+}
+
+// segs2 = segs2 - segs1
+template<typename H>
 void subtract_in_place(      std::vector<alignment_segment>& segs2,
                        const std::vector<alignment_segment>& segs1)
 {
@@ -228,7 +247,6 @@ void subtract_in_place(      std::vector<alignment_segment>& segs2,
       }
 
       else if (H::l(seg1) <= H::l(seg2) && H::r(seg2) <= H::r(seg1)) {
-        std::cout << "erasing seg: " << seg2 << std::endl;
         it = segs2.erase(it);
       }
 
@@ -248,9 +266,15 @@ void subtract_in_place(      std::vector<alignment_segment>& segs2,
     BOOST_FOREACH(const alignment_segment& seg3, new_segs)
       segs2.push_back(seg3);
     new_segs.clear();
-  }
+
+  } // end loop over segs1
+
+  // Remove mismatches that no longer fall within a segment.
+  remove_extraneous_mismatches<segment_ops_wrt_a>(segs2);
+  remove_extraneous_mismatches<segment_ops_wrt_b>(segs2);
 }
 
+// return segs2 - segs1
 template<typename H>
 std::vector<alignment_segment> subtract(      std::vector<alignment_segment>  segs2, // copy
                                         const std::vector<alignment_segment>& segs1)
