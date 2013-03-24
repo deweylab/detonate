@@ -27,7 +27,7 @@ LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboos
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
-all: summarize summarize_kmer
+all: summarize summarize_matched summarize_kmer
 
 summarize_jobs := $(foreach gp, 1 2 3 4, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
 gp = $(word 1,$(subst _, ,$*))
@@ -38,6 +38,9 @@ np = $(word 3,$(subst _, ,$*))
 summarize: ${summarize_jobs}
 ${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)
+
+summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
@@ -88,4 +91,4 @@ test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_kmer ${all_tests}
+	-rm -f ${summarize_jobs} summarize_matched summarize_kmer ${all_tests}
