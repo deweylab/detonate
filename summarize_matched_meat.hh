@@ -233,7 +233,7 @@ void do_it_all(HelperType&                   helper,
     typename std::vector<tagged_alignment *>::const_iterator
         l2_a = popped_by_A[l1->a_idx].begin(), end_a = popped_by_A[l1->a_idx].end(),
         l2_b = popped_by_B[l1->b_idx].begin(), end_b = popped_by_B[l1->b_idx].end();
-    for ( ; l2_a != end_a && l2_b != end_b; ) {
+    while (l2_a != end_a || l2_b != end_b) {
 
       bool l2_b_was_popped_first;
       if (l2_a != end_a && l2_b != end_b) {
