@@ -45,7 +45,7 @@ summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
-all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment
+all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
 
 test: ${all_tests}
 	./test_lazycsv
@@ -58,6 +58,7 @@ test: ${all_tests}
 	./test_read_cluster_filter_alignments
 	./test_compute_alignment_stats
 	./test_alignment_segment
+	./test_summarize_matched
 
 test_lazycsv: test_lazycsv.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_lazycsv.cpp $(LIBS) $(TEST_LIBS) -o test_lazycsv
@@ -88,6 +89,9 @@ test_compute_alignment_stats: test_compute_alignment_stats.cpp
 
 test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_alignment_segment.cpp $(LIBS) $(TEST_LIBS) -o test_alignment_segment
+
+test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
+	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_summarize_matched.cpp $(LIBS) $(TEST_LIBS) -o test_summarize_matched
 
 .PHONY:
 clean:
