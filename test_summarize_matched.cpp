@@ -1,5 +1,7 @@
 #include <string>
 #include <iostream>
+#include <random>       // std::default_random_engine
+#include <chrono>       // std::chrono::system_clock
 #define BOOST_TEST_MODULE test_summarize_matched_meat
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/floating_point_comparison.hpp>
@@ -279,4 +281,255 @@ BOOST_AUTO_TEST_CASE(several_A_elements_from_one_B_element)
   CHECK_CLOSE(recall.pair, (taus[0]*choose_2(100+1)) / pair_denom(lens, taus));
   CHECK_CLOSE(recall.nucl, (taus[0]*         100   ) / nucl_denom(lens, taus));
   CHECK_CLOSE(recall.tran, taus[0]);
+}
+
+//    b0                    b1
+// B  -----------------     -------------
+//         /    \   /  \   /  | / |
+//        /      \ /    \ /   |/  |
+//       /  x     /  y   \  z / w |
+//      /        / \    / \  /|   |
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Assume:
+// - x > y > z > w
+// - y - x < z
+// - y - x is contained in z, wrt A
+//
+// Step 1: Process alignment x, resulting in
+//
+//    b0                    b1
+// B  ------------------   --------------
+//         /        /\ \   /  | / |
+//        /        /  \ \ /   |/  |
+//       /  x     /    \*\  z / w |        * = y - x
+//      /        /      / \  /|   |
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Step 2: Process alignment z, resulting in
+//
+//    b0                    b1
+// B  -----------------    --------------
+//         /        /      /    /||
+//        /        /      /    / ||
+//       /  x     /      /  z /  *|        * = w - z
+//      /        /      /    /   ||
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Now we have a 1-1 mathing. The intervals of B used to compute recall are:
+//
+//    b0                    b1
+// B  -----[--------]--    [----][]------
+//         /        /      /    /||
+//        ...
+BOOST_AUTO_TEST_CASE(complicated_ordering_1)
+{
+  tagged_alignment x{ 0, 0, Segs{ {  0, 499, 200, 699, {}, {}} }, nan("") }; // #id = 500
+  tagged_alignment y{ 1, 0, Segs{ {150, 549, 500, 899, {}, {}} }, nan("") }; // #id = 400
+  tagged_alignment z{ 1, 1, Segs{ {300, 599,   0, 299, {}, {}} }, nan("") }; // #id = 300
+  tagged_alignment w{ 2, 1, Segs{ {  0, 249, 150, 399, {}, {}} }, nan("") }; // #id = 250
+  // Note:
+  // * y - x is [irrelevant] -> [700, 899], #id = 200
+  // * y - x is [350, 549] -> [700, 899] which is contained within z, wrt A, when the difference is taken wrt B.
+  // * w - z is [irrelevant] -> [300, 399], #id = 100
+  size_t A_card = 3, B_card = 2;
+  Lens lens{1000, 1000};
+  Taus taus{0.5, 0.5};
+  stats_tuple recall = do_it_all_wrapper({x, y, z, w}, A_card, B_card, lens, taus);
+  CHECK_CLOSE(recall.pair, (taus[0]*choose_2(500+1) + taus[1]*choose_2(300+1) + taus[1]*choose_2(100+1)) / pair_denom(lens, taus));
+  CHECK_CLOSE(recall.nucl, (taus[0]*         500    + taus[1]*         300    + taus[1]*         100   ) / nucl_denom(lens, taus));
+  CHECK_CLOSE(recall.tran, 0.0);
+}
+
+// Same initial picture:
+//
+//    b0                    b1
+// B  -----------------     -------------
+//         /    \   /  \   /  | / |
+//        /      \ /    \ /   |/  |
+//       /  x     /  y   \  z / w |
+//      /        / \    / \  /|   |
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Assume:
+// - x > y > w > z  (w and z are interchanged)
+// - y - x < w
+// - y - x > z - w
+// - y - x is contained in z, wrt A
+//
+// Step 1: Process alignment x, resulting in
+//
+//    b0                    b1
+// B  ------------------   --------------
+//         /        /\ \   /  | / |
+//        /        /  \ \ /   |/  |
+//       /  x     /    \*\  z / w |        * = y - x
+//      /        /      / \  /|   |
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Step 2: Process alignment w, resulting in
+//
+//    b0                    b1
+// B  ------------------   --------------
+//         /        /\ \   /  |   |
+//        /        /  \ \ /  /|   |
+//       /  x     /    \*\ +/ | w |        * = y - x
+//      /        /      / \/  |   |        + = z - w
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Step 3: Process alignment y - x, resulting in
+//
+//    b0                    b1
+// B  ------------------   --------------
+//         /        /\ \  +/  |   |
+//        /        /  \*\//   |   |
+//       /  x     /    \ \    | w |        * = y - x
+//      /        /     // \   |   |        + = (z - w) - (y - x)
+// A    ---------   --------- ---------
+//      a0          a1        a2
+//
+// Now we have a 1-1 mathing. The intervals of B used to compute recall are:
+//
+//    b0                    b1
+// B  -----[--------][-]   []-[---]------
+//         /        /\ \  //  |   |        * = y - x
+//          x         *   +     w          + = (z - w) - (y - x)
+//        ...                              
+BOOST_AUTO_TEST_CASE(complicated_ordering_2)
+{
+  tagged_alignment x{ 0, 0, Segs{ {  0, 499, 200, 699, {}, {}} }, nan("") }; // #id = 500
+  tagged_alignment y{ 1, 0, Segs{ {150, 549, 500, 899, {}, {}} }, nan("") }; // #id = 400
+  tagged_alignment z{ 1, 1, Segs{ {300, 549,   0, 249, {}, {}} }, nan("") }; // #id = 250
+  tagged_alignment w{ 2, 1, Segs{ {  0, 299, 100, 399, {}, {}} }, nan("") }; // #id = 300
+  // Note:
+  // * y - x is [350, 549] -> [700, 899], #id = 200, which is contained within z, wrt A, when the difference is taken wrt B.
+  // * z - w is [300, 399] -> [0, 99], #id = 100
+  // * (z - w) - (y - x) is [300, 349] -> [0, 49], #id = 50
+  size_t A_card = 3, B_card = 2;
+  Lens lens{1000, 1000};
+  Taus taus{0.5, 0.5};
+  stats_tuple recall = do_it_all_wrapper({x, y, z, w}, A_card, B_card, lens, taus);
+  CHECK_CLOSE(recall.pair, (taus[0]*(choose_2(500+1)+choose_2(200+1)) + taus[1]*(choose_2(50+1)+choose_2(300+1))) / pair_denom(lens, taus));
+  CHECK_CLOSE(recall.nucl, (taus[0]*(         500   +         200   ) + taus[1]*(         50   +         300   )) / nucl_denom(lens, taus));
+  CHECK_CLOSE(recall.tran, 0.0);
+}
+
+BOOST_AUTO_TEST_CASE(allpairs)
+{
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  std::default_random_engine rng(seed);
+
+  for (size_t trial = 0; trial < 50; ++trial) {
+
+    size_t n = 6;       // number of elements of A and of B
+    size_t len = n*n*2; // length of each element of A and of B
+
+    // E[i][j] is going to be the number of mismatches in the alignment from a[i] -> b[j].
+    //
+    // Simulate E randomly such that all nonzeros are distinct integers between
+    // 1 and n*n.
+    std::vector<std::vector<size_t>> E(n, std::vector<size_t>(n, 0)); // all zeros
+    {
+      std::vector<size_t> tmp;
+      for (size_t k = 0; k < n*n; ++k)
+        tmp.push_back(k+1);
+      std::shuffle(tmp.begin(), tmp.end(), rng);
+      std::vector<size_t>::iterator it = tmp.begin();
+      for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+          E[i][j] = *it;
+          ++it;
+        }
+      }
+    }
+
+    // A[i][j] is going to be 1 if there is an alignment a[i] -> b[j], and 0 otherwise.
+    std::vector<std::vector<size_t>> A(n, std::vector<size_t>(n, 1)); // all ones
+
+    // D[i][j] is going to be 1 if there the alignment a[i] -> b[j] has already been selected.
+    std::vector<std::vector<size_t>> D(n, std::vector<size_t>(n, 0)); // all zeros
+
+    // Figure out the matching that should be selected.
+    for (;;) {
+
+      // Choose i,j = argmin E[i][j] subject to constraints.
+      size_t best_i = 0, best_j = 0, best_E = std::numeric_limits<size_t>::max();
+      for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+          if (D[i][j] == 0 &&     // is not already done
+              A[i][j] == 1 &&     // is still aligned
+              E[i][j] < best_E) { // has fewer mismatches than current candidate
+            best_i = i;
+            best_j = j;
+            best_E = E[i][j];
+          }
+        }
+      }
+      D[best_i][best_j] = 1;
+
+      // Set all other entries of A in (i,j)'s row and column to zero.
+      for (size_t i = 0; i < n; ++i) if (i != best_i) A[i][best_j] = 0;
+      for (size_t j = 0; j < n; ++j) if (j != best_j) A[best_i][j] = 0;
+
+      // If nnz(A) == n, we are done.
+      size_t nnz = 0;
+      for (size_t i = 0; i < n; ++i)
+        for (size_t j = 0; j < n; ++j)
+          if (A[i][j] != 0)
+            ++nnz;
+      if (nnz == n)
+        break;
+      BOOST_CHECK(nnz >= n);
+
+    }
+
+    // Compute predicted recall.
+    double pred_pair_recall, pred_nucl_recall;
+    {
+      double pair_numer = 0.0, nucl_numer = 0.0;
+      for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+          if (A[i][j]) {
+            size_t num_id = len - E[i][j];
+            double tau    = 1.0/n;
+            pair_numer += tau*choose_2(num_id+1);
+            nucl_numer += tau*         num_id   ;
+          }
+        }
+      }
+      double pair_denom = n*(1.0/n)*choose_2(len+1);
+      double nucl_denom = n*(1.0/n)*         len   ;
+      pred_pair_recall = pair_numer / pair_denom;
+      pred_nucl_recall = nucl_numer / nucl_denom;
+    }
+
+    // Make all pairs of alignments, in which the alignment from a[i] -> b[j]
+    // has E[i][j] mismatches.
+    std::vector<tagged_alignment> alignments;
+    for (size_t i = 0; i < n; ++i) {
+      for (size_t j = 0; j < n; ++j) {
+        std::vector<size_t> mis;
+        for (size_t k = 0; k < E[i][j]; ++k)
+          mis.push_back(k);
+        alignments.push_back(tagged_alignment { i, j, Segs{ {  0, len-1, 0, len-1, mis, mis} }, nan("") });
+      }
+    }
+    size_t A_card = n, B_card = n;
+    Lens lens(n, len);
+    Taus taus(n, 1.0/n);
+    
+    // Compute hopefully true recall.
+    stats_tuple recall = do_it_all_wrapper(alignments, A_card, B_card, lens, taus);
+
+    // Compare the recalls.
+    CHECK_CLOSE(recall.pair, pred_pair_recall);
+    CHECK_CLOSE(recall.nucl, pred_nucl_recall);
+
+  } // loop over trials
 }
