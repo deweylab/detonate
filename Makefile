@@ -27,7 +27,7 @@ LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboos
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
-all: summarize summarize_matched summarize_kmer
+all: summarize summarize_matched summarize_kmer summarize_kmerpair
 
 summarize_jobs := $(foreach gp, 1 2 3 4, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
 gp = $(word 1,$(subst _, ,$*))
@@ -44,6 +44,9 @@ summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
+
+summarize_kmerpair: summarize_kmerpair.cpp summarize_kmer_meat.hh
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
 
 all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
 
@@ -95,4 +98,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_matched summarize_kmer ${all_tests}
+	-rm -f ${summarize_jobs} summarize_matched summarize_kmer summarize_kmerpair ${all_tests}
