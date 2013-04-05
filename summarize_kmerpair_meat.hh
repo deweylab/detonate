@@ -19,18 +19,23 @@ struct Probs
 {
   double for_A, for_B;
   Probs() : for_A(0.0), for_B(0.0) {}
-  inline double& operator()(size_t A_or_B)
-  {
-    if (A_or_B == 0) 
-      return for_A;
-    else
-      return for_B;
-  }
 };
+
+//typedef boost::array<google::sparse_hash_map<size_t, Probs>, 16> KmerStats;
 
 struct KmerStats
 {
-  typedef boost::array<google::sparse_hash_map<size_t, Probs>, 16> container_type;
+  boost::array<std::vector<Probs>, 16> data;
+
+  double& get_or_init(size_t pair, size_t dist, size_t A_or_B)
+  {
+    if (dist >= data[pair].size())
+      data[pair].resize(std::max(dist+1, data[pair].size()*2));
+    if (A_or_B == 0)
+      return data[pair][dist].for_A;
+    else
+      return data[pair][dist].for_B;
+  }
 };
 
 inline size_t choose_2(size_t n) { return n*(n-1)/2; }
@@ -50,7 +55,7 @@ inline size_t encode(char c)
 }
 
 void count_kmers(
-    KmerStats::container_type& stats,
+    KmerStats& stats,
     size_t A_or_B, // 0 if we're counting A's mers, 1 if B's
     const vector<string>& A,
     const vector<string>& A_rc,
@@ -73,7 +78,7 @@ void count_kmers(
           size_t i = encode(*a_l);
           size_t j = encode(*a_r);
           if (i < 4 && j < 4)
-            stats[i + 4*j][dist](A_or_B) += c; // relies on default init of Probs to {0.0, 0.0}
+            stats.get_or_init(i+4*j, dist, A_or_B) += c; // relies on default init of Probs to {0.0, 0.0}
           ++dist;
         }
       }
@@ -81,28 +86,26 @@ void count_kmers(
   }
 }
 
-void normalize_kmer_distributions(KmerStats::container_type& stats)
+void normalize_kmer_distributions(KmerStats& stats)
 {
-  typedef std::pair<const size_t, Probs> X;
-
   double denom_for_A = 0.0, denom_for_B = 0.0;
   for (size_t pair = 0; pair < 16; ++pair) {
-    BOOST_FOREACH(const X& x, stats[pair]) {
-      denom_for_A += x.second.for_A;
-      denom_for_B += x.second.for_B;
+    BOOST_FOREACH(const Probs& probs, stats.data[pair]) {
+      denom_for_A += probs.for_A;
+      denom_for_B += probs.for_B;
     }
   }
 
   for (size_t pair = 0; pair < 16; ++pair) {
-    BOOST_FOREACH(X& x, stats[pair]) {
-      x.second.for_A /= denom_for_A;
-      x.second.for_B /= denom_for_B;
+    BOOST_FOREACH(Probs& probs, stats.data[pair]) {
+      probs.for_A /= denom_for_A;
+      probs.for_B /= denom_for_B;
     }
   }
 }
 
 void compute_kmer_stats(
-    KmerStats::container_type& stats,
+    KmerStats& stats,
     const vector<string>& A,
     const vector<string>& A_rc, 
     const vector<double>& tau_A,
@@ -116,15 +119,12 @@ void compute_kmer_stats(
 }
 
 void print_kmer_stats(
-    const KmerStats::container_type& stats,
+    const KmerStats& stats,
     const string& prefix)
 {
-  typedef std::pair<size_t, Probs> X;
-
   double KL_A_to_M = 0.0, KL_B_to_M = 0.0;
   for (size_t pair = 0; pair < 16; ++pair) {
-    BOOST_FOREACH(const X& x, stats[pair]) {
-      const Probs& probs = x.second;
+    BOOST_FOREACH(const Probs& probs, stats.data[pair]) {
       double mean_prob = 0.5*(probs.for_A + probs.for_B);
       KL_A_to_M += probs.for_A == 0 ? 0 : probs.for_A * (log2(probs.for_A) - log2(mean_prob));
       KL_B_to_M += probs.for_B == 0 ? 0 : probs.for_B * (log2(probs.for_B) - log2(mean_prob));
@@ -145,7 +145,7 @@ void compute_and_print_kmer_stats(
     const vector<double>& tau_B,
     const string& prefix)
 {
-  KmerStats::container_type kmer_stats;
+  KmerStats kmer_stats;
   compute_kmer_stats(kmer_stats, A, A_rc, tau_A, B, B_rc, tau_B);
   print_kmer_stats(kmer_stats, prefix);
 }
