@@ -139,6 +139,7 @@ void print_kmer_distributions(KmerStats::container_type& stats)
     std::cout << x.second.probs[0] << ","
               << x.second.probs[1] << ";";
   }
+  std::cout << std::endl;
 }
 
 KmerStats::container_type
@@ -317,4 +318,6 @@ void main_1(const boost::program_options::variables_map& vm)
   size_t kmerlen = vm["kmerlen"].as<size_t>();
   compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", kmerlen);
   compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", kmerlen);
+
+  std::cerr << "Done" << std::endl;
 }
