@@ -20,12 +20,13 @@ CC = /usr/bin/g++
 #DEBUG = -g3 -fno-inline -O0
 #CFLAGS = -O3 -W -Wall -Wextra $(DEBUG)
 DEBUG =
-CFLAGS = -O3 -fopenmp -W -Wall -Wextra $(DEBUG)
+CFLAGS = -g -O3 -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
 LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
-CONDOR_LIBS = -L/usr/lib/x86_64-redhat-linux5E/lib64
+#CONDOR_LIBS = -L/usr/lib/x86_64-redhat-linux5E/lib64
+CONDOR_LIBS = 
 
 .PHONY: all
 all: summarize summarize_matched summarize_kmer summarize_kmerpair
@@ -38,10 +39,10 @@ np = $(word 3,$(subst _, ,$*))
 .PHONY: summarize
 summarize: ${summarize_jobs}
 ${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
-	$(CC) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)
+	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)
 
 summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
+	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
