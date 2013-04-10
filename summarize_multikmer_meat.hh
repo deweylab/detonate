@@ -142,7 +142,10 @@ size_t estimate_hashtable_size(
   const vector<string>& A,
   const vector<string>& B)
 {
-  size_t fudge_factor = 1;
+  // The fudge factor is based partly on empirical observation and partly on
+  // the assumption that most kmers will be shared between the oracleset and
+  // the assembly.
+  size_t fudge_factor = 2;
   size_t max_entries = 0;
   BOOST_FOREACH(const string& a, A) {
     for (size_t k = 1; k < a.size(); k *= 2)
@@ -377,4 +380,6 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Computing and printing unweighted stats" << std::endl;
   compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_multikmer", "at_exp2");
+
+  std::cerr << "Done" << std::endl;
 }
