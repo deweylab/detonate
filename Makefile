@@ -25,8 +25,6 @@ LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
 LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
-#CONDOR_LIBS = -L/usr/lib/x86_64-redhat-linux5E/lib64
-CONDOR_LIBS = 
 
 .PHONY: all
 all: summarize summarize_matched summarize_kmer summarize_kmerpair
@@ -45,10 +43,10 @@ summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
 	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
+	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
 summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
-	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) $(CONDOR_LIBS) -o summarize_multikmer
+	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
 
 summarize_kmerpair: summarize_kmerpair.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
