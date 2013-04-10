@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <list>
-#include <omp.h>
 #include <boost/program_options.hpp>
 #include <boost/foreach.hpp>
 #include <sparsehash/sparse_hash_map>
@@ -131,6 +130,23 @@ void normalize_kmer_distributions(KmerStats::container_type& stats)
   }
 }
 
+size_t estimate_hashtable_size(
+  const vector<string>& A,
+  const vector<string>& B,
+  size_t kmerlen)
+{
+  // The fudge factor is based partly on empirical observation and partly on
+  // the assumption that most kmers will be shared between the oracleset and
+  // the assembly.
+  size_t fudge_factor = 2;
+  size_t max_entries = 0;
+  BOOST_FOREACH(const string& a, A)
+    max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
+  BOOST_FOREACH(const string& a, B)
+    max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
+  return max_entries;
+}
+
 KmerStats::container_type
 compute_kmer_stats(
     const vector<string>& A,
@@ -141,41 +157,80 @@ compute_kmer_stats(
     const vector<double>& tau_B,
     size_t kmerlen)
 {
-  KmerStats::container_type stats;
-  /*{
-    std::string empty = "";
-    KmerKey empty_key(empty.begin(), empty.end());
-    stats.set_empty_key(empty_key);
-  }*/
+  // Figure out roughly how many entries to expect in the hash table.
+  size_t max_entries = estimate_hashtable_size(A, B, kmerlen);
+  std::cerr << "Max entries: " << max_entries << std::endl;
+
+  // Create hash table.
+  KmerStats::container_type stats(max_entries);
+
+  // Actually compute the desired stats.
   count_kmers(stats, 0, A, A_rc, tau_A, kmerlen);
   count_kmers(stats, 1, B, B_rc, tau_B, kmerlen);
-  normalize_kmer_distributions(stats);
+  std::cerr << "... hashtable size is " << stats.size() << std::endl;
+  //normalize_kmer_distributions(stats);
+
   return stats;
 }
 
+double compute_F1(double precis, double recall)
+{
+  if (precis == 0.0 && recall == 0.0)
+    return 0.0;
+  else
+    return 2*precis*recall/(precis+recall);
+}
+
 void print_kmer_stats(
-    const KmerStats::container_type& stats,
+    KmerStats::container_type& stats,
     const string& prefix,
     const string& suffix)
 {
   typedef std::pair<const KmerStats::key_type, KmerStats::value_type> X;
 
+  // First, compute and print stats based on the UNnormalized distribution.
+
+  {
+    size_t num_shared = 0;
+    BOOST_FOREACH(const X& x, stats) {
+      const KmerInfo& i = x.second;
+      if (i.probs[0] != 0 && i.probs[1] != 0)
+        ++num_shared;
+    }
+    cout << prefix << "_num_shared_" << suffix << "\t" << num_shared << endl;
+  }
+
+  {
+    double numer = 0.0, denom_precis = 0.0, denom_recall = 0.0;
+    BOOST_FOREACH(const X& x, stats) {
+      const KmerInfo& i = x.second;
+      numer += std::min(i.probs[0], i.probs[1]); // frac "retrieved" and "relevant"
+      denom_precis += i.probs[0]; // frac "retrieved"
+      denom_recall += i.probs[1]; // frac "relevant"
+    }
+    double precis = numer / denom_precis;
+    double recall = numer / denom_recall;
+    double F1 = compute_F1(precis, recall);
+    cout << prefix << "_precision_" << suffix << "\t" << precis << endl;
+    cout << prefix << "_recall_"    << suffix << "\t" << recall << endl;
+    cout << prefix << "_F1_"        << suffix << "\t" << F1     << endl;
+  }
+
+  // Second, compute and print stats based on the normalized distribution.
+  normalize_kmer_distributions(stats);
+
   {
     double KL_A_to_M = 0, KL_B_to_M = 0;
-    size_t num_shared = 0;
     BOOST_FOREACH(const X& x, stats) {
       const KmerInfo& i = x.second;
       double mean_prob = 0.5*(i.probs[0] + i.probs[1]);
       KL_A_to_M += i.probs[0] == 0 ? 0 : i.probs[0] * (log2(i.probs[0]) - log2(mean_prob));
       KL_B_to_M += i.probs[1] == 0 ? 0 : i.probs[1] * (log2(i.probs[1]) - log2(mean_prob));
-      if (i.probs[0] != 0 && i.probs[1] != 0)
-        ++num_shared;
     }
     double JS = 0.5*KL_A_to_M + 0.5*KL_B_to_M;
     cout << prefix << "_probs_KL_A_to_M_" << suffix << "\t" << KL_A_to_M << endl;
     cout << prefix << "_probs_KL_B_to_M_" << suffix << "\t" << KL_B_to_M << endl;
     cout << prefix << "_probs_JS_" << suffix << "\t" << JS << endl;
-    cout << prefix << "_num_shared_" << suffix << "\t" << num_shared << endl;
   }
 
   {
@@ -188,6 +243,7 @@ void print_kmer_stats(
     probs_hellinger = sqrt(probs_hellinger)/sqrt(2.0);
     cout << prefix << "_probs_hellinger_" << suffix << "\t" << probs_hellinger << endl;
   }
+
 }
 
 void compute_and_print_kmer_stats(
@@ -244,6 +300,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("A-expr", po::value<std::string>()->required(), "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
     ("B-expr", po::value<std::string>()->required(), "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
     ("readlen", po::value<size_t>()->required(),     "The read length.")
+    ("estimate-hashtable-size", "Estimate hashtable size, in bytes.")
   ;
 
   try {
@@ -266,8 +323,6 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 
 void main_1(const boost::program_options::variables_map& vm)
 {
-  //clock_t start;
-
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
   std::vector<std::string> A_names, B_names;
@@ -301,13 +356,15 @@ void main_1(const boost::program_options::variables_map& vm)
   compute_nucl_expression(A, unif_tau_A, unif_nu_A);
   compute_nucl_expression(B, unif_tau_B, unif_nu_B);
 
-  std::cout << "summarize_kmer_version\t1" << std::endl;
-
   size_t readlen = vm["readlen"].as<size_t>();
-  //compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_half", readlen/2);
+
+  if (vm.count("estimate-hashtable-size")) {
+    std::cout << estimate_hashtable_size(A, B, readlen) * sizeof(KmerInfo) << std::endl;
+    return;
+  }
+
+  std::cout << "summarize_kmer_version\t2" << std::endl;
   compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen);
-  //compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_double", readlen*2);
-  //compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_half", readlen/2);
   compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", readlen);
-  //compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_double", readlen*2);
+  std::cerr << "Done" << std::endl;
 }
