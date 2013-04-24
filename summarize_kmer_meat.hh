@@ -330,6 +330,13 @@ void main_1(const boost::program_options::variables_map& vm)
   read_fasta_names_and_seqs(vm["A-seqs"].as<std::string>(), A, A_names, A_names_to_idxs);
   read_fasta_names_and_seqs(vm["B-seqs"].as<std::string>(), B, B_names, B_names_to_idxs);
 
+  size_t readlen = vm["readlen"].as<size_t>();
+
+  if (vm.count("estimate-hashtable-size")) {
+    std::cout << estimate_hashtable_size(A, B, readlen) * sizeof(KmerInfo) << std::endl;
+    return;
+  }
+
   std::cerr << "Reverse complementing the sequences" << std::endl;
   std::vector<std::string> A_rc, B_rc;
   transform(A.begin(), A.end(), back_inserter(A_rc), reverse_complement);
@@ -355,13 +362,6 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_nu_A(A.size()), unif_nu_B(B.size());
   compute_nucl_expression(A, unif_tau_A, unif_nu_A);
   compute_nucl_expression(B, unif_tau_B, unif_nu_B);
-
-  size_t readlen = vm["readlen"].as<size_t>();
-
-  if (vm.count("estimate-hashtable-size")) {
-    std::cout << estimate_hashtable_size(A, B, readlen) * sizeof(KmerInfo) << std::endl;
-    return;
-  }
 
   std::cout << "summarize_kmer_version\t2" << std::endl;
   compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen);
