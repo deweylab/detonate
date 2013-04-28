@@ -145,7 +145,7 @@ size_t estimate_hashtable_size(
   // The fudge factor is based partly on empirical observation and partly on
   // the assumption that most kmers will be shared between the oracleset and
   // the assembly.
-  size_t fudge_factor = 2;
+  size_t fudge_factor = 1;
   size_t max_entries = 0;
   BOOST_FOREACH(const string& a, A) {
     for (size_t k = 1; k < a.size(); k *= 2)

@@ -27,7 +27,7 @@ LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboos
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
-all: summarize summarize_matched summarize_kmer summarize_kmerpair
+all: summarize summarize_matched summarize_kmer summarize_kmerpair summarize_multikmer
 
 summarize_jobs := $(foreach gp, 1 2 3 4, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
 gp = $(word 1,$(subst _, ,$*))
