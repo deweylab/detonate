@@ -102,6 +102,19 @@ inline bool is_better(const T& al, const S& ref)
   #endif
 }
 
+inline bool is_valid(const psl_alignment& al, bool strand_specific)
+{
+  if (!strand_specific)
+    return true;
+  else
+    return al.strand() == "+";
+}
+
+inline bool is_valid(const blast_alignment& /*al*/, bool /*strand_specific*/)
+{
+  return true;
+}
+
 // For each a in A, figure out which alignment from a -> b (for some b in B) is
 // best.
 //
@@ -110,13 +123,14 @@ inline bool is_better(const T& al, const S& ref)
 template<typename AlignmentType>
 void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentType> >&    best_from_A, 
                                                typename AlignmentType::input_stream_type& input_stream,
-                                               const std::map<std::string, size_t>&       A_names_to_idxs)
+                                               const std::map<std::string, size_t>&       A_names_to_idxs,
+                                               bool                                       strand_specific)
 {
   AlignmentType al;
   while (input_stream >> al) {
     size_t a_idx = A_names_to_idxs.find(al.a_name())->second;
     BestTuple<AlignmentType>& bt = best_from_A[a_idx];
-    if (is_good_enough(al)) {
+    if (is_valid(al, strand_specific) && is_good_enough(al)) {
       if (bt.is_empty || is_better(al, bt)) {
         bt.frac_identity_wrt_a = al.frac_identity_wrt_a();
         bt.frac_identity_wrt_b = al.frac_identity_wrt_b();
@@ -133,11 +147,12 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
 // - best_from_A should be of size 0
 template<typename AlignmentType>
 void read_alignments_without_filtering(std::vector<BestTuple<AlignmentType> >&    best_from_A, 
-                                       typename AlignmentType::input_stream_type& input_stream)
+                                       typename AlignmentType::input_stream_type& input_stream,
+                                       bool                                       strand_specific)
 {
   AlignmentType al;
   while (input_stream >> al) {
-    if (is_good_enough(al)) {
+    if (is_valid(al, strand_specific) && is_good_enough(al)) {
       BestTuple<AlignmentType> bt;
       bt.frac_identity_wrt_a = al.frac_identity_wrt_a();
       bt.frac_identity_wrt_b = al.frac_identity_wrt_b();
@@ -299,6 +314,16 @@ void induce_prot_expression(std::vector<double>&                                
   for (size_t b_idx = 0; b_idx < tau_B.size(); ++b_idx) tau_B[b_idx] /= z;
 }
 
+void print_plot_output(std::vector<double>& B_frac_ones,
+                       const std::string& plot_output_prefix,
+                       const std::string& plot_output_suffix)
+{
+  std::string s = plot_output_prefix + "_" + plot_output_suffix;
+  std::ofstream f(s.c_str());
+  BOOST_FOREACH(double x, B_frac_ones)
+    f << x << std::endl;
+}
+
 void parse_options(boost::program_options::variables_map& vm, int argc, const char **argv)
 {
   namespace po = boost::program_options;
@@ -315,6 +340,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-to-A", po::value<std::string>()->required(), "The alignments of B to A.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
+    ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
   ;
 
   try {
@@ -349,7 +375,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 template<typename AlignmentType>
 void main_1(const boost::program_options::variables_map& vm)
 {
-  //clock_t start;
+  std::string plot_output_prefix = vm["plot-output"].as<std::string>();
+  bool strand_specific = vm.count("strand-specific");
 
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
@@ -364,15 +391,15 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<BestTuple<AlignmentType> > best_from_A(A_card), best_from_B(B_card);
   typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
   typename AlignmentType::input_stream_type B_to_A_is(open_or_throw(vm["B-to-A"].as<std::string>()));
-  read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs);
-  read_alignments_and_filter_by_best_from_A(best_from_B, B_to_A_is, B_names_to_idxs);
+  read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs, strand_specific);
+  read_alignments_and_filter_by_best_from_A(best_from_B, B_to_A_is, B_names_to_idxs, strand_specific);
 
   std::cerr << "Reading alignments without filtering them by A" << std::endl;
   std::vector<BestTuple<AlignmentType> > all_from_A, all_from_B;
   typename AlignmentType::input_stream_type A_to_B_is2(open_or_throw(vm["A-to-B"].as<std::string>()));
   typename AlignmentType::input_stream_type B_to_A_is2(open_or_throw(vm["B-to-A"].as<std::string>()));
-  read_alignments_without_filtering(all_from_A, A_to_B_is2);
-  read_alignments_without_filtering(all_from_B, B_to_A_is2);
+  read_alignments_without_filtering(all_from_A, A_to_B_is2, strand_specific);
+  read_alignments_without_filtering(all_from_B, B_to_A_is2, strand_specific);
 
   std::cerr << "Clustering alignments by B" << std::endl;
   std::vector<std::vector<const AlignmentType *> > clustered_best_to_B(B_card), clustered_best_to_A(A_card);
@@ -406,7 +433,7 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  std::cout << "summarize_version_8\t0" << std::endl;
+  std::cout << "summarize_version_9\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
@@ -420,16 +447,18 @@ void main_1(const boost::program_options::variables_map& vm)
   recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
   precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
   print_stats(precis, recall, "unweighted_clustered");
+  print_plot_output(B_frac_ones, plot_output_prefix, "clustered");
 
-  std::cerr << "Computing weighted jumbled stats" << std::endl;
-  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, real_tau_B, A_names_to_idxs);
-  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, real_tau_A, B_names_to_idxs);
-  print_stats(precis, recall, "weighted_jumbled");
-
-  std::cerr << "Computing unweighted jumbled stats" << std::endl;
-  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, unif_tau_B, A_names_to_idxs);
-  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, unif_tau_A, B_names_to_idxs);
-  print_stats(precis, recall, "unweighted_jumbled");
+  // std::cerr << "Computing weighted jumbled stats" << std::endl;
+  // recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, real_tau_B, A_names_to_idxs);
+  // precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, real_tau_A, B_names_to_idxs);
+  // print_stats(precis, recall, "weighted_jumbled");
+  //
+  // std::cerr << "Computing unweighted jumbled stats" << std::endl;
+  // recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, unif_tau_B, A_names_to_idxs);
+  // precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, unif_tau_A, B_names_to_idxs);
+  // print_stats(precis, recall, "unweighted_jumbled");
+  // print_plot_output(B_frac_ones, plot_output_prefix, "jumbled");
 
   if (vm.count("induce-B-expr")) {
     std::cerr << "Inducing transcript-level expression for B with filtered stats" << std::endl;
@@ -445,9 +474,5 @@ void main_1(const boost::program_options::variables_map& vm)
   recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
   precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
   print_stats(precis, recall, "unweighted_filtered");
-
-  std::ofstream plot_out(vm["plot-output"].as<std::string>().c_str());
-  BOOST_FOREACH(double x, B_frac_ones)
-    plot_out << x << std::endl;
-
+  print_plot_output(B_frac_ones, plot_output_prefix, "filtered"); 
 }
