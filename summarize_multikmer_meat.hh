@@ -10,6 +10,8 @@
 #include <boost/foreach.hpp>
 #include <sparsehash/sparse_hash_map>
 //#include <sparsehash/dense_hash_map>
+#include <ext/pb_ds/assoc_container.hpp>
+#include <ext/pb_ds/trie_policy.hpp>
 #include "util.hh"
 using namespace std;
 
@@ -30,6 +32,58 @@ struct KmerKey
   KmerKey() {}
   KmerKey(const string::const_iterator& begin, const string::const_iterator& end) : begin(begin), end(end) {}
 };
+
+// Following is an element access traits for a DNA string.
+// (based on example code from the pb_ds library)
+struct dna_string_access_traits
+{
+public:
+  typedef size_t size_type;
+  typedef KmerKey key_type;
+  typedef const key_type& key_const_reference;
+  typedef char e_type;
+  typedef string::const_iterator const_iterator;
+
+  enum
+    {
+      // Number of distinct elements. This is 5 = |{'A', 'C', 'G', 'T', 'N'}|
+      max_size = 5
+    };
+
+  // Returns a const_iterator to the firstelement of r_key.
+  inline static const_iterator
+  begin(key_const_reference r_key)
+  { return r_key.begin; }
+
+  // Returns a const_iterator to the after-lastelement of r_key.
+  inline static const_iterator
+  end(key_const_reference r_key)
+  { return r_key.end; }
+
+  // Maps an element to a position.
+  inline static size_t
+  e_pos(e_type e)
+  {
+    switch(e)
+      {
+      case 'A':
+      case 'a':
+        return 0;
+      case 'C':
+      case 'c':
+        return 1;
+      case 'G':
+      case 'g':
+        return 2;
+      case 'T':
+      case 't':
+        return 3;
+      default:
+        return 4;
+      };
+  }
+};
+
 
 namespace std
 {
@@ -75,14 +129,47 @@ namespace std
       }
     }
   };
+
+  template<>
+  struct less<KmerKey>
+  {
+    bool operator()(const KmerKey& a, const KmerKey& b)
+    {
+      // If b is empty, then a cannot be less than b.
+      if (b.begin == b.end)
+        return false;
+      // If b is not empty, but a is empty, then a is less than b.
+      else if (a.begin == a.end)
+        return true;
+      // If at any position i, a[i] < b[i], then a is less than b.
+      // If at any position i, a[i] > b[i], then a is not less than b.
+      string::const_iterator ita = a.begin, itb = b.begin;
+      for (; ita != a.end && itb != b.end; ++ita, ++itb) {
+        if (*ita < *itb)
+          return true;
+        else if (*ita > *itb)
+          return false;
+      }
+      // If we have iterated through all matched positions, and b is at the
+      // end, then a is at least as long as b, so a is not less than b.
+      if (itb == b.end)
+        return false;
+      // If b is not at the end, but a is at the end, then a is less than b.
+      else if (ita == a.end)
+        return true;
+      else
+        throw std::logic_error("Shouldn't get here.");
+    }
+  };
 }
 
 struct KmerStats
 {
   typedef KmerKey key_type;
   typedef KmerInfo value_type;
-  typedef google::sparse_hash_map<key_type, value_type> container_type;
+  //typedef google::sparse_hash_map<key_type, value_type> container_type;
   //typedef google::dense_hash_map<key_type, value_type> container_type;
+  typedef __gnu_pbds::trie<key_type, value_type, dna_string_access_traits> container_type;
 };
 
 void count_kmers(
@@ -99,13 +186,19 @@ void count_kmers(
   //   For each kmer r in reverse_complement(a):
   //     Add (1/2)*[1/(length(a) - k + 1)]*tau_A(a) to count_A(r)
   for (size_t i = 0; i < A.size(); ++i) {
+    if (i % 1000 == 0)
+      std::cerr << "." << std::flush;
     for (size_t which = 0; which < 2; ++which) {
       const string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
         double c = 0.5 * tau_A[i];
+        size_t j = 0;
         string::const_iterator beg = a.begin();
         string::const_iterator end = a.begin() + kmerlen;
         for (; end != a.end(); ++beg, ++end) {
+          if (j % 10000 == 0)
+            std::cerr << ":" << std::flush;
+          ++j;
           KmerKey kmer_key(beg, end);
           stats[kmer_key].probs[A_or_B] += c; // relies on default init to 0
         }
@@ -172,11 +265,12 @@ compute_kmer_stats(
   std::cerr << "Max entries: " << max_entries << std::endl;
 
   // Create hash table.
-  KmerStats::container_type stats(max_entries);
+  KmerStats::container_type stats; //(max_entries);
 
   // Actually compute the desired stats.
   size_t max_contig_len = std::max(find_max_contig_len(A), find_max_contig_len(B));
-  for (size_t k = 1; k < max_contig_len; k *= 2) {
+  //for (size_t k = 1; k < max_contig_len; k *= 2) {
+  for (size_t k = 131072; k < max_contig_len; k *= 2) {
     std::cerr << "Counting kmers of length " << k << std::endl;
     count_kmers(stats, 0, A, A_rc, tau_A, k);
     count_kmers(stats, 1, B, B_rc, tau_B, k);
