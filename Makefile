@@ -23,13 +23,13 @@ DEBUG =
 CFLAGS = -g -O3 -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
-LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a)
+LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a) $(TBB_LIBS)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
 all: summarize summarize_matched summarize_kmer summarize_kmerpair summarize_multikmer
 
-summarize_jobs := $(foreach gp, 1 2 3 4, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
+summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, summarize_${gp}_${bp}_${np})))
 gp = $(word 1,$(subst _, ,$*))
 bp = $(word 2,$(subst _, ,$*))
 np = $(word 3,$(subst _, ,$*))
@@ -46,7 +46,8 @@ summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
 summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
-	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
+	#condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
+	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) $(BOOST_LIB)/libboost_system$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_thread$(BOOST_SUFFIX) -o summarize_multikmer
 
 summarize_kmerpair: summarize_kmerpair.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair

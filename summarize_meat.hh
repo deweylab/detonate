@@ -54,25 +54,32 @@ struct BestTuple
   BestTuple() : is_empty(true) {}
 };
 
+#define min_frac_id 0.95
+//#define min_frac_id 0.8
+
 template<typename T>
-inline bool is_good_enough(const T& al)
+inline bool is_good_enough_helper(const T& al)
 {
   #if (GOOD_POLICY == 1)
-  return al.frac_identity_wrt_a() >= 0.95 && al.frac_indel_wrt_a() <= 0.0;
+  return al.frac_identity_wrt_a() >= min_frac_id && al.frac_indel_wrt_a() <= 0.0;
   #elif (GOOD_POLICY == 2)
-  return (al.frac_identity_wrt_a() >= 0.95 && al.frac_indel_wrt_a() <= 0.0) ||
-         (al.frac_identity_wrt_b() >= 0.95 && al.frac_indel_wrt_b() <= 0.0);
+  return (al.frac_identity_wrt_a() >= min_frac_id && al.frac_indel_wrt_a() <= 0.0) ||
+         (al.frac_identity_wrt_b() >= min_frac_id && al.frac_indel_wrt_b() <= 0.0);
   #elif (GOOD_POLICY == 3)
-  return al.frac_identity_wrt_a() >= 0.95 || al.frac_identity_wrt_b() >= 0.95;
+  return al.frac_identity_wrt_a() >= min_frac_id || al.frac_identity_wrt_b() >= min_frac_id;
   #elif (GOOD_POLICY == 4)
   return true;
+  #elif (GOOD_POLICY == 5)
+  return al.frac_identity_wrt_b() >= min_frac_id;
+  #elif (GOOD_POLICY == 6)
+  return al.frac_identity_wrt_a() >= min_frac_id && al.frac_identity_wrt_b() >= min_frac_id;
   #else
   #error "need to define GOOD_POLICY"
   #endif
 }
 
-template<>
-inline bool is_good_enough(const blast_alignment& al) { return al.evalue() <= 1e-5; }
+inline bool is_good_enough(const psl_alignment& al) { return is_good_enough_helper(al); }
+inline bool is_good_enough(const blast_alignment& al) { return al.evalue() <= 1e-5 && is_good_enough_helper(al); }
 
 // is al better than ref?
 template<typename T, typename S>
@@ -394,12 +401,12 @@ void main_1(const boost::program_options::variables_map& vm)
   read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs, strand_specific);
   read_alignments_and_filter_by_best_from_A(best_from_B, B_to_A_is, B_names_to_idxs, strand_specific);
 
-  std::cerr << "Reading alignments without filtering them by A" << std::endl;
-  std::vector<BestTuple<AlignmentType> > all_from_A, all_from_B;
-  typename AlignmentType::input_stream_type A_to_B_is2(open_or_throw(vm["A-to-B"].as<std::string>()));
-  typename AlignmentType::input_stream_type B_to_A_is2(open_or_throw(vm["B-to-A"].as<std::string>()));
-  read_alignments_without_filtering(all_from_A, A_to_B_is2, strand_specific);
-  read_alignments_without_filtering(all_from_B, B_to_A_is2, strand_specific);
+  // std::cerr << "Reading alignments without filtering them by A" << std::endl;
+  // std::vector<BestTuple<AlignmentType> > all_from_A, all_from_B;
+  // typename AlignmentType::input_stream_type A_to_B_is2(open_or_throw(vm["A-to-B"].as<std::string>()));
+  // typename AlignmentType::input_stream_type B_to_A_is2(open_or_throw(vm["B-to-A"].as<std::string>()));
+  // read_alignments_without_filtering(all_from_A, A_to_B_is2, strand_specific);
+  // read_alignments_without_filtering(all_from_B, B_to_A_is2, strand_specific);
 
   std::cerr << "Clustering alignments by B" << std::endl;
   std::vector<std::vector<const AlignmentType *> > clustered_best_to_B(B_card), clustered_best_to_A(A_card);
@@ -411,10 +418,10 @@ void main_1(const boost::program_options::variables_map& vm)
   filter_by_best_alignment_to_B(filtered_best_to_B, best_from_A, B_names_to_idxs);
   filter_by_best_alignment_to_B(filtered_best_to_A, best_from_B, A_names_to_idxs);
 
-  std::cerr << "Clustering 'all' alignments by B" << std::endl;
-  std::vector<std::vector<const AlignmentType *> > jumbled_to_B(B_card), jumbled_to_A(A_card);
-  cluster_best_alignments_to_B(jumbled_to_B, all_from_A, B_names_to_idxs);
-  cluster_best_alignments_to_B(jumbled_to_A, all_from_B, A_names_to_idxs);
+  // std::cerr << "Clustering 'all' alignments by B" << std::endl;
+  // std::vector<std::vector<const AlignmentType *> > jumbled_to_B(B_card), jumbled_to_A(A_card);
+  // cluster_best_alignments_to_B(jumbled_to_B, all_from_A, B_names_to_idxs);
+  // cluster_best_alignments_to_B(jumbled_to_A, all_from_B, A_names_to_idxs);
 
   std::cerr << "Reading transcript-level expression for A" << std::endl;
   std::vector<double> real_tau_A(A_card), real_tau_B(B_card);
@@ -433,7 +440,8 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  std::cout << "summarize_version_9\t0" << std::endl;
+  std::cout << "summarize_version_11\t0" << std::endl;
+  std::cout << "summarize_min_frac_identity_" << min_frac_id << "\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
