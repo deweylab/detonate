@@ -172,6 +172,19 @@ inline bool is_good_enough_for_do_it_all(const std::vector<alignment_segment>& s
   return len >= 30;
 }
 
+inline bool is_valid(const psl_alignment& al, bool strand_specific)
+{
+  if (!strand_specific)
+    return true;
+  else
+    return al.strand() == "+";
+}
+
+inline bool is_valid(const blast_alignment& /*al*/, bool /*strand_specific*/)
+{
+  return true;
+}
+
 // Reads alignments, perfoms initial filtering, and converts the alignments to
 // segments. However, does *not* compute the initial contributions.
 template<typename AlignmentType>
@@ -180,17 +193,20 @@ void read_alignments(std::vector<tagged_alignment>& alignments,
                      const std::vector<std::string>&                A,
                      const std::vector<std::string>&                B,
                      const std::map<std::string, size_t>&           A_names_to_idxs,
-                     const std::map<std::string, size_t>&           B_names_to_idxs)
+                     const std::map<std::string, size_t>&           B_names_to_idxs,
+                     bool                                           strand_specific)
 {
   AlignmentType al;
   tagged_alignment l;
   while (input_stream >> al) {
-    l.a_idx = A_names_to_idxs.find(al.a_name())->second;
-    l.b_idx = B_names_to_idxs.find(al.b_name())->second;
-    typename AlignmentType::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
-    l.segments.assign(segs.begin(), segs.end());
-    if (is_good_enough_for_do_it_all(l.segments))
-      alignments.push_back(l);
+    if (is_valid(al, strand_specific)) {
+      l.a_idx = A_names_to_idxs.find(al.a_name())->second;
+      l.b_idx = B_names_to_idxs.find(al.b_name())->second;
+      typename AlignmentType::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
+      l.segments.assign(segs.begin(), segs.end());
+      if (is_good_enough_for_do_it_all(l.segments))
+        alignments.push_back(l);
+    }
   }
 }
 
@@ -292,7 +308,8 @@ stats_tuple do_it_all_wrapper(const std::vector<tagged_alignment>& alignments,
                               size_t                               A_card,
                               size_t                               B_card,
                               const std::vector<size_t>&           B_lengths,
-                              const std::vector<double>&           tau_B)
+                              const std::vector<double>&           tau_B,
+                              std::vector<double>                  *plot_output) // if non-null, B_frac_ones will be copied here
 {
   stats_tuple st;
 
@@ -312,6 +329,8 @@ stats_tuple do_it_all_wrapper(const std::vector<tagged_alignment>& alignments,
     tran_helper h(B_lengths, tau_B);
     do_it_all(h, alignments, A_card, B_card);
     st.tran = h.get_recall();
+    if (plot_output)
+      *plot_output = h.B_frac_ones;
   }
 
   return st;
@@ -326,11 +345,14 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("help,?", "Display this information.")
     ("A-seqs", po::value<std::string>()->required(), "The assembly sequences, in FASTA format.")
     ("B-seqs", po::value<std::string>()->required(), "The oracleset sequences, in FASTA format.")
-    ("A-expr", po::value<std::string>()->required(), "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
-    ("B-expr", po::value<std::string>()->required(), "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("A-expr", po::value<std::string>(),             "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("no-expr",                                      "Do not use expression at all. No weighted scores will be produced.")
     ("A-to-B", po::value<std::string>()->required(), "The alignments of A to B.")
     ("B-to-A", po::value<std::string>()->required(), "The alignments of B to A.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
+    ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
+    ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
   ;
 
   try {
@@ -343,6 +365,14 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     }
 
     po::notify(vm);
+
+    if (vm.count("no-expr")) {
+      if (vm.count("A-expr") != 0 || vm.count("B-expr") != 0)
+        throw po::error("If --no-expr is given, then --A-expr and --B-expr cannot be given.");
+    } else {
+      if (vm.count("A-expr") == 0 || vm.count("B-expr") == 0)
+        throw po::error("If --no-expr is not given, then --A-expr and --B-expr must be given.");
+    }
 
     if (vm["alignment-type"].as<std::string>() != "blast" &&
         vm["alignment-type"].as<std::string>() != "psl")
@@ -358,6 +388,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 template<typename AlignmentType>
 void main_1(const boost::program_options::variables_map& vm)
 {
+  bool strand_specific = vm.count("strand-specific");
+
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
   std::vector<std::string> A_names, B_names;
@@ -371,12 +403,14 @@ void main_1(const boost::program_options::variables_map& vm)
   BOOST_FOREACH(const std::string& a, A) A_lengths.push_back(a.size());
   BOOST_FOREACH(const std::string& b, B) B_lengths.push_back(b.size());
 
-  std::cerr << "Reading transcript-level expression for A and B" << std::endl;
   std::vector<double> real_tau_A(A_card), real_tau_B(B_card);
-  std::string A_expr_fname = vm["A-expr"].as<std::string>();
-  std::string B_expr_fname = vm["B-expr"].as<std::string>();
-  read_transcript_expression(A_expr_fname, real_tau_A, A_names_to_idxs);
-  read_transcript_expression(B_expr_fname, real_tau_B, B_names_to_idxs);
+  if (!vm.count("no-expr")) {
+    std::cerr << "Reading transcript-level expression for A and B" << std::endl;
+    std::string A_expr_fname = vm["A-expr"].as<std::string>();
+    std::string B_expr_fname = vm["B-expr"].as<std::string>();
+    read_transcript_expression(A_expr_fname, real_tau_A, A_names_to_idxs);
+    read_transcript_expression(B_expr_fname, real_tau_B, B_names_to_idxs);
+  }
 
   std::cerr << "Computing uniform transcript-level expression" << std::endl;
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
@@ -386,19 +420,27 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<tagged_alignment> A_to_B, B_to_A;
   typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
   typename AlignmentType::input_stream_type B_to_A_is(open_or_throw(vm["B-to-A"].as<std::string>()));
-  read_alignments<AlignmentType>(A_to_B, A_to_B_is, A, B, A_names_to_idxs, B_names_to_idxs);
-  read_alignments<AlignmentType>(B_to_A, B_to_A_is, B, A, B_names_to_idxs, A_names_to_idxs);
+  read_alignments<AlignmentType>(A_to_B, A_to_B_is, A, B, A_names_to_idxs, B_names_to_idxs, strand_specific);
+  read_alignments<AlignmentType>(B_to_A, B_to_A_is, B, A, B_names_to_idxs, A_names_to_idxs, strand_specific);
 
-  std::cout << "summarize_matched_version_8\t0" << std::endl;
+  std::cout << "summarize_matched_version_9\t0" << std::endl;
 
   stats_tuple recall, precis;
-  recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, real_tau_B);
-  precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, real_tau_A);
-  print_stats(precis, recall, "weighted_matched");                  
+  std::vector<double> B_frac_ones;
+
+  if (!vm.count("no-expr")) {
+    recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, real_tau_B, NULL);
+    precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, real_tau_A, NULL);
+    print_stats(precis, recall, "weighted_matched");
+  }
                                                                     
-  recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, unif_tau_B);
-  precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, unif_tau_A);
+  recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, unif_tau_B, &B_frac_ones);
+  precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, unif_tau_A, NULL);
   print_stats(precis, recall, "unweighted_matched");
+
+  std::ofstream f(vm["plot-output"].as<std::string>().c_str());
+  BOOST_FOREACH(double x, B_frac_ones)
+    f << x << std::endl;
 
   std::cerr << "Done!" << std::endl;
 }
