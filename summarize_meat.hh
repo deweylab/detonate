@@ -29,11 +29,13 @@ double compute_F1(double precis, double recall)
     return 2*precis*recall/(precis+recall);
 }
 
-void print_stats(const stats_tuple& precis, const stats_tuple& recall, const std::string& prefix)
+void print_stats(const stats_tuple& precis, const stats_tuple& recall, const std::string& prefix, bool no_pair)
 {
-  std::cout << prefix << "_pair_precision\t" << precis.pair                          << std::endl;
-  std::cout << prefix << "_pair_recall\t"    << recall.pair                          << std::endl;
-  std::cout << prefix << "_pair_F1\t"        << compute_F1(precis.pair, recall.pair) << std::endl;
+  if (!no_pair) {
+    std::cout << prefix << "_pair_precision\t" << precis.pair                          << std::endl;
+    std::cout << prefix << "_pair_recall\t"    << recall.pair                          << std::endl;
+    std::cout << prefix << "_pair_F1\t"        << compute_F1(precis.pair, recall.pair) << std::endl;
+  }
 
   std::cout << prefix << "_nucl_precision\t" << precis.nucl                          << std::endl;
   std::cout << prefix << "_nucl_recall\t"    << recall.nucl                          << std::endl;
@@ -217,7 +219,8 @@ stats_tuple compute_alignment_stats(std::vector<double>& B_frac_ones,
                                     const std::vector<std::string>&                         A,
                                     const std::vector<std::string>&                         B,
                                     const std::vector<double>&                              tau_B,
-                                    const std::map<std::string, size_t>&                    A_names_to_idxs)
+                                    const std::map<std::string, size_t>&                    A_names_to_idxs,
+                                    bool                                                    no_pair)
 {
   std::vector<size_t> perm = make_random_permutation(B.size()); // for better load balancing (in case e.g. seqs are ordered by length)
 
@@ -241,7 +244,8 @@ stats_tuple compute_alignment_stats(std::vector<double>& B_frac_ones,
       BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
         size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
         BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
-          b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+          if (!no_pair)
+            b_pairset.add_square_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
           b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
         }
       }
@@ -276,50 +280,6 @@ stats_tuple compute_alignment_stats(std::vector<double>& B_frac_ones,
   return recall;
 }
 
-template<typename AlignmentType>
-void induce_prot_expression(std::vector<double>&                                    tau_B,
-                            const std::vector<std::vector<const AlignmentType *> >& best_to_B,
-                            const std::vector<double>&                              tau_A,
-                            const std::map<std::string, size_t>&                    A_names_to_idxs,
-                            const std::vector<std::string>&                         A,
-                            const std::vector<std::string>&                         B)
-
-{
-  // Let IAC(c,p) be the interval of the contig c that is aligned to protein c (an interval of nucleotides)
-  // Let IAP(c,p) be the interval of the protein p that is aligned to contig c (an interval of amino acids)
-  // Then, let
-  // n(p) = sum_{c in C(p)} (expr(c) * |IAC(c,p)|) / (3 * |union_{c in C(p)} (IAP(c,p))|)
-  // and normalize with z = sum_p n(p), expr(p) = n(p)/z, as before.
-  #pragma omp parallel for
-  for (int b_idx = 0; b_idx < static_cast<int>(tau_B.size()); ++b_idx) {
-    // Compute numer = sum_{c in C(p)} (expr(c) * |IAC(c,p)|)
-    // and     denom = (3 * |union_{c in C(p)} (IAP(c,p))|)
-    double numer = 0.0;
-    std::set<size_t> union_IAP;
-    BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
-      size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
-      size_t IAC_size = 0;
-      BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
-        size_t a_start = seg.a_start, a_end = seg.a_end;
-        size_t b_start = seg.b_start, b_end = seg.b_end;
-        if (a_start > a_end) std::swap(a_start, a_end);
-        if (b_start > b_end) std::swap(b_start, b_end);
-        //assert(a_end - a_start + 1 == 3*(b_end - b_start + 1)); // i.e., a is nucl, b is prot
-        IAC_size += a_end - a_start + 1;
-        for (size_t i = b_start; i != b_end; ++i)
-          union_IAP.insert(i);
-      }
-      numer += tau_A[a_idx] * IAC_size;
-    }
-    double denom = 3 * union_IAP.size();
-    tau_B[b_idx] = (numer == 0.0) ? 0.0 : numer / denom;
-  }
-  // Normalize
-  double z = 0.0;
-  for (size_t b_idx = 0; b_idx < tau_B.size(); ++b_idx) z += tau_B[b_idx];
-  for (size_t b_idx = 0; b_idx < tau_B.size(); ++b_idx) tau_B[b_idx] /= z;
-}
-
 void print_plot_output(std::vector<double>& B_frac_ones,
                        const std::string& plot_output_prefix,
                        const std::string& plot_output_suffix)
@@ -339,14 +299,15 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("help,?", "Display this information.")
     ("A-seqs", po::value<std::string>()->required(), "The assembly sequences, in FASTA format.")
     ("B-seqs", po::value<std::string>()->required(), "The oracleset sequences, in FASTA format.")
-    ("A-expr", po::value<std::string>()->required(), "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("A-expr", po::value<std::string>(),             "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
     ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
-    ("induce-B-expr",                                "Induce oracleset expression from assembly expression and alignments.")
+    ("no-expr",                                      "Do not use expression at all. No weighted scores will be produced.")
     ("A-to-B", po::value<std::string>()->required(), "The alignments of A to B.")
     ("B-to-A", po::value<std::string>()->required(), "The alignments of B to A.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
     ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
+    ("no-pair",                                      "Do not compute pair scores.")
   ;
 
   try {
@@ -361,15 +322,17 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 
     po::notify(vm);
 
-    if (!vm.count("B-expr") && !vm.count("induce-B-expr"))
-      throw po::error("Either --B-expr or --induce-B-expr is required.");
+    if (vm.count("no-expr")) {
+      if (vm.count("A-expr") != 0 || vm.count("B-expr") != 0)
+        throw po::error("If --no-expr is given, then --A-expr and --B-expr cannot be given.");
+    } else {
+      if (vm.count("A-expr") == 0 || vm.count("B-expr") == 0)
+        throw po::error("If --no-expr is not given, then --A-expr and --B-expr must be given.");
+    }
 
     if (vm["alignment-type"].as<std::string>() != "blast" &&
         vm["alignment-type"].as<std::string>() != "psl")
       throw po::error("Option --alignment-type needs to be 'blast' or 'psl'.");
-
-    if (vm.count("induce-B-expr") && vm["alignment-type"].as<std::string>() != "blast")
-      throw po::error("Option --induce-B-expr only makes sense if --alignment-type=blast, i.e., if A is of nucleotide type and B is of protein type.");
 
   } catch (std::exception& x) {
     std::cerr << "Error: " << x.what() << std::endl;
@@ -383,6 +346,7 @@ void main_1(const boost::program_options::variables_map& vm)
 {
   std::string plot_output_prefix = vm["plot-output"].as<std::string>();
   bool strand_specific = vm.count("strand-specific");
+  bool no_pair = vm.count("no-pair");
 
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
@@ -422,16 +386,12 @@ void main_1(const boost::program_options::variables_map& vm)
   // cluster_best_alignments_to_B(jumbled_to_B, all_from_A, B_names_to_idxs);
   // cluster_best_alignments_to_B(jumbled_to_A, all_from_B, A_names_to_idxs);
 
-  std::cerr << "Reading transcript-level expression for A" << std::endl;
   std::vector<double> real_tau_A(A_card), real_tau_B(B_card);
-  std::string A_expr_fname = vm["A-expr"].as<std::string>();
-  read_transcript_expression(A_expr_fname, real_tau_A, A_names_to_idxs);
-  if (vm.count("induce-B-expr")) {
-    std::cerr << "Inducing transcript-level expression for B" << std::endl;
-    induce_prot_expression(real_tau_B, clustered_best_to_B, real_tau_A, A_names_to_idxs, A, B);
-  } else {
-    std::cerr << "Reading transcript-level expression for B" << std::endl;
+  if (!vm.count("no-expr")) {
+    std::cerr << "Reading transcript-level expression for A and B" << std::endl;
+    std::string A_expr_fname = vm["A-expr"].as<std::string>();
     std::string B_expr_fname = vm["B-expr"].as<std::string>();
+    read_transcript_expression(A_expr_fname, real_tau_A, A_names_to_idxs);
     read_transcript_expression(B_expr_fname, real_tau_B, B_names_to_idxs);
   }
 
@@ -439,47 +399,46 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  std::cout << "summarize_version_11\t0" << std::endl;
+  std::cout << "summarize_version_12\t0" << std::endl;
   std::cout << "summarize_min_frac_identity_" << MIN_FRAC_ID << "\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
 
-  std::cerr << "Computing weighted clustered stats" << std::endl;
-  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, real_tau_B, A_names_to_idxs);
-  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, real_tau_A, B_names_to_idxs);
-  print_stats(precis, recall, "weighted_clustered");
+  if (!vm.count("no-expr")) {
+    std::cerr << "Computing weighted clustered stats" << std::endl;
+    recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, real_tau_B, A_names_to_idxs, no_pair);
+    precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, real_tau_A, B_names_to_idxs, no_pair);
+    print_stats(precis, recall, "weighted_clustered", no_pair);
+  }
 
   std::cerr << "Computing unweighted clustered stats" << std::endl;
-  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
-  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
-  print_stats(precis, recall, "unweighted_clustered");
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, clustered_best_to_B, A, B, unif_tau_B, A_names_to_idxs, no_pair);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, clustered_best_to_A, B, A, unif_tau_A, B_names_to_idxs, no_pair);
+  print_stats(precis, recall, "unweighted_clustered", no_pair);
   print_plot_output(B_frac_ones, plot_output_prefix, "clustered");
 
   // std::cerr << "Computing weighted jumbled stats" << std::endl;
-  // recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, real_tau_B, A_names_to_idxs);
-  // precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, real_tau_A, B_names_to_idxs);
-  // print_stats(precis, recall, "weighted_jumbled");
+  // recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, real_tau_B, A_names_to_idxs, no_pair);
+  // precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, real_tau_A, B_names_to_idxs, no_pair);
+  // print_stats(precis, recall, "weighted_jumbled", no_pair);
   //
   // std::cerr << "Computing unweighted jumbled stats" << std::endl;
-  // recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, unif_tau_B, A_names_to_idxs);
-  // precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, unif_tau_A, B_names_to_idxs);
-  // print_stats(precis, recall, "unweighted_jumbled");
+  // recall = compute_alignment_stats<smart_pairset>(B_frac_ones, jumbled_to_B, A, B, unif_tau_B, A_names_to_idxs, no_pair);
+  // precis = compute_alignment_stats<smart_pairset>(A_frac_ones, jumbled_to_A, B, A, unif_tau_A, B_names_to_idxs, no_pair);
+  // print_stats(precis, recall, "unweighted_jumbled", no_pair);
   // print_plot_output(B_frac_ones, plot_output_prefix, "jumbled");
 
-  if (vm.count("induce-B-expr")) {
-    std::cerr << "Inducing transcript-level expression for B with filtered stats" << std::endl;
-    induce_prot_expression(real_tau_B, filtered_best_to_B, real_tau_A, A_names_to_idxs, A, B);
+  if (!vm.count("no-expr")) {
+    std::cerr << "Computing weighted filtered stats" << std::endl;
+    recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, real_tau_B, A_names_to_idxs, no_pair);
+    precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, real_tau_A, B_names_to_idxs, no_pair);
+    print_stats(precis, recall, "weighted_filtered", no_pair);
   }
 
-  std::cerr << "Computing weighted filtered stats" << std::endl;
-  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, real_tau_B, A_names_to_idxs);
-  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, real_tau_A, B_names_to_idxs);
-  print_stats(precis, recall, "weighted_filtered");
-
   std::cerr << "Computing unweighted filtered stats" << std::endl;
-  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
-  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, unif_tau_A, B_names_to_idxs);
-  print_stats(precis, recall, "unweighted_filtered");
+  recall = compute_alignment_stats<smart_pairset>(B_frac_ones, filtered_best_to_B, A, B, unif_tau_B, A_names_to_idxs, no_pair);
+  precis = compute_alignment_stats<smart_pairset>(A_frac_ones, filtered_best_to_A, B, A, unif_tau_A, B_names_to_idxs, no_pair);
+  print_stats(precis, recall, "unweighted_filtered", no_pair);
   print_plot_output(B_frac_ones, plot_output_prefix, "filtered"); 
 }
