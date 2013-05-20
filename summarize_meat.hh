@@ -14,6 +14,8 @@
 #include "mask.hh"
 #include "util.hh"
 
+#define MIN_FRAC_ID (MIN_PCT_ID/100.0)
+
 struct stats_tuple
 {
   double pair, nucl, tran;
@@ -54,25 +56,22 @@ struct BestTuple
   BestTuple() : is_empty(true) {}
 };
 
-#define min_frac_id 0.95
-//#define min_frac_id 0.8
-
 template<typename T>
 inline bool is_good_enough_helper(const T& al)
 {
   #if (GOOD_POLICY == 1)
-  return al.frac_identity_wrt_a() >= min_frac_id && al.frac_indel_wrt_a() <= 0.0;
+  return al.frac_identity_wrt_a() >= MIN_FRAC_ID && al.frac_indel_wrt_a() <= 0.0;
   #elif (GOOD_POLICY == 2)
-  return (al.frac_identity_wrt_a() >= min_frac_id && al.frac_indel_wrt_a() <= 0.0) ||
-         (al.frac_identity_wrt_b() >= min_frac_id && al.frac_indel_wrt_b() <= 0.0);
+  return (al.frac_identity_wrt_a() >= MIN_FRAC_ID && al.frac_indel_wrt_a() <= 0.0) ||
+         (al.frac_identity_wrt_b() >= MIN_FRAC_ID && al.frac_indel_wrt_b() <= 0.0);
   #elif (GOOD_POLICY == 3)
-  return al.frac_identity_wrt_a() >= min_frac_id || al.frac_identity_wrt_b() >= min_frac_id;
+  return al.frac_identity_wrt_a() >= MIN_FRAC_ID || al.frac_identity_wrt_b() >= MIN_FRAC_ID;
   #elif (GOOD_POLICY == 4)
   return true;
   #elif (GOOD_POLICY == 5)
-  return al.frac_identity_wrt_b() >= min_frac_id;
+  return al.frac_identity_wrt_b() >= MIN_FRAC_ID;
   #elif (GOOD_POLICY == 6)
-  return al.frac_identity_wrt_a() >= min_frac_id && al.frac_identity_wrt_b() >= min_frac_id;
+  return al.frac_identity_wrt_a() >= MIN_FRAC_ID && al.frac_identity_wrt_b() >= MIN_FRAC_ID;
   #else
   #error "need to define GOOD_POLICY"
   #endif
@@ -441,7 +440,7 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
   std::cout << "summarize_version_11\t0" << std::endl;
-  std::cout << "summarize_min_frac_identity_" << min_frac_id << "\t0" << std::endl;
+  std::cout << "summarize_min_frac_identity_" << MIN_FRAC_ID << "\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
