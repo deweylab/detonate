@@ -91,15 +91,17 @@ void count_kmers(
     const vector<string>& A,
     const vector<string>& A_rc,
     const vector<double>& tau_A,
-    size_t kmerlen)
+    size_t kmerlen,
+    bool strand_specific)
 {
   // For each contig a in A:
   //   For each kmer r in a or reverse_complement(a):
   //     Add (1/2)*[1/(length(a) - k + 1)]*tau_A(a) to count_A(r)
   //   For each kmer r in reverse_complement(a):
   //     Add (1/2)*[1/(length(a) - k + 1)]*tau_A(a) to count_A(r)
+  size_t num_strands = strand_specific ? 1 : 2;
   for (size_t i = 0; i < A.size(); ++i) {
-    for (size_t which = 0; which < 2; ++which) {
+    for (size_t which = 0; which < num_strands; ++which) {
       const string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
         double c = 0.5 * tau_A[i];
@@ -155,7 +157,8 @@ compute_kmer_stats(
     const vector<string>& B,
     const vector<string>& B_rc,
     const vector<double>& tau_B,
-    size_t kmerlen)
+    size_t kmerlen,
+    bool strand_specific)
 {
   // Figure out roughly how many entries to expect in the hash table.
   size_t max_entries = estimate_hashtable_size(A, B, kmerlen);
@@ -165,8 +168,8 @@ compute_kmer_stats(
   KmerStats::container_type stats(max_entries);
 
   // Actually compute the desired stats.
-  count_kmers(stats, 0, A, A_rc, tau_A, kmerlen);
-  count_kmers(stats, 1, B, B_rc, tau_B, kmerlen);
+  count_kmers(stats, 0, A, A_rc, tau_A, kmerlen, strand_specific);
+  count_kmers(stats, 1, B, B_rc, tau_B, kmerlen, strand_specific);
   std::cerr << "... hashtable size is " << stats.size() << std::endl;
   //normalize_kmer_distributions(stats);
 
@@ -255,9 +258,10 @@ void compute_and_print_kmer_stats(
     const vector<double>& tau_B,
     const string& prefix,
     const string& suffix,
-    size_t kmerlen)
+    size_t kmerlen,
+    bool strand_specific)
 {
-  KmerStats::container_type kmer_stats = compute_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, kmerlen);
+  KmerStats::container_type kmer_stats = compute_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, kmerlen, strand_specific);
   print_kmer_stats(kmer_stats, prefix, suffix);
 }
 
@@ -301,6 +305,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-expr", po::value<std::string>()->required(), "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
     ("readlen", po::value<size_t>()->required(),     "The read length.")
     ("estimate-hashtable-size", "Estimate hashtable size, in bytes.")
+    ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
   ;
 
   try {
@@ -323,6 +328,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 
 void main_1(const boost::program_options::variables_map& vm)
 {
+  bool strand_specific = vm.count("strand-specific");
+
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
   std::vector<std::string> A_names, B_names;
@@ -363,8 +370,8 @@ void main_1(const boost::program_options::variables_map& vm)
   compute_nucl_expression(A, unif_tau_A, unif_nu_A);
   compute_nucl_expression(B, unif_tau_B, unif_nu_B);
 
-  std::cout << "summarize_kmer_version\t2" << std::endl;
-  compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen);
-  compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", readlen);
+  std::cout << "summarize_kmer_version\t3" << std::endl;
+  compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen, strand_specific);
+  compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", readlen, strand_specific);
   std::cerr << "Done" << std::endl;
 }
