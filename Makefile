@@ -56,7 +56,7 @@ summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
 	#condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
 	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) $(BOOST_LIB)/libboost_system$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_thread$(BOOST_SUFFIX) -o summarize_multikmer
 
-summarize_kmerpair: summarize_kmerpair.cpp summarize_kmer_meat.hh
+summarize_kmerpair: summarize_kmerpair.cpp summarize_kmerpair_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
 
 all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
