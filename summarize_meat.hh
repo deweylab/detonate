@@ -118,9 +118,12 @@ inline bool is_valid(const psl_alignment& al, bool strand_specific)
     return al.strand() == "+";
 }
 
-inline bool is_valid(const blast_alignment& /*al*/, bool /*strand_specific*/)
+inline bool is_valid(const blast_alignment& /*al*/, bool strand_specific)
 {
-  return true;
+  if (!strand_specific)
+    return true;
+  else
+    throw std::runtime_error("Strand-specificity has not been implemented yet for blast alignments.");
 }
 
 // For each a in A, figure out which alignment from a -> b (for some b in B) is
