@@ -30,7 +30,7 @@ be it.) The name is broken down as follows:
 
 where gp is the "good policy", bp is the "better policy", np is the "N policy",
 and mpi is the "minimum percent identity". The definitions and possible values
-for these are detailed under "POLICY CHOICES" below. For now, I recommend gp=4,
+for these are detailed under "Policy choices" below. For now, I recommend gp=4,
 bp=3, np=2, and mpi=95 or mpi=80. Thus, you would run summarize_4_3_2_95.
 
 
@@ -52,7 +52,7 @@ like the following:
 
 Here, "A" refers to the assembly, and "B" refers to the reference. (We have
 been using an "oracleset" rather than the collection of reference transcripts
-directly, but that is not necessary.)
+directly, but that is not necessary, depending on your goals.)
 
 "--A-expr" and "--B-expr" should be the expression.isoforms.results files
 produced by RSEM_eval or classical RSEM. If these are not available, you can
@@ -96,7 +96,7 @@ First, prf is either "precision", "recall", or "F1". Here:
 - Recall measures what fraction of items (transcripts, nucleotides, or pairs)
   from the oracleset are correctly predicted by the assembly. (The definition
   of "correctly predicted" is determined by the good and better policies,
-  described in POLICY CHOICES below.)
+  described in "Policy choices" below.)
 
 - Precision measures what fraction of items from the assembly is correctly
   predicted by the oracleset. In the rest of the document, we only describe how
@@ -111,8 +111,9 @@ Second, pnt is either "pair", "nucl", or "tran". Here:
 - Transcript recall measures what fraction of transcripts in the oracleset
   satisfy the following criterion:
 
-    >= (min percent identity) of the transcript's bases are (i) aligned to a
-    base in some contig (in the assembly), and (ii) are identical to that base.
+    >= (minimum percent identity) of the transcript's bases are (i) aligned to
+    a base in some contig (in the assembly), and (ii) are identical to that
+    base.
 
 - Nucleotide recall measures what fraction of nucleotides in the oracleset
   satisfy (i) and (ii) from the previous item.
@@ -132,7 +133,7 @@ Second, pnt is either "pair", "nucl", or "tran". Here:
   Here, the transcript recall is 0 (because neither a1 nor a2 covers b to >= 95
   percent), but the nucleotide recall is 1 (becuase a1 and a2 jointly cover b
   completely). The pair recall is somewhere in between, because the following
-  pairs of b are correctly predicted:
+  pairs of b are correctly predicted (represented by an indicator matrix):
 
           First base
       S   AGCTCGACGT
@@ -150,7 +151,7 @@ Second, pnt is either "pair", "nucl", or "tran". Here:
 Third, clu is either "clustered" or "filtered". For filtered recall, we require
 a 1-1 match between contigs and reference transcripts. For clustered recall, we
 allow more than one contig to map to the same reference transcript. (This is
-discussed further under POLICY CHOICES below.)
+discussed further under "Algorithm" below.)
 
 Fourth, wei is either "weighted" or "unweighted". 
 
@@ -193,3 +194,131 @@ Fourth, wei is either "weighted" or "unweighted".
     unweighted pair recall = (0.5*3000 + 0.5*1275) / (0.5*100*101/2 + 0.5*200*201/2)
                            = (    3000 +     1275) / (    100*101/2 +     200*201/2)
 
+
+II.C. Algorithm
+---------------
+
+At a high level, the algorithm to compute the various scores is as follows:
+
+  - Make oracleset, the contiguous fragments of reference transcripts that are
+    covered by at least one read. (As I said earlier, this step is option. You
+    could also use the set of reference transcripts directly. It depends on
+    what you want to do.)
+
+  - Compute recall:
+
+    - Align contigs against oracleset using blat -minIdentity=80.
+
+    - Discard alignments that are not good enough (good policy).
+
+    - For each contig, choose the best alignment (best policy) to some
+      oracleset element. Discard other alignments.
+
+    - If "filtered": [*]
+      - For each oracleset element, choose the best alignment (best policy)
+        from some contig. Discard other alignments.
+
+    - Based on the remaining alignments, calculate the pair, nucleotide, and
+      transcript recall:
+
+      - Pair: The fraction of pairs of oracleset bases that are covered by an
+        alignment (within one segment).
+
+      - Nucleotide: The fraction of oracleset nucleotides that are covered by
+        an alignment.
+
+      - Transcript: The fraction of transcripts in which >= (minimum percent
+        identity) of bases are covered by an alignment.
+
+  - Compute precision: Interchange the oracleset and assembly and do the above.
+
+  - Compute F1 as the harmonic mean of precision and recall.
+
+[*] If "clustered", this step is skipped. The result is that more than one
+alignment (from more than one contig) can involved the same oracleset element.
+
+
+II.B. Policy choices
+--------------------
+
+- The good policy determines which alignments are considered "good enough" to
+  be used. Choices:
+
+  - gp1: al.frac_identity_wrt_a() >= MFI && al.frac_indel_wrt_a() <= 0.0;
+
+  - gp2: (al.frac_identity_wrt_a() >= MFI && al.frac_indel_wrt_a() <= 0.0) ||
+         (al.frac_identity_wrt_b() >= MFI && al.frac_indel_wrt_b() <= 0.0);
+
+  - gp3: al.frac_identity_wrt_a() >= MFI || al.frac_identity_wrt_b() >= MFI;
+
+  - gp4: return true, i.e., all alignments found by blat are good enough
+
+  - gp5: al.frac_identity_wrt_b() >= MFI;
+
+  - gp6: al.frac_identity_wrt_a() >= MFI && al.frac_identity_wrt_b() >= MFI;
+
+  Here, MFI (min fraction identity) is the minimum percent identity, divided by
+  100.
+
+  Some of these choices do not make that much sense, and are kept around for
+  now for our internal convenience.
+
+  I recommend gp4, because it is the simplest and easiest to understand.
+
+  Note: For blast alignments, in addition to the above, all alignments are
+  required to have evalue <= 1e-5.
+
+  Note: If --strand-specific is given, then all alignments are required to put
+  their contig and transcript (i.e., query and target) on the same strand.
+
+- The better policy determines which alignments will be considered better than
+  others, and hence ultimately used. (See description under "Algorithm".)
+  Choices:
+
+  - bp1:
+    return (al.frac_identity_wrt_a() > ref.frac_identity_wrt_a
+            || (al.frac_identity_wrt_a() == ref.frac_identity_wrt_a && al.frac_indel_wrt_a() == ref.frac_indel_wrt_a));
+
+  - bp2:
+    double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
+    double d2 = -(al.frac_indel_wrt_a()  - ref.frac_indel_wrt_a);
+    double d3 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
+    double d4 = -(al.frac_indel_wrt_b()  - ref.frac_indel_wrt_b);
+    return d1 > 0 || (d1 == 0 && d2 > 0)
+                  || (d1 == 0 && d2 == 0 && d3 > 0)
+                  || (d1 == 0 && d2 == 0 && d3 == 0 && d4 > 0);
+
+  - bp3:
+    double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
+    double d2 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
+    return d1 > 0 || (d1 == 0 && d2 > 0);
+
+  - bp4:
+    double d1 = 1.0*al.num_identity() - 1.0*ref.al.num_identity();
+    double d2 = -(1.0*al.num_indel()  - 1.0*ref.al.num_indel());
+    return d1 > 0 || (d1 == 0 && d2 > 0);
+
+  I recommend bp3 because it is most related to the recall score actually
+  trying to be coherently defined. The recall doesn't really care (except for
+  pair) about indels or the raw number of identical bases. It mainly cares
+  about the fraction identity achieved.
+
+- The N policy determines how "N" bases are treated. 
+
+  - np1: "N" != "N", i.e., "N" is special and not equal to itself.
+  
+  - np2: "N" == "N", i.e., "N" is treated like any real base.
+
+  Although np1 makes more sense when one puts it like the above, np2 ends up
+  being simpler to implement consistently. At least for the data we have been
+  using, the difference between np1 and np2 is neglibile. 
+  
+  Therefore, we have been using np2, and this is what I recommend.
+
+- The minimum percent identity is used to determine whether a transcript is
+  considered to have been correctly predicted (i.e., recalled), and also
+  possibly whether an alignment is good enough. See above. Choices are 95% or
+  80%.
+
+  We have been focusing on 95% but 80% is arguably more reasonable, and perhaps
+  also more conventional.
