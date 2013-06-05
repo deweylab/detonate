@@ -1,0 +1,195 @@
+I. BUILD
+--------
+
+To compile, do the following:
+
+- Edit paths as appropriate in the first part of the Makefile. I am using
+  mostly static libraries, but this is not necessary if you don't need to use
+  condor_compile.
+
+- make -j 24
+
+  On Linux, there may be some scary warnings that "array subscript is above
+  array bounds". These can be ignored. I am confident that everything is okay
+  in the relevant part of the code.
+
+
+
+II. PRECISION-RECALL-F1
+-----------------------
+
+After you have run make, there will be a bunch of programs named things like
+summarize_4_3_2_95. These are the main programs of interest for computing
+precision-recall-F1 scores.
+
+The numbers at the end of each program's name indicate certain policy choices.
+(Obviously, it would be better to pass these as command-line arguments, but so
+be it.) The name is broken down as follows:
+
+    summarize_${gp}_${bp}_${np}_${mpi}
+
+where gp is the "good policy", bp is the "better policy", np is the "N policy",
+and mpi is the "minimum percent identity". The definitions and possible values
+for these are detailed under "POLICY CHOICES" below. For now, I recommend gp=4,
+bp=3, np=2, and mpi=95 or mpi=80. Thus, you would run summarize_4_3_2_95.
+
+
+II.A. Parameters
+----------------
+
+To run this program (whichever variant you choose), you would do something
+like the following:
+
+    ./summarize_4_3_2_95 --A-seqs trinity_default.fa \
+                         --B-seqs cc_0.fa \
+                         --A-expr trinity_default_expression/expression.isoforms.results \
+                         --B-expr cc_0_expression/expression.isoforms.results \
+                         --A-to-B trinity_default_to_cc_0.psl \
+                         --B-to-A cc_0_to_trinity_default.psl \
+                         --alignment-type psl \
+                         --strand_specific \
+                         --plot-output tmp_plot_output
+
+Here, "A" refers to the assembly, and "B" refers to the reference. (We have
+been using an "oracleset" rather than the collection of reference transcripts
+directly, but that is not necessary.)
+
+"--A-expr" and "--B-expr" should be the expression.isoforms.results files
+produced by RSEM_eval or classical RSEM. If these are not available, you can
+pass --no-expr instead; in that, case, the "weighted" scores (described below)
+will not be computed.
+
+"--A-to-B" and "--B-to-A" should be the psl files produced by
+
+    blat -minIdentity=80 B.fa A.fa A_to_B.psl
+    blat -minIdentity=80 A.fa B.fa B_to_A.psl
+
+respectively, where (again) A.fa is the assembly and B.fa is the reference.
+
+"--alignment-type" should always be "psl" if you are comparing to a transcript
+reference. 
+
+(If you are comparing to a protein reference, then "--alignment-type" should be
+"blast". In that case, "--A-to-B" and "--B-to-A" should be the results of
+blastx and tblastn, respectively, with outfmt "6 qseqid qlen sseqid slen qstart
+qend sstart send qseq sseq evalue bitscore score length pident nident mismatch
+positive gapopen gaps ppos qframe sframe".)
+
+If you pass "--strand-specific", then it is assumed that all contigs are in the
+same orientation as the reference transcripts. (Only implemented for psl
+alignments.)
+
+"--plot-output" is the prefix of two files that will be created. These are so
+far mainly for our internal use, and you can ignore them for now.
+
+
+II.B. Output
+------------
+
+A bunch of scores are printed on stdout. Each score's name follows the
+following pattern:
+
+  ${wei}_${clu}_${pnt}_${prf}
+
+First, prf is either "precision", "recall", or "F1". Here:
+
+- Recall measures what fraction of items (transcripts, nucleotides, or pairs)
+  from the oracleset are correctly predicted by the assembly. (The definition
+  of "correctly predicted" is determined by the good and better policies,
+  described in POLICY CHOICES below.)
+
+- Precision measures what fraction of items from the assembly is correctly
+  predicted by the oracleset. In the rest of the document, we only describe how
+  we define and compute recall, because in order to define/compute precision,
+  we simply interchange the assembly and the oracleset and then compute the
+  recall.
+
+- F1 is the harmonic mean of the precision and recall.
+
+Second, pnt is either "pair", "nucl", or "tran". Here:
+
+- Transcript recall measures what fraction of transcripts in the oracleset
+  satisfy the following criterion:
+
+    >= (min percent identity) of the transcript's bases are (i) aligned to a
+    base in some contig (in the assembly), and (ii) are identical to that base.
+
+- Nucleotide recall measures what fraction of nucleotides in the oracleset
+  satisfy (i) and (ii) from the previous item.
+
+- Pair recall measures what fraction of pairs of nucleotides in the oracleset
+  satisfy (i) there is a single ungapped alignment segment, with no indels,
+  involving both bases of this pair, (ii) each base in the pair is identical to
+  its corresponding base in the contig.
+
+  For example, consider the reference B (with one transcript) and assembly A
+  (with two contigs), where horizontal position indicates alignment.
+
+      B: b  =  AGCTCGACGT 
+      A: a1 =  AGCT
+         a2 =      CGACGT
+
+  Here, the transcript recall is 0 (because neither a1 nor a2 covers b to >= 95
+  percent), but the nucleotide recall is 1 (becuase a1 and a2 jointly cover b
+  completely). The pair recall is somewhere in between, because the following
+  pairs of b are correctly predicted:
+
+          First base
+      S   AGCTCGACGT
+      e A 1111
+      c G 1111
+      o C 1111
+      n T 1111
+      d C     111111
+        G     111111
+      b A     111111
+      a C     111111
+      s G     111111
+      e T     111111
+   
+Third, clu is either "clustered" or "filtered". For filtered recall, we require
+a 1-1 match between contigs and reference transcripts. For clustered recall, we
+allow more than one contig to map to the same reference transcript. (This is
+discussed further under POLICY CHOICES below.)
+
+Fourth, wei is either "weighted" or "unweighted". 
+
+- For unweighted, each transcript's contribution to the recall is counted
+  equally. 
+  
+- For weighted, each transcript's contribution to the recall is weighted by the
+  TPM of the transcript.
+
+  One way to think about this is that unweighted recall looks at how well
+  "types" of transcripts (etc.) are recovered, while weighted recall looks at
+  how well transcript "tokens" are recovered.
+
+  For example, if the reference has two transcripts b1 and b1, with:
+
+         TPM/1e-6   length   (num identical nucls)  (num identical pairs)
+    ---------------------------------------------------------------------
+    b1   0.3        100      98                     3000                 
+    b2   0.7        200      50                     1275                 
+
+  then unweighted transcript recall is 0.5, but weighted transcript recall is
+  only 0.3. 
+    
+  (This is because b1 has 98% of its nucleotides covered by an alignment and
+  identical to the corresponding base, but b2 only has 25% of its nucleotides
+  covered. Thus, only b1 is counted toward the transcript recall.)
+
+  The interpretation is that 50% of the different types of transcripts were
+  correctly recalled, and 30% of the transcript tokens (molecules) really
+  present in the sample represented by our reads were correctly recalled.
+
+  The definition and interpretation of weighted vs unweighted in the context of
+  pair and nucleotide measures is similar:
+
+      weighted nucl recall = (0.3*98 + 0.7*50) / (0.3*100 + 0.7*200)
+    unweighted nucl recall = (0.5*98 + 0.5*50) / (0.5*100 + 0.5*200)
+                           = (    98 +     50) / (    100 +     200)
+
+      weighted pair recall = (0.3*3000 + 0.7*1275) / (0.3*100*101/2 + 0.7*200*201/2)
+    unweighted pair recall = (0.5*3000 + 0.5*1275) / (0.5*100*101/2 + 0.5*200*201/2)
+                           = (    3000 +     1275) / (    100*101/2 +     200*201/2)
+
