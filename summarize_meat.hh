@@ -257,7 +257,7 @@ stats_tuple compute_alignment_stats(std::vector<double>& B_frac_ones,
       private_nucl_recall_denom += tau_B[b_idx] * B[b_idx].size();
 
       B_frac_ones[b_idx] = (1.0 * b_mask.num_ones()) / B[b_idx].size();
-      if (B_frac_ones[b_idx] >= 0.95)
+      if (B_frac_ones[b_idx] >= MIN_FRAC_ID)
         private_tran_recall += tau_B[b_idx];
 
     }
