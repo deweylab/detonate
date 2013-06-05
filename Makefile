@@ -59,13 +59,12 @@ summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
 summarize_kmerpair: summarize_kmerpair.cpp summarize_kmerpair_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
 
-all_tests := test_lazycsv test_line_stream test_blast test_pslx test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
+all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
 
 test: ${all_tests}
 	./test_lazycsv
 	./test_line_stream
 	./test_blast
-	./test_pslx
 	./test_psl
 	./test_pairset --show_progress
 	./test_mask
@@ -82,9 +81,6 @@ test_line_stream: test_line_stream.cpp
 
 test_blast: test_blast.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_blast.cpp $(LIBS) $(TEST_LIBS) -o test_blast
-
-test_pslx: test_pslx.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) test_pslx.cpp $(LIBS) $(TEST_LIBS) -o test_pslx
 
 test_psl: test_psl.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_psl.cpp $(LIBS) $(TEST_LIBS) -o test_psl
