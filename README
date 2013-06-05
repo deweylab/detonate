@@ -238,7 +238,19 @@ At a high level, the algorithm to compute the various scores is as follows:
 alignment (from more than one contig) can involved the same oracleset element.
 
 
-II.B. Policy choices
+Note that together, "filtered" and the good policy "gp4" simplify the
+algorithm, so that the core part is as follows:
+
+- Align contigs against oracleset using blat -minIdentity=80.
+- For each contig, choose the best alignment to some oracleset element. Discard
+  other alignments.
+- For each oracleset element, choose the best alignment from some contig.
+  Discard other alignments.
+- Based on the remaining alignments, calculate the pair, nucleotide, and
+  transcript recall: ...
+
+
+II.D. Policy choices
 --------------------
 
 - The good policy determines which alignments are considered "good enough" to
@@ -322,3 +334,23 @@ II.B. Policy choices
 
   We have been focusing on 95% but 80% is arguably more reasonable, and perhaps
   also more conventional.
+
+
+
+III. KMER JENSEN-SHANNON
+------------------------
+
+This program calculates the Jensen-Shannon divergence (and some other info)
+between the distribution over kmers induced by the assembly and the
+distribution over kmers (of the same length) by the reference. Here, k is
+chosen to be the read length.
+
+./summarize_kmer --A-seqs trinity_default.fa \
+                 --B-seqs cc_0.fa \
+                 --A-expr trinity_default_expression/expression.isoforms.results \
+                 --B-expr cc_0_expression/expression.isoforms.results \
+                 --readlen 76
+
+The relevant fields are weighted_kmer_probs_JS_at_one and
+unweighted_kmer_probs_JS_at_one. As in Section II, "weighted" looks at "tokens"
+and "unweighted" looks at "types".
