@@ -23,7 +23,7 @@ DEBUG =
 CFLAGS = -g -O3 -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
 INCLUDE = -I$(BOOST_INCLUDE)
-LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a) $(TBB_LIBS)
+LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
