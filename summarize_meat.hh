@@ -399,8 +399,8 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_tau_A(A_card, 1.0/A_card);
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-  std::cout << "summarize_version_12\t0" << std::endl;
-  std::cout << "summarize_min_frac_identity_" << MIN_FRAC_ID << "\t0" << std::endl;
+  std::cout << "summarize_version_13\t0" << std::endl;
+  //std::cout << "summarize_min_frac_identity_" << MIN_FRAC_ID << "\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones(B_card), A_frac_ones(A_card);
