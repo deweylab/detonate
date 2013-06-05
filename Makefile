@@ -109,4 +109,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_matched summarize_kmer summarize_kmerpair ${all_tests}
+	-rm -f ${summarize_jobs} ${summarize_aligned_kmer_jobs} summarize_matched summarize_kmer summarize_kmerpair summarize_multikmer ${all_tests}
