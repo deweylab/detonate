@@ -29,7 +29,7 @@ TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 .PHONY: all
 all: summarize summarize_aligned_kmer summarize_matched summarize_kmer summarize_kmerpair summarize_multikmer
 
-summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
+summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
 summarize_aligned_kmer_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_aligned_kmer_${gp}_${bp}_${np}_${mpi}))))
 gp = $(word 1,$(subst _, ,$*))
 bp = $(word 2,$(subst _, ,$*))
