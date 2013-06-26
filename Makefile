@@ -3,6 +3,8 @@ ifeq ($(shell uname), Linux)
   BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
   BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
   BOOST_SUFFIX  = .a
+  LEMON_INCLUDE = -I$(shell pwd)/lemon/tip -I$(shell pwd)/lemon/tip/build
+  LEMON_LIB     = $(shell pwd)/lemon/tip/build/lemon/libemon.a
   UNIT_TEST_DLL = libboost_unit_test_framework.so
   CC11          = /u/deweylab/sw/gcc-4.7.2/arch/x86_64-redhat-linux-gnu/bin/g++
 endif
@@ -22,12 +24,12 @@ CC = /usr/bin/g++
 DEBUG =
 CFLAGS = -g -O3 -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
-INCLUDE = -I$(BOOST_INCLUDE)
-LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a)
+INCLUDE = -I$(BOOST_INCLUDE) $(LEMON_INCLUDE)
+LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a) $(LEMON_LIB)
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
-all: summarize summarize_aligned_kmer summarize_matched summarize_kmer summarize_kmerpair summarize_multikmer
+all: summarize summarize_aligned_kmer summarize_matched summarize_oomatched summarize_kmer summarize_kmerpair summarize_multikmer
 
 summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
 summarize_aligned_kmer_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_aligned_kmer_${gp}_${bp}_${np}_${mpi}))))
@@ -48,6 +50,9 @@ ${summarize_aligned_kmer_jobs}: summarize_aligned_kmer_%: summarize_aligned_kmer
 
 summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
 	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
+
+summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_oomatched.cpp $(LIBS) -o summarize_oomatched
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
@@ -105,4 +110,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} ${summarize_aligned_kmer_jobs} summarize_matched summarize_kmer summarize_kmerpair summarize_multikmer ${all_tests}
+	-rm -f ${summarize_jobs} ${summarize_aligned_kmer_jobs} summarize_matched summarize_oomatched summarize_kmer summarize_kmerpair summarize_multikmer ${all_tests}
