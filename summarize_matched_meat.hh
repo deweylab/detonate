@@ -12,12 +12,13 @@
 #include "blast.hh"
 #include "psl.hh"
 #include "pairset.hh"
+#include "kpairset.hh"
 #include "mask.hh"
 #include "util.hh"
 
 struct stats_tuple
 {
-  double pair, nucl, tran;
+  double pair, kpair, nucl, tran;
 };
 
 double compute_F1(double precis, double recall)
@@ -33,6 +34,10 @@ void print_stats(const stats_tuple& precis, const stats_tuple& recall, const std
   std::cout << prefix << "_pair_precision\t" << precis.pair                          << std::endl;
   std::cout << prefix << "_pair_recall\t"    << recall.pair                          << std::endl;
   std::cout << prefix << "_pair_F1\t"        << compute_F1(precis.pair, recall.pair) << std::endl;
+
+  std::cout << prefix << "_kpair_precision\t" << precis.kpair                          << std::endl;
+  std::cout << prefix << "_kpair_recall\t"    << recall.kpair                          << std::endl;
+  std::cout << prefix << "_kpair_F1\t"        << compute_F1(precis.kpair, recall.kpair) << std::endl;
 
   std::cout << prefix << "_nucl_precision\t" << precis.nucl                          << std::endl;
   std::cout << prefix << "_nucl_recall\t"    << recall.nucl                          << std::endl;
@@ -84,6 +89,46 @@ struct pair_helper
     double denom = 0.0;
     for (size_t b_idx = 0; b_idx < B_lengths.size(); ++b_idx)
       denom += tau_B[b_idx] * B_lengths[b_idx] * (B_lengths[b_idx] + 1) / 2;
+    return numer/denom;
+  }
+};
+
+struct kpair_helper
+{
+  size_t                     k;
+  const std::vector<size_t>& B_lengths;
+  const std::vector<double>& tau_B;
+  double                     numer;
+
+  kpair_helper(size_t k,
+               const std::vector<size_t>& B_lengths,
+               const std::vector<double>& tau_B)
+  : k(k), B_lengths(B_lengths), tau_B(tau_B), numer(0.0)
+  {}
+
+  double compute_contribution(const tagged_alignment& l) const
+  {
+    kpairset b_kpairset(k, B_lengths[l.b_idx]);
+    BOOST_FOREACH(const alignment_segment& seg, l.segments)
+      b_kpairset.add_kpairs_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+    return tau_B[l.b_idx] * b_kpairset.size();
+  }
+
+  void add_contribution_to_recall(const tagged_alignment& l) { numer += l.contribution; }
+
+  double get_recall()
+  {
+    // How many k-pairs are there in a seq of length n?
+    // There are n-k+2 such k-pairs.
+    // 
+    // E.g., k=3, n=5
+    // 01234  -> (0,2), (1,3), (2,4)
+    // Indeed, 5-3+1 = 3
+    double denom = 0.0;
+    for (size_t b_idx = 0; b_idx < B_lengths.size(); ++b_idx) {
+      if (B_lengths[b_idx] >= k)
+        denom += tau_B[b_idx] * (B_lengths[b_idx] - k + 1);
+    }
     return numer/denom;
   }
 };
@@ -312,6 +357,7 @@ stats_tuple do_it_all_wrapper(const std::vector<tagged_alignment>& alignments,
                               size_t                               B_card,
                               const std::vector<size_t>&           B_lengths,
                               const std::vector<double>&           tau_B,
+                              size_t                               k,
                               std::vector<double>                  *plot_output) // if non-null, B_frac_ones will be copied here
 {
   stats_tuple st;
@@ -320,6 +366,12 @@ stats_tuple do_it_all_wrapper(const std::vector<tagged_alignment>& alignments,
     pair_helper h(B_lengths, tau_B);
     do_it_all(h, alignments, A_card, B_card);
     st.pair = h.get_recall();
+  }
+
+  {
+    kpair_helper h(k, B_lengths, tau_B);
+    do_it_all(h, alignments, A_card, B_card);
+    st.kpair = h.get_recall();
   }
 
   {
@@ -356,6 +408,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("plot-output", po::value<std::string>()->required(),   "File where plot values will be written.")
     ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
+    ("readlen", po::value<size_t>()->required(),     "The read length.")
   ;
 
   try {
@@ -392,6 +445,7 @@ template<typename AlignmentType>
 void main_1(const boost::program_options::variables_map& vm)
 {
   bool strand_specific = vm.count("strand-specific");
+  size_t readlen = vm["readlen"].as<size_t>();
 
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
@@ -426,19 +480,19 @@ void main_1(const boost::program_options::variables_map& vm)
   read_alignments<AlignmentType>(A_to_B, A_to_B_is, A, B, A_names_to_idxs, B_names_to_idxs, strand_specific);
   read_alignments<AlignmentType>(B_to_A, B_to_A_is, B, A, B_names_to_idxs, A_names_to_idxs, strand_specific);
 
-  std::cout << "summarize_matched_version_9\t0" << std::endl;
+  std::cout << "summarize_matched_version_10\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones;
 
   if (!vm.count("no-expr")) {
-    recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, real_tau_B, NULL);
-    precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, real_tau_A, NULL);
+    recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, real_tau_B, readlen, NULL);
+    precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, real_tau_A, readlen, NULL);
     print_stats(precis, recall, "weighted_matched");
   }
                                                                     
-  recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, unif_tau_B, &B_frac_ones);
-  precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, unif_tau_A, NULL);
+  recall = do_it_all_wrapper(A_to_B, A_card, B_card, B_lengths, unif_tau_B, readlen, &B_frac_ones);
+  precis = do_it_all_wrapper(B_to_A, B_card, A_card, A_lengths, unif_tau_A, readlen, NULL);
   print_stats(precis, recall, "unweighted_matched");
 
   std::ofstream f(vm["plot-output"].as<std::string>().c_str());
