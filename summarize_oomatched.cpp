@@ -11,7 +11,8 @@ int main(int argc, const char **argv)
 
     std::string alignment_type = vm["alignment-type"].as<std::string>();
     if (alignment_type == "blast")
-      main_1<blast_alignment>(vm);
+      std::cerr << "Blast alignments are not currently supported." << std::endl;
+      //main_1<blast_alignment>(vm);
     else if (alignment_type == "psl")
       main_1<psl_alignment>(vm);
 
