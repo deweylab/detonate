@@ -13,12 +13,13 @@
 #include "psl.hh"
 #include "pairset.hh"
 #include "kpairset.hh"
+#include "kmerset.hh"
 #include "mask.hh"
 #include "util.hh"
 
 struct stats_tuple
 {
-  double pair, kpair, nucl, tran;
+  double pair, kpair, kmer, nucl, tran;
 };
 
 double compute_F1(double precis, double recall)
@@ -38,6 +39,10 @@ void print_stats(const stats_tuple& precis, const stats_tuple& recall, const std
   std::cout << prefix << "_kpair_precision\t" << precis.kpair                          << std::endl;
   std::cout << prefix << "_kpair_recall\t"    << recall.kpair                          << std::endl;
   std::cout << prefix << "_kpair_F1\t"        << compute_F1(precis.kpair, recall.kpair) << std::endl;
+
+  std::cout << prefix << "_kmer_precision\t" << precis.kmer                          << std::endl;
+  std::cout << prefix << "_kmer_recall\t"    << recall.kmer                          << std::endl;
+  std::cout << prefix << "_kmer_F1\t"        << compute_F1(precis.kmer, recall.kmer) << std::endl;
 
   std::cout << prefix << "_nucl_precision\t" << precis.nucl                          << std::endl;
   std::cout << prefix << "_nucl_recall\t"    << recall.nucl                          << std::endl;
@@ -123,6 +128,46 @@ struct kpair_helper
     // 
     // E.g., k=3, n=5
     // 01234  -> (0,2), (1,3), (2,4)
+    // Indeed, 5-3+1 = 3
+    double denom = 0.0;
+    for (size_t b_idx = 0; b_idx < B_lengths.size(); ++b_idx) {
+      if (B_lengths[b_idx] >= k)
+        denom += tau_B[b_idx] * (B_lengths[b_idx] - k + 1);
+    }
+    return numer/denom;
+  }
+};
+
+struct kmer_helper
+{
+  size_t                     k;
+  const std::vector<size_t>& B_lengths;
+  const std::vector<double>& tau_B;
+  double                     numer;
+
+  kmer_helper(size_t k,
+              const std::vector<size_t>& B_lengths,
+              const std::vector<double>& tau_B)
+  : k(k), B_lengths(B_lengths), tau_B(tau_B), numer(0.0)
+  {}
+
+  double compute_contribution(const tagged_alignment& l) const
+  {
+    kmerset b_kmerset(k, B_lengths[l.b_idx]);
+    BOOST_FOREACH(const alignment_segment& seg, l.segments)
+      b_kmerset.add_kmers_with_exceptions(seg.b_start, seg.b_end, seg.b_mismatches.begin(), seg.b_mismatches.end());
+    return tau_B[l.b_idx] * b_kmerset.size();
+  }
+
+  void add_contribution_to_recall(const tagged_alignment& l) { numer += l.contribution; }
+
+  double get_recall()
+  {
+    // How many kmers are there in a seq of length n?
+    // There are n-k+2 such kmers.
+    // 
+    // E.g., k=3, n=5
+    // 01234  -> (0,1,2), (1,2,3), (2,3,4)
     // Indeed, 5-3+1 = 3
     double denom = 0.0;
     for (size_t b_idx = 0; b_idx < B_lengths.size(); ++b_idx) {
@@ -372,6 +417,12 @@ stats_tuple do_it_all_wrapper(const std::vector<tagged_alignment>& alignments,
     kpair_helper h(k, B_lengths, tau_B);
     do_it_all(h, alignments, A_card, B_card);
     st.kpair = h.get_recall();
+  }
+
+  {
+    kmer_helper h(k, B_lengths, tau_B);
+    do_it_all(h, alignments, A_card, B_card);
+    st.kmer = h.get_recall();
   }
 
   {
