@@ -250,7 +250,7 @@ struct tran_helper
   }
 };
 
-inline bool is_good_enough_for_do_it_all(const std::vector<alignment_segment>& segs)
+inline bool is_good_enough_for_do_it_all(const std::vector<alignment_segment>& segs, size_t min_seg_len)
 {
   size_t len = 0;
   BOOST_FOREACH(const alignment_segment& seg, segs) {
@@ -259,7 +259,7 @@ inline bool is_good_enough_for_do_it_all(const std::vector<alignment_segment>& s
     else
       len += seg.a_start - seg.a_end + 1;
   }
-  return len >= 30;
+  return len >= min_seg_len;
 }
 
 inline bool is_valid(const psl_alignment& al, bool strand_specific)
@@ -287,7 +287,8 @@ void read_alignments(std::vector<tagged_alignment>& alignments,
                      const std::vector<std::string>&                B,
                      const std::map<std::string, size_t>&           A_names_to_idxs,
                      const std::map<std::string, size_t>&           B_names_to_idxs,
-                     bool                                           strand_specific)
+                     bool                                           strand_specific,
+                     size_t                                         readlen)
 {
   AlignmentType al;
   tagged_alignment l;
@@ -297,7 +298,7 @@ void read_alignments(std::vector<tagged_alignment>& alignments,
       l.b_idx = B_names_to_idxs.find(al.b_name())->second;
       typename AlignmentType::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
       l.segments.assign(segs.begin(), segs.end());
-      if (is_good_enough_for_do_it_all(l.segments))
+      if (is_good_enough_for_do_it_all(l.segments, readlen))
         alignments.push_back(l);
     }
   }
@@ -309,7 +310,8 @@ template<typename HelperType>
 void do_it_all(HelperType&                   helper,
                std::vector<tagged_alignment> alignments, /* passed by value */
                size_t                        A_card,
-               size_t                        B_card)
+               size_t                        B_card,
+               size_t                        readlen)
 {
   // Compute contributions.
   #pragma omp parallel for
@@ -377,7 +379,7 @@ void do_it_all(HelperType&                   helper,
     // If the alignment has changed, then put it back in the priority queue.
     if (l1_has_changed) {
 
-      if (is_good_enough_for_do_it_all(l1->segments)) {
+      if (is_good_enough_for_do_it_all(l1->segments, readlen)) {
         l1->contribution = helper.compute_contribution(*l1);
         Q.push(l1);
       }
@@ -402,38 +404,38 @@ stats_tuple do_it_all_wrapper(const std::vector<tagged_alignment>& alignments,
                               size_t                               B_card,
                               const std::vector<size_t>&           B_lengths,
                               const std::vector<double>&           tau_B,
-                              size_t                               k,
+                              size_t                               readlen,
                               std::vector<double>                  *plot_output) // if non-null, B_frac_ones will be copied here
 {
   stats_tuple st;
 
   {
     pair_helper h(B_lengths, tau_B);
-    do_it_all(h, alignments, A_card, B_card);
+    do_it_all(h, alignments, A_card, B_card, readlen);
     st.pair = h.get_recall();
   }
 
   {
-    kpair_helper h(k, B_lengths, tau_B);
-    do_it_all(h, alignments, A_card, B_card);
+    kpair_helper h(readlen, B_lengths, tau_B);
+    do_it_all(h, alignments, A_card, B_card, readlen);
     st.kpair = h.get_recall();
   }
 
   {
-    kmer_helper h(k, B_lengths, tau_B);
-    do_it_all(h, alignments, A_card, B_card);
+    kmer_helper h(readlen, B_lengths, tau_B);
+    do_it_all(h, alignments, A_card, B_card, readlen);
     st.kmer = h.get_recall();
   }
 
   {
     nucl_helper h(B_lengths, tau_B);
-    do_it_all(h, alignments, A_card, B_card);
+    do_it_all(h, alignments, A_card, B_card, readlen);
     st.nucl = h.get_recall();
   }
 
   {
     tran_helper h(B_lengths, tau_B);
-    do_it_all(h, alignments, A_card, B_card);
+    do_it_all(h, alignments, A_card, B_card, readlen);
     st.tran = h.get_recall();
     if (plot_output)
       *plot_output = h.B_frac_ones;
@@ -528,10 +530,10 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<tagged_alignment> A_to_B, B_to_A;
   typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
   typename AlignmentType::input_stream_type B_to_A_is(open_or_throw(vm["B-to-A"].as<std::string>()));
-  read_alignments<AlignmentType>(A_to_B, A_to_B_is, A, B, A_names_to_idxs, B_names_to_idxs, strand_specific);
-  read_alignments<AlignmentType>(B_to_A, B_to_A_is, B, A, B_names_to_idxs, A_names_to_idxs, strand_specific);
+  read_alignments<AlignmentType>(A_to_B, A_to_B_is, A, B, A_names_to_idxs, B_names_to_idxs, strand_specific, readlen);
+  read_alignments<AlignmentType>(B_to_A, B_to_A_is, B, A, B_names_to_idxs, A_names_to_idxs, strand_specific, readlen);
 
-  std::cout << "summarize_matched_version_10\t0" << std::endl;
+  std::cout << "summarize_matched_version_11\t0" << std::endl;
 
   stats_tuple recall, precis;
   std::vector<double> B_frac_ones;
