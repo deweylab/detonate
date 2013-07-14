@@ -88,7 +88,8 @@ std::pair<double, double> compute_recall(
   while (input_stream >> al) {
     if (is_valid(al, strand_specific) &&
         al.frac_identity_wrt_a() >= thresh && 
-        al.frac_identity_wrt_b() >= thresh) {
+        al.frac_identity_wrt_b() >= thresh &&
+        al.num_indel() == 0) {
       size_t a_idx = A_names_to_idxs.find(al.a_name())->second;
       size_t b_idx = B_names_to_idxs.find(al.b_name())->second;
       lemon::SmartGraph::Edge edge = graph.addEdge(A_nodes[a_idx], B_nodes[b_idx]);
@@ -239,7 +240,7 @@ void main_1(const boost::program_options::variables_map& vm)
   double wei_F1 = compute_F1(precis.first,  recall.first);
   double unw_F1 = compute_F1(precis.second, recall.second);
 
-  std::cout << "summarize_oomatched_version_1\t0\n";
+  std::cout << "summarize_oomatched_version_2\t0\n";
 
   if (!vm.count("no-expr")) {
     std::cout << "weighted_oomatched_tran_recall\t"    << recall.first << "\n"
