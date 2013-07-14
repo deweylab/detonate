@@ -104,7 +104,7 @@ void count_kmers(
     for (size_t which = 0; which < num_strands; ++which) {
       const string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
-        double c = 0.5 * tau_A[i];
+        double c = tau_A[i];
         string::const_iterator beg = a.begin();
         string::const_iterator end = a.begin() + kmerlen;
         for (; end != a.end(); ++beg, ++end) {
@@ -204,19 +204,26 @@ void print_kmer_stats(
   }
 
   {
-    double numer = 0.0, denom_precis = 0.0, denom_recall = 0.0;
+    double numer = 0.0, denom_precis = 0.0, denom_recall = 0.0, frac_present_numer = 0.0, frac_present_denom = 0.0;
     BOOST_FOREACH(const X& x, stats) {
       const KmerInfo& i = x.second;
       numer += std::min(i.probs[0], i.probs[1]); // frac "retrieved" and "relevant"
       denom_precis += i.probs[0]; // frac "retrieved"
       denom_recall += i.probs[1]; // frac "relevant"
+      if (i.probs[0] > 0)
+        frac_present_numer += i.probs[1];
+      frac_present_denom += i.probs[1];
     }
     double precis = numer / denom_precis;
     double recall = numer / denom_recall;
     double F1 = compute_F1(precis, recall);
+    double frac_present = frac_present_numer / frac_present_denom;
     cout << prefix << "_precision_" << suffix << "\t" << precis << endl;
     cout << prefix << "_recall_"    << suffix << "\t" << recall << endl;
     cout << prefix << "_F1_"        << suffix << "\t" << F1     << endl;
+    cout << prefix << "_frac_present_numer_" << suffix << "\t" << frac_present_numer << endl;
+    cout << prefix << "_frac_present_denom_" << suffix << "\t" << frac_present_denom << endl;
+    cout << prefix << "_frac_present_"       << suffix << "\t" << frac_present       << endl;
   }
 
   // Second, compute and print stats based on the normalized distribution.
@@ -370,7 +377,7 @@ void main_1(const boost::program_options::variables_map& vm)
   compute_nucl_expression(A, unif_tau_A, unif_nu_A);
   compute_nucl_expression(B, unif_tau_B, unif_nu_B);
 
-  std::cout << "summarize_kmer_version\t3" << std::endl;
+  std::cout << "summarize_kmer_version_4\t0" << std::endl;
   compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen, strand_specific);
   compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", readlen, strand_specific);
   std::cerr << "Done" << std::endl;
