@@ -51,6 +51,9 @@ summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
+summarize_aligned_kmer: summarize_aligned_kmer.cpp summarize_aligned_kmer_meat.hh
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_aligned_kmer.cpp $(LIBS) -o summarize_aligned_kmer
+
 summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
 	#condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
 	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) $(BOOST_LIB)/libboost_system$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_thread$(BOOST_SUFFIX) -o summarize_multikmer
@@ -104,4 +107,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_matched summarize_oomatched summarize_kmer summarize_kmerpair summarize_multikmer ${all_tests}
+	-rm -f ${summarize_jobs} summarize_matched summarize_oomatched summarize_kmer summarize_aligned_kmer summarize_kmerpair summarize_multikmer ${all_tests}
