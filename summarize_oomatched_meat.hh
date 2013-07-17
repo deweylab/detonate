@@ -138,7 +138,7 @@ std::pair<double, double> compute_recall(
       unw_fo << B_names[b_idx] << "\t" << A_names[a_idx] << "\t" << 1.0/B_card << "\t"
              << join(al_map[edge]->block_sizes(), ",") << "\t"
              << join(al_map[edge]->q_starts(), ",") << "\t"
-             << join(al_map[edge]->t_starts(), ",") << "\t"
+             << join(al_map[edge]->t_starts(), ",")
              << std::endl;
     }
   }
