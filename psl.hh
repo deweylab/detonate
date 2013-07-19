@@ -26,6 +26,7 @@ public:
   std::string b_name()        const { return t_name(); }
   double      frac_identity_wrt_a() const { return 1.0 * num_identity() / a_length(); }
   double      frac_identity_wrt_b() const { return 1.0 * num_identity() / b_length(); }
+  // NOTE: these frac_indel_wrt_a or frac_indel_wrt_b are not really correct, unless one is just checking that they are == 0.0...
   double      frac_indel_wrt_a()    const { return 1.0 * num_indel()    / a_length(); }
   double      frac_indel_wrt_b()    const { return 1.0 * num_indel()    / b_length(); }
   typedef detail::psl_alignment_input_stream input_stream_type;

@@ -62,7 +62,8 @@ std::pair<double, double> compute_recall(
     const std::vector<std::string>&            B_names,
     const std::vector<double>&                 tau_B,
     bool                                       strand_specific,
-    double                                     thresh,
+    double                                     frac_identity_thresh,
+    double                                     frac_indel_thresh,
     const std::string&                         wei_mm_fname,
     const std::string&                         unw_mm_fname)
 {
@@ -87,9 +88,10 @@ std::pair<double, double> compute_recall(
   AlignmentType al;
   while (input_stream >> al) {
     if (is_valid(al, strand_specific) &&
-        al.frac_identity_wrt_a() >= thresh && 
-        al.frac_identity_wrt_b() >= thresh &&
-        al.num_indel() == 0) {
+        al.frac_identity_wrt_a() >= frac_identity_thresh && 
+        al.frac_identity_wrt_b() >= frac_identity_thresh &&
+        al.q_base_insert()/al.q_size() <= frac_indel_thresh &&
+        al.t_base_insert()/al.t_size() <= frac_indel_thresh) {
       size_t a_idx = A_names_to_idxs.find(al.a_name())->second;
       size_t b_idx = B_names_to_idxs.find(al.b_name())->second;
       lemon::SmartGraph::Edge edge = graph.addEdge(A_nodes[a_idx], B_nodes[b_idx]);
@@ -162,7 +164,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-to-A", po::value<std::string>()->required(), "The alignments of B to A.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
-    ("thresh", po::value<double>()->required(), "The threshold for frac_identity (wrt both a and b) below which the alignment is not counted.")
+    ("frac-identity-thresh", po::value<double>()->required(), "The threshold for frac_identity (wrt both a and b) below which the alignment is not counted.")
+    ("frac-indel-thresh", po::value<double>()->required(), "The threshold for frac_indel (wrt both a and b) below which the alignment is not counted.")
     ("output", po::value<std::string>()->required(), "The prefix for all output files.")
   ;
 
@@ -233,14 +236,15 @@ void main_1(const boost::program_options::variables_map& vm)
   std::string A_to_B_unw_mm_fname = output + ".A_to_B_unw_mm";
   std::string B_to_A_unw_mm_fname = output + ".B_to_A_unw_mm";
 
-  double thresh = vm["thresh"].as<double>();
-  std::pair<double, double> recall = compute_recall<AlignmentType>(A_to_B_is, A_card, B_card, A_names_to_idxs, B_names_to_idxs, A_names, B_names, tau_B, strand_specific, thresh, A_to_B_wei_mm_fname, A_to_B_unw_mm_fname);
-  std::pair<double, double> precis = compute_recall<AlignmentType>(B_to_A_is, B_card, A_card, B_names_to_idxs, A_names_to_idxs, B_names, A_names, tau_A, strand_specific, thresh, B_to_A_wei_mm_fname, B_to_A_unw_mm_fname);
+  double frac_identity_thresh = vm["frac-identity-thresh"].as<double>();
+  double frac_indel_thresh = vm["frac-indel-thresh"].as<double>();
+  std::pair<double, double> recall = compute_recall<AlignmentType>(A_to_B_is, A_card, B_card, A_names_to_idxs, B_names_to_idxs, A_names, B_names, tau_B, strand_specific, frac_identity_thresh, frac_indel_thresh, A_to_B_wei_mm_fname, A_to_B_unw_mm_fname);
+  std::pair<double, double> precis = compute_recall<AlignmentType>(B_to_A_is, B_card, A_card, B_names_to_idxs, A_names_to_idxs, B_names, A_names, tau_A, strand_specific, frac_identity_thresh, frac_indel_thresh, B_to_A_wei_mm_fname, B_to_A_unw_mm_fname);
 
   double wei_F1 = compute_F1(precis.first,  recall.first);
   double unw_F1 = compute_F1(precis.second, recall.second);
 
-  std::cout << "summarize_oomatched_version_2\t0\n";
+  std::cout << "summarize_oomatched_version_3\t0\n";
 
   if (!vm.count("no-expr")) {
     std::cout << "weighted_oomatched_tran_recall\t"    << recall.first << "\n"
