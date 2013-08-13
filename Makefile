@@ -42,6 +42,9 @@ summarize: ${summarize_jobs}
 ${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
 	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) -DMIN_PCT_ID=$(mpi) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)_$(mpi)
 
+summarize_axolotl: summarize_axolotl.cpp summarize_axolotl_meat.hh
+	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_axolotl.cpp $(LIBS) -o summarize_axolotl
+
 summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
 	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
 
