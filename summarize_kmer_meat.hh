@@ -143,9 +143,11 @@ size_t estimate_hashtable_size(
   size_t fudge_factor = 2;
   size_t max_entries = 0;
   BOOST_FOREACH(const string& a, A)
-    max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
+    if (a.size() >= kmerlen)
+      max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
   BOOST_FOREACH(const string& a, B)
-    max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
+    if (a.size() >= kmerlen)
+      max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
   return max_entries;
 }
 
@@ -313,6 +315,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("readlen", po::value<size_t>()->required(),     "The read length.")
     ("estimate-hashtable-size", "Estimate hashtable size, in bytes.")
     ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
+    ("at-half-and-double",                           "Also run with k = half and double the read length.")
   ;
 
   try {
@@ -336,6 +339,7 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 void main_1(const boost::program_options::variables_map& vm)
 {
   bool strand_specific = vm.count("strand-specific");
+  bool at_half_and_double = vm.count("at-half-and-double");
 
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
@@ -377,8 +381,14 @@ void main_1(const boost::program_options::variables_map& vm)
   compute_nucl_expression(A, unif_tau_A, unif_nu_A);
   compute_nucl_expression(B, unif_tau_B, unif_nu_B);
 
-  std::cout << "summarize_kmer_version_4\t0" << std::endl;
-  compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one", readlen, strand_specific);
-  compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one", readlen, strand_specific);
+  std::cout << "summarize_kmer_version_5\t0" << std::endl;
+  compute_and_print_kmer_stats(  A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_one",    readlen,   strand_specific);
+  compute_and_print_kmer_stats(  A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one",    readlen,   strand_specific);
+  if (at_half_and_double) {
+    compute_and_print_kmer_stats(A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_half",   readlen/2, strand_specific);
+    compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_half",   readlen/2, strand_specific);
+    compute_and_print_kmer_stats(A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_double", readlen*2, strand_specific);
+    compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_double", readlen*2, strand_specific);
+  }
   std::cerr << "Done" << std::endl;
 }
