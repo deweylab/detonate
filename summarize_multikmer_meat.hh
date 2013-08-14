@@ -192,16 +192,11 @@ void count_kmers(
       const string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
         double c = 0.5 * tau_A[i];
-        size_t j = 0;
         string::const_iterator beg = a.begin();
         string::const_iterator end = a.begin() + kmerlen;
-        for (; end != a.end(); ++beg, ++end) {
-          if (j % 10000 == 0)
-            std::cerr << ":" << std::flush;
-          ++j;
-          KmerKey kmer_key(beg, end);
-          stats[kmer_key].probs[A_or_B] += c; // relies on default init to 0
-        }
+        for (; end != a.end(); ++beg, ++end)
+          stats[KmerKey(beg, end)].probs[A_or_B] += c; // relies on default init to 0
+        stats[KmerKey(beg, end)].probs[A_or_B] += c; // relies on default init to 0
       }
     }
   }
@@ -467,7 +462,7 @@ void main_1(const boost::program_options::variables_map& vm)
     return;
   }
 
-  std::cout << "summarize_multikmer_version\t1" << std::endl;
+  std::cout << "summarize_multikmer_version\t2" << std::endl;
 
   std::cerr << "Computing and printing weighted stats" << std::endl;
   compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_multikmer", "at_exp2");

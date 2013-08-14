@@ -107,10 +107,9 @@ void count_kmers(
         double c = tau_A[i];
         string::const_iterator beg = a.begin();
         string::const_iterator end = a.begin() + kmerlen;
-        for (; end != a.end(); ++beg, ++end) {
-          KmerKey kmer_key(beg, end);
-          stats[kmer_key].probs[A_or_B] += c; // relies on default init to 0
-        }
+        for (; end != a.end(); ++beg, ++end)
+          stats[KmerKey(beg, end)].probs[A_or_B] += c; // relies on default init to 0
+        stats[KmerKey(beg, end)].probs[A_or_B] += c; // relies on default init to 0
       }
     }
   }
@@ -380,8 +379,8 @@ void main_1(const boost::program_options::variables_map& vm)
   std::vector<double> unif_nu_A(A.size()), unif_nu_B(B.size());
   compute_nucl_expression(A, unif_tau_A, unif_nu_A);
   compute_nucl_expression(B, unif_tau_B, unif_nu_B);
+  std::cout << "summarize_kmer_version_6\t0" << std::endl;
 
-  std::cout << "summarize_kmer_version_5\t0" << std::endl;
   compute_and_print_kmer_stats(  A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_one",    readlen,   strand_specific);
   compute_and_print_kmer_stats(  A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one",    readlen,   strand_specific);
   if (at_half_and_double) {
