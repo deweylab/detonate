@@ -9,10 +9,6 @@ To compile, do the following:
 
 - make -j 24
 
-  On Linux, there may be some scary warnings that "array subscript is above
-  array bounds". These can be ignored. I am confident that everything is okay
-  in the relevant part of the code.
-
 
 II. SCORES USED IN PAPER
 ------------------------
