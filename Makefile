@@ -6,17 +6,16 @@ ifeq ($(shell uname), Darwin)
 endif
 
 CC = g++
-#DEBUG = -g3 -fno-inline -O0
+#DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
-CFLAGS = -g -O3 -W -Wall -Wextra $(DEBUG)
-LFLAGS = -Wall $(DEBUG)
+CFLAGS = -g -O3 -W $(DEBUG)
 BOOST_INCLUDE = -I$(shell pwd)/boost
-BOOST_LIB     = $(shell pwd)/boost/stage/lib
-LEMON_INCLUDE = -I$(shell pwd)/lemon/tip -I$(shell pwd)/lemon/tip/build
-LEMON_LIB     = $(shell pwd)/lemon/tip/build/lemon
+BOOST_LIB     = -L$(shell pwd)/boost/stage/lib -Wl,-rpath,$(shell pwd)/boost/stage/lib -lboost_program_options -lboost_random
+LEMON_INCLUDE = -I$(shell pwd)/lemon/build -I$(shell pwd)/lemon/lemon-main-473c71baff72
+LEMON_LIB     = -L$(shell pwd)/lemon/build/lemon -Wl,-rpath,$(shell pwd)/lemon/build/lemon -lemon -lpthread
 INCLUDE = $(BOOST_INCLUDE) $(LEMON_INCLUDE)
-LIBS = -Wl,-Bstatic -L$(BOOST_LIB) -L$(LEMON_LIB) -lboost_program_options -lboost_random -lemon -lpthread -static-libgcc $(shell $(CC) -print-file-name=libstdc++.a)
-TEST_LIBS = -Wl,-Bdynamic -Wl,-rpath,$(BOOST_LIB) -L$(BOOST_LIB) -lboost_unit_test_framework
+LIBS    = $(BOOST_LIB) $(LEMON_LIB)
+TEST_LIBS = -lboost_unit_test_framework
 
 .PHONY: all
 all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_kmerpair summarize_multikmer
