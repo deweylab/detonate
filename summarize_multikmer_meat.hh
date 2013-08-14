@@ -264,8 +264,7 @@ compute_kmer_stats(
 
   // Actually compute the desired stats.
   size_t max_contig_len = std::max(find_max_contig_len(A), find_max_contig_len(B));
-  //for (size_t k = 1; k < max_contig_len; k *= 2) {
-  for (size_t k = 131072; k < max_contig_len; k *= 2) {
+  for (size_t k = 1; k < max_contig_len; k *= 2) {
     std::cerr << "Counting kmers of length " << k << std::endl;
     count_kmers(stats, 0, A, A_rc, tau_A, k);
     count_kmers(stats, 1, B, B_rc, tau_B, k);
@@ -399,8 +398,9 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("help,?", "Display this information.")
     ("A-seqs", po::value<std::string>()->required(), "The assembly sequences, in FASTA format.")
     ("B-seqs", po::value<std::string>()->required(), "The oracleset sequences, in FASTA format.")
-    ("A-expr", po::value<std::string>()->required(), "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
-    ("B-expr", po::value<std::string>()->required(), "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("A-expr", po::value<std::string>(),             "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("no-expr",                                      "Do not use expression at all. No weighted scores will be produced.")
     ("estimate-hashtable-size", "Estimate hashtable size, in bytes.")
   ;
 
@@ -415,6 +415,14 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 
     po::notify(vm);
 
+    if (vm.count("no-expr")) {
+      if (vm.count("A-expr") != 0 || vm.count("B-expr") != 0)
+        throw po::error("If --no-expr is given, then --A-expr and --B-expr cannot be given.");
+    } else {
+      if (vm.count("A-expr") == 0 || vm.count("B-expr") == 0)
+        throw po::error("If --no-expr is not given, then --A-expr and --B-expr must be given.");
+    }
+
   } catch (std::exception& x) {
     std::cerr << "Error: " << x.what() << std::endl;
     std::cerr << desc << std::endl;
@@ -424,6 +432,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 
 void main_1(const boost::program_options::variables_map& vm)
 {
+  bool no_expr = vm.count("no-expr");
+
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
   std::vector<std::string> A_names, B_names;
@@ -436,17 +446,19 @@ void main_1(const boost::program_options::variables_map& vm)
   transform(A.begin(), A.end(), back_inserter(A_rc), reverse_complement);
   transform(B.begin(), B.end(), back_inserter(B_rc), reverse_complement);
 
-  std::cerr << "Reading transcript-level expression" << std::endl;
   std::vector<double> tau_A(A.size()), tau_B(B.size());
-  std::string A_expr_fname = vm["A-expr"].as<std::string>();
-  std::string B_expr_fname = vm["B-expr"].as<std::string>();
-  read_transcript_expression(A_expr_fname, tau_A, A_names_to_idxs);
-  read_transcript_expression(B_expr_fname, tau_B, B_names_to_idxs);
+  if (!no_expr) {
+    std::cerr << "Reading transcript-level expression" << std::endl;
+    std::string A_expr_fname = vm["A-expr"].as<std::string>();
+    std::string B_expr_fname = vm["B-expr"].as<std::string>();
+    read_transcript_expression(A_expr_fname, tau_A, A_names_to_idxs);
+    read_transcript_expression(B_expr_fname, tau_B, B_names_to_idxs);
 
-  std::cerr << "Computing nucleotide-level expression" << std::endl;
-  std::vector<double> nu_A(A.size()), nu_B(B.size());
-  compute_nucl_expression(A, tau_A, nu_A);
-  compute_nucl_expression(B, tau_B, nu_B);
+    std::cerr << "Computing nucleotide-level expression" << std::endl;
+    std::vector<double> nu_A(A.size()), nu_B(B.size());
+    compute_nucl_expression(A, tau_A, nu_A);
+    compute_nucl_expression(B, tau_B, nu_B);
+  }
 
   std::cerr << "Computing uniform transcript-level expression" << std::endl;
   std::vector<double> unif_tau_A(A.size(), 1.0/A.size());
@@ -464,8 +476,10 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cout << "summarize_multikmer_version\t2" << std::endl;
 
-  std::cerr << "Computing and printing weighted stats" << std::endl;
-  compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_multikmer", "at_exp2");
+  if (!no_expr) {
+    std::cerr << "Computing and printing weighted stats" << std::endl;
+    compute_and_print_kmer_stats(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_multikmer", "at_exp2");
+  }
 
   std::cerr << "Computing and printing unweighted stats" << std::endl;
   compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_multikmer", "at_exp2");

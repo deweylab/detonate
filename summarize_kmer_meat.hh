@@ -195,12 +195,19 @@ void print_kmer_stats(
   // First, compute and print stats based on the UNnormalized distribution.
 
   {
-    size_t num_shared = 0;
+    size_t num_nonzero_A = 0, num_nonzero_B = 0, num_shared = 0;
     BOOST_FOREACH(const X& x, stats) {
+      const KmerKey& k = x.first;
       const KmerInfo& i = x.second;
+      if (i.probs[0] != 0)
+        ++num_nonzero_A;
+      if (i.probs[1] != 0)
+        ++num_nonzero_B;
       if (i.probs[0] != 0 && i.probs[1] != 0)
         ++num_shared;
     }
+    cout << prefix << "_num_nonzero_in_A_" << suffix << "\t" << num_nonzero_A << endl;
+    cout << prefix << "_num_nonzero_in_B_" << suffix << "\t" << num_nonzero_B << endl;
     cout << prefix << "_num_shared_" << suffix << "\t" << num_shared << endl;
   }
 
@@ -257,7 +264,7 @@ void print_kmer_stats(
 
 }
 
-void compute_and_print_kmer_stats(
+void run(
     const vector<string>& A,
     const vector<string>& A_rc, 
     const vector<double>& tau_A,
@@ -309,10 +316,11 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("help,?", "Display this information.")
     ("A-seqs", po::value<std::string>()->required(), "The assembly sequences, in FASTA format.")
     ("B-seqs", po::value<std::string>()->required(), "The oracleset sequences, in FASTA format.")
-    ("A-expr", po::value<std::string>()->required(), "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
-    ("B-expr", po::value<std::string>()->required(), "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("A-expr", po::value<std::string>(),             "The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("B-expr", po::value<std::string>(),             "The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+    ("no-expr",                                      "Do not use expression at all. No weighted scores will be produced.")
     ("readlen", po::value<size_t>()->required(),     "The read length.")
-    ("estimate-hashtable-size", "Estimate hashtable size, in bytes.")
+    ("estimate-hashtable-size",                      "Estimate hashtable size, in bytes.")
     ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
     ("at-half-and-double",                           "Also run with k = half and double the read length.")
   ;
@@ -328,6 +336,14 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
 
     po::notify(vm);
 
+    if (vm.count("no-expr")) {
+      if (vm.count("A-expr") != 0 || vm.count("B-expr") != 0)
+        throw po::error("If --no-expr is given, then --A-expr and --B-expr cannot be given.");
+    } else {
+      if (vm.count("A-expr") == 0 || vm.count("B-expr") == 0)
+        throw po::error("If --no-expr is not given, then --A-expr and --B-expr must be given.");
+    }
+
   } catch (std::exception& x) {
     std::cerr << "Error: " << x.what() << std::endl;
     std::cerr << desc << std::endl;
@@ -339,6 +355,7 @@ void main_1(const boost::program_options::variables_map& vm)
 {
   bool strand_specific = vm.count("strand-specific");
   bool at_half_and_double = vm.count("at-half-and-double");
+  bool no_expr = vm.count("no-expr");
 
   std::cerr << "Reading the sequences" << std::endl;
   std::vector<std::string> A, B;
@@ -361,33 +378,30 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Reading transcript-level expression" << std::endl;
   std::vector<double> tau_A(A.size()), tau_B(B.size());
-  std::string A_expr_fname = vm["A-expr"].as<std::string>();
-  std::string B_expr_fname = vm["B-expr"].as<std::string>();
-  read_transcript_expression(A_expr_fname, tau_A, A_names_to_idxs);
-  read_transcript_expression(B_expr_fname, tau_B, B_names_to_idxs);
-
-  std::cerr << "Computing nucleotide-level expression" << std::endl;
-  std::vector<double> nu_A(A.size()), nu_B(B.size());
-  compute_nucl_expression(A, tau_A, nu_A);
-  compute_nucl_expression(B, tau_B, nu_B);
+  if (!no_expr) {
+    std::string A_expr_fname = vm["A-expr"].as<std::string>();
+    std::string B_expr_fname = vm["B-expr"].as<std::string>();
+    read_transcript_expression(A_expr_fname, tau_A, A_names_to_idxs);
+    read_transcript_expression(B_expr_fname, tau_B, B_names_to_idxs);
+  }
 
   std::cerr << "Computing uniform transcript-level expression" << std::endl;
   std::vector<double> unif_tau_A(A.size(), 1.0/A.size());
   std::vector<double> unif_tau_B(B.size(), 1.0/B.size());
 
-  std::cerr << "Computing uniform nucleotide-level expression" << std::endl;
-  std::vector<double> unif_nu_A(A.size()), unif_nu_B(B.size());
-  compute_nucl_expression(A, unif_tau_A, unif_nu_A);
-  compute_nucl_expression(B, unif_tau_B, unif_nu_B);
   std::cout << "summarize_kmer_version_6\t0" << std::endl;
+  if (!no_expr) {
+    run(  A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_one",    readlen,   strand_specific);
+    if (at_half_and_double) {
+      run(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_half",   readlen/2, strand_specific);
+      run(A, A_rc, tau_A, B, B_rc, tau_B, "weighted_kmer", "at_double", readlen*2, strand_specific);
+    }
+  }
 
-  compute_and_print_kmer_stats(  A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_one",    readlen,   strand_specific);
-  compute_and_print_kmer_stats(  A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one",    readlen,   strand_specific);
+  run(  A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_one",    readlen,   strand_specific);
   if (at_half_and_double) {
-    compute_and_print_kmer_stats(A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_half",   readlen/2, strand_specific);
-    compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_half",   readlen/2, strand_specific);
-    compute_and_print_kmer_stats(A, A_rc,      tau_A, B, B_rc,      tau_B, "weighted_kmer",   "at_double", readlen*2, strand_specific);
-    compute_and_print_kmer_stats(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_double", readlen*2, strand_specific);
+    run(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_half",   readlen/2, strand_specific);
+    run(A, A_rc, unif_tau_A, B, B_rc, unif_tau_B, "unweighted_kmer", "at_double", readlen*2, strand_specific);
   }
   std::cerr << "Done" << std::endl;
 }
