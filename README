@@ -3,11 +3,9 @@ I. BUILD
 
 To compile, do the following:
 
-- Edit paths as appropriate in the first part of the Makefile. I am using
-  mostly static libraries, but this is not necessary if you don't need to use
-  condor_compile.
+- pushd boost && ./bootstrap.sh && ./b2 && popd
 
-- cd lemon && make && cd ..
+- pushd lemon && make && popd
 
 - make -j 24
 

@@ -1,32 +1,22 @@
-# LINUX
 ifeq ($(shell uname), Linux)
-  BOOST_INCLUDE = /ua/nathanae/downloads/boost/install/include
-  BOOST_LIB     = /ua/nathanae/downloads/boost/install/lib
-  BOOST_SUFFIX  = .a
-  LEMON_INCLUDE = -I$(shell pwd)/lemon/tip -I$(shell pwd)/lemon/tip/build
-  LEMON_LIB     = $(shell pwd)/lemon/tip/build/lemon/libemon.a
-  UNIT_TEST_DLL = libboost_unit_test_framework.so
-  CC11          = /u/deweylab/sw/gcc-4.7.2/arch/x86_64-redhat-linux-gnu/bin/g++
+  CC11 = /u/deweylab/sw/gcc-4.7.2/arch/x86_64-redhat-linux-gnu/bin/g++
 endif
-
-# MAC
 ifeq ($(shell uname), Darwin)
-  BOOST_INCLUDE = /opt/local/include
-  BOOST_LIB     = /opt/local/lib
-  BOOST_SUFFIX  = -mt.a
-  UNIT_TEST_DLL = libboost_unit_test_framework-mt.dylib
-  CC11          = g++
+  CC11 = g++
 endif
 
-CC = /usr/bin/g++
+CC = g++
 #DEBUG = -g3 -fno-inline -O0
-#CFLAGS = -O3 -W -Wall -Wextra $(DEBUG)
 DEBUG =
 CFLAGS = -g -O3 -W -Wall -Wextra $(DEBUG)
 LFLAGS = -Wall $(DEBUG)
-INCLUDE = -I$(BOOST_INCLUDE) $(LEMON_INCLUDE)
-LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_random$(BOOST_SUFFIX) -static-libgcc $(shell g++ -print-file-name=libstdc++.a) $(LEMON_LIB)
-TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
+BOOST_INCLUDE = -I$(shell pwd)/boost
+BOOST_LIB     = $(shell pwd)/boost/stage/lib
+LEMON_INCLUDE = -I$(shell pwd)/lemon/tip -I$(shell pwd)/lemon/tip/build
+LEMON_LIB     = $(shell pwd)/lemon/tip/build/lemon
+INCLUDE = $(BOOST_INCLUDE) $(LEMON_INCLUDE)
+LIBS = -Wl,-Bstatic -L$(BOOST_LIB) -L$(LEMON_LIB) -lboost_program_options -lboost_random -lemon -lpthread -static-libgcc $(shell $(CC) -print-file-name=libstdc++.a)
+TEST_LIBS = -Wl,-Bdynamic -Wl,-rpath,$(BOOST_LIB) -L$(BOOST_LIB) -lboost_unit_test_framework
 
 .PHONY: all
 all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_kmerpair summarize_multikmer
@@ -52,14 +42,13 @@ summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_oomatched.cpp $(LIBS) -o summarize_oomatched
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
-	condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
 summarize_aligned_kmer: summarize_aligned_kmer.cpp summarize_aligned_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_aligned_kmer.cpp $(LIBS) -o summarize_aligned_kmer
 
 summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
-	#condor_compile $(CC) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
-	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) $(BOOST_LIB)/libboost_system$(BOOST_SUFFIX) $(BOOST_LIB)/libboost_thread$(BOOST_SUFFIX) -o summarize_multikmer
+	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
 
 summarize_kmerpair: summarize_kmerpair.cpp summarize_kmerpair_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
