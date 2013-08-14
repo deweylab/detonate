@@ -29,7 +29,7 @@ LIBS = $(BOOST_LIB)/libboost_program_options$(BOOST_SUFFIX) $(BOOST_LIB)/libboos
 TEST_LIBS = $(BOOST_LIB)/$(UNIT_TEST_DLL) -Wl,-rpath,$(BOOST_LIB)/
 
 .PHONY: all
-all: summarize summarize_matched summarize_oomatched summarize_kmer summarize_kmerpair summarize_multikmer
+all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_kmerpair summarize_multikmer
 
 summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
 gp = $(word 1,$(subst _, ,$*))
@@ -110,4 +110,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_matched summarize_oomatched summarize_kmer summarize_aligned_kmer summarize_kmerpair summarize_multikmer ${all_tests}
+	-rm -f ${summarize_jobs} summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_kmerpair summarize_multikmer ${all_tests}
