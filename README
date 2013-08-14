@@ -7,6 +7,8 @@ To compile, do the following:
   mostly static libraries, but this is not necessary if you don't need to use
   condor_compile.
 
+- cd lemon && make && cd ..
+
 - make -j 24
 
   On Linux, there may be some scary warnings that "array subscript is above
@@ -14,8 +16,16 @@ To compile, do the following:
   in the relevant part of the code.
 
 
+II. SCORES USED IN PAPER
+------------------------
 
-II. PRECISION-RECALL-F1
+To just compute the scores used in our paper, use summarize_for_paper.py. Run
+"python3 summarize_for_paper.py --help" for further details.
+
+The rest of this document describes other scores.
+
+
+III. PRECISION-RECALL-F1
 -----------------------
 
 After you have run make, there will be a bunch of programs named things like
@@ -337,7 +347,7 @@ II.D. Policy choices
 
 
 
-III. KMER JENSEN-SHANNON
+IV. KMER JENSEN-SHANNON
 ------------------------
 
 This program calculates the Jensen-Shannon divergence (and some other info)
