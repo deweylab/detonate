@@ -9,11 +9,12 @@ CC = g++
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
 CFLAGS = -g -O3 -W $(DEBUG)
+DL_INCLUDE 	  = -I$(shell pwd)/deweylab
 BOOST_INCLUDE = -I$(shell pwd)/boost
 BOOST_LIB     = -L$(shell pwd)/boost/stage/lib -Wl,-rpath,$(shell pwd)/boost/stage/lib -lboost_program_options -lboost_random
 LEMON_INCLUDE = -I$(shell pwd)/lemon/build -I$(shell pwd)/lemon/lemon-main-473c71baff72
 LEMON_LIB     = -L$(shell pwd)/lemon/build/lemon -Wl,-rpath,$(shell pwd)/lemon/build/lemon -lemon -lpthread
-INCLUDE = $(BOOST_INCLUDE) $(LEMON_INCLUDE)
+INCLUDE = $(DL_INCLUDE) $(BOOST_INCLUDE) $(LEMON_INCLUDE)
 LIBS    = $(BOOST_LIB) $(LEMON_LIB)
 TEST_LIBS = -lboost_unit_test_framework
 
