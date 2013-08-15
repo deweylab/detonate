@@ -3,7 +3,7 @@ I. BUILD
 
 To compile, do the following:
 
-- pushd boost && ./bootstrap.sh && ./b2 && popd
+- pushd boost && ./bootstrap.sh && ./b2 -j 24 && popd
 
 - pushd lemon && make && popd
 
