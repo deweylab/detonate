@@ -16,8 +16,70 @@ II. SCORES USED IN PAPER
 To just compute the scores used in our paper, use summarize_for_paper.py. Run
 "python3 summarize_for_paper.py --help" for further details.
 
-The rest of this document describes other scores.
+The contig recall is defined as follows:
+- Align the assembly A to the oracleset B. Notation: each alignment a->b is
+  between a contig a in A and an oracleset element b in B.
+- Throw out alignments that have incorrect strand-specificity.
+- Throw out alignments whose fraction identity wrt a or b is less than 0.99.
+- Throw out alignments whose fraction indel wrt a or b is greater than 0.01.
+- Construct a bipartite graph from the remaining alignments, in which there is
+  an edge between a and b iff there is a remaining alignment a->b.
+- The recall is the number of edges in the maximum cardinality matching of this
+  graph, divided by the number of sequences in the oracleset B.
 
+The contig precision is defined as follows: Interchange the assembly and
+oracleset, and compute the contig recall.
+
+The contig F1 is the harmonic mean of the precision and recall.
+
+The nucleotide recall is defined as follows:
+- Align the assembly A to the oracleset B. Notation: each alignment a->b is
+  between a contig a in A and an oracleset element b in B.
+- Throw out alignments that have incorrect strand-specificity.
+- Throw out alignments that are shorter than the read length.
+- Add each remaining alignment to a priority queue, with priority equal to the
+  number of identical bases in the alignment.
+- Let numer = 0.
+- While the priority queue is not empty:
+  - Pop the alignment a->b with highest priority.
+  - Add the number of identical bases in the alignment to numer.
+  - Subtract a->b from all the other alignments in the queue and update their
+    priorities.
+- Let denom be the total number of nucleotides in the oracleset B.
+- The recall is numer/denom.
+
+The actual implementation uses a more complicated and efficient algorithm than
+the one above.
+
+Alignment subtraction is defined as follows.
+- An alignment l from a to b can be thought of as a set of pairs of disjoint
+  intervals
+    {([as_1, ae_1], [bs_1, be_1]), ..., ([as_n, ae_n], [bs_n, be_n])},
+  where each pair ([as_i, as_i], [bs_i, be_i]) corresponds to an ungapped
+  segment of the alignment: as_i and ae_i are the segment's start and end
+  positions within a, and bs_i and be_i are the segment's start and end
+  positions within b. In the case of non-strand-specific alignments, bs_i might
+  be greater than be_i.
+- If l is an alignment from a to b, l' is an alignment from a' to b', a != a',
+  and b != b', then the difference l - l' = l.
+- If l is an alignment from a to b, l' is an alignment from a' to b', a == a',
+  and b != b', then the difference l - l' = l'', defined as follows. Each
+  alignment segment of l is compared to the alignment segments of l'. If a
+  segment of l overlaps one of the segments of l' wrt a, it is truncated so as
+  to avoid the overlap. This truncation may result in zero, one, or two
+  replacement alignment segments. (If the overlapping alignment segment of l'
+  is contained strictly within the segment of l, wrt a, two segments will
+  result.)
+- If l is an alignment from a to b, l' is an alignment from a' to b', a != a',
+  and b == b', then the difference l - l' = l'', defined similarly, except
+  overlaps are examined and resolved wrt b.
+
+The nucleotide precision is defined as follows: Interchange the assembly and
+oracleset, and compute the nucleotide recall.
+
+The nucleotide F1 is the harmonic mean of the precision and recall.
+
+The rest of this document describes other scores.
 
 III. PRECISION-RECALL-F1
 -----------------------
