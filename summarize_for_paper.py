@@ -41,8 +41,9 @@ standard error.
 """, formatter_class=argparse.RawDescriptionHelpFormatter)
 p.add_argument("--A-seqs", required=True, help="The assembly sequences, in FASTA format.")
 p.add_argument("--B-seqs", required=True, help="The oracleset sequences, in FASTA format.")
-p.add_argument("--A-expr", required=True, help="The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
-p.add_argument("--B-expr", required=True, help="The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+p.add_argument("--A-expr", help="The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
+p.add_argument("--B-expr", help="The oracleset expression, as produced by RSEM in a file called *.isoforms.results.")
+p.add_argument("--no-expr", action="store_true", help="Do not use expression at all. No weighted scores will be produced.")
 p.add_argument("--A-to-B", required=True, help="The alignments of A to B.")
 p.add_argument("--B-to-A", required=True, help="The alignments of B to A.")
 p.add_argument("--strand-specific", action="store_true", help="Ignore alignments that are to the reverse strand.")
@@ -52,18 +53,31 @@ p.add_argument("--num_nucls", required=True, type=int, help="The number of nucle
 p.add_argument("--output", required=True, help="Output useful for debugging will be written here.")
 args = p.parse_args()
 
+if args.no_expr:
+  if args.A_expr or args.B_expr:
+    print("Error: If --no-expr is given, then --A-expr and --B-expr cannot be given.", file=sys.stderr)
+    sys.exit(1)
+else:
+  if not args.A_expr or not args.B_expr:
+    print("Error: If --no-expr is not given, then --A-expr and --B-expr must be given.", file=sys.stderr)
+    sys.exit(1)
+
 if args.strand_specific:
   strand_specific = "--strand_specific"
 else:
   strand_specific = ""
+
+if args.no_expr:
+  args_expr = ["--no-expr"]
+else:
+  args_expr = ["--A-expr", args.A_expr, "--B-expr", args.B_expr]
 
 print("Running summarize_matched.", file=sys.stderr)
 matched_output = subprocess.check_output([
   "./summarize_matched",
   "--A-seqs", args.A_seqs,
   "--B-seqs", args.B_seqs,
-  "--A-expr", args.A_expr,
-  "--B-expr", args.B_expr,
+  ] + args_expr + [
   "--A-to-B", args.A_to_B,
   "--B-to-A", args.B_to_A,
   "--alignment-type", "psl",
@@ -77,8 +91,7 @@ oomatched_output = subprocess.check_output([
   "./summarize_oomatched",
   "--A-seqs", args.A_seqs,
   "--B-seqs", args.B_seqs,
-  "--A-expr", args.A_expr,
-  "--B-expr", args.B_expr,
+  ] + args_expr + [
   "--A-to-B", args.A_to_B,
   "--B-to-A", args.B_to_A,
   "--alignment-type", "psl",
@@ -88,24 +101,26 @@ oomatched_output = subprocess.check_output([
   "--output", args.output + "/summarize_oomatched_matching"]).decode("utf-8").strip("\n")
 print(oomatched_output, end="", file=open(args.output + "/summarize_oomatched_output", "w"))
 
-print("Running summarize_kmer.", file=sys.stderr)
-kmer_output = subprocess.check_output([
-  "./summarize_kmer",
-  "--A-seqs", args.A_seqs,
-  "--B-seqs", args.B_seqs,
-  "--A-expr", args.A_expr,
-  "--B-expr", args.B_expr,
-  strand_specific,
-  "--readlen", str(args.readlen)]).decode("utf-8").strip("\n")
-print(kmer_output, end="", file=open(args.output + "/summarize_kmer_output", "w"))
+if not args.no_expr:
+  print("Running summarize_kmer.", file=sys.stderr)
+  kmer_output = subprocess.check_output([
+    "./summarize_kmer",
+    "--A-seqs", args.A_seqs,
+    "--B-seqs", args.B_seqs,
+    ] + args_expr + [
+    strand_specific,
+    "--readlen", str(args.readlen)]).decode("utf-8").strip("\n")
+  print(kmer_output, end="", file=open(args.output + "/summarize_kmer_output", "w"))
 
 matched_dict   = dict(l.strip("\n").split("\t") for l in matched_output.split("\n"))
 oomatched_dict = dict(l.strip("\n").split("\t") for l in oomatched_output.split("\n"))
-kmer_dict      = dict(l.strip("\n").split("\t") for l in kmer_output.split("\n"))
 
-WKR = float(kmer_dict["weighted_kmer_frac_present_at_one"])
-ICR = 1.0 * args.num_nucls / (args.num_reads * args.readlen)
+if not args.no_expr:
+  kmer_dict    = dict(l.strip("\n").split("\t") for l in kmer_output.split("\n"))
+  WKR = float(kmer_dict["weighted_kmer_frac_present_at_one"])
+  ICR = 1.0 * args.num_nucls / (args.num_reads * args.readlen)
 
 print("nucl_F1\t{}".format(matched_dict["unweighted_matched_nucl_F1"]))
 print("tran_F1\t{}".format(oomatched_dict["unweighted_oomatched_tran_F1"]))
-print("WKR-ICR\t{}".format(WKR-ICR))
+if not args.no_expr:
+  print("WKR-ICR\t{}".format(WKR-ICR))
