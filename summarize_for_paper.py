@@ -1,4 +1,7 @@
-import subprocess, argparse, sys
+import subprocess, argparse, sys, os
+
+class ADFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+  pass
 
 p = argparse.ArgumentParser(description="""
 
@@ -38,7 +41,7 @@ Output useful for debugging, etc., is written to several files in tmpdir. The
 main scores are written to standard output. Status messages are written to
 standard error.
 
-""", formatter_class=argparse.RawDescriptionHelpFormatter)
+""", formatter_class=ADFormatter)
 p.add_argument("--A-seqs", required=True, help="The assembly sequences, in FASTA format.")
 p.add_argument("--B-seqs", required=True, help="The oracleset sequences, in FASTA format.")
 p.add_argument("--A-expr", help="The assembly expression, as produced by RSEM in a file called *.isoforms.results.")
@@ -50,6 +53,7 @@ p.add_argument("--strand-specific", action="store_true", help="Ignore alignments
 p.add_argument("--readlen", required=True, type=int, help="The read length.")
 p.add_argument("--num_reads", required=True, type=int, help="The number of reads in the dataset used to make the assembly A.")
 p.add_argument("--num_nucls", required=True, type=int, help="The number of nucleotides in the assembly A.")
+p.add_argument("--bindir", default=os.path.dirname(os.path.abspath(__file__)), help="The directory where the summarize_* executables are located.")
 p.add_argument("--output", required=True, help="Output useful for debugging will be written here.")
 args = p.parse_args()
 
@@ -74,7 +78,7 @@ else:
 
 print("Running summarize_matched.", file=sys.stderr)
 matched_output = subprocess.check_output([
-  "./summarize_matched",
+  args.bindir + "/summarize_matched",
   "--A-seqs", args.A_seqs,
   "--B-seqs", args.B_seqs,
   ] + args_expr + [
@@ -88,7 +92,7 @@ print(matched_output, end="", file=open(args.output + "/summarize_matched_output
 
 print("Running summarize_oomatched.", file=sys.stderr)
 oomatched_output = subprocess.check_output([
-  "./summarize_oomatched",
+  args.bindir + "/summarize_oomatched",
   "--A-seqs", args.A_seqs,
   "--B-seqs", args.B_seqs,
   ] + args_expr + [
@@ -104,7 +108,7 @@ print(oomatched_output, end="", file=open(args.output + "/summarize_oomatched_ou
 if not args.no_expr:
   print("Running summarize_kmer.", file=sys.stderr)
   kmer_output = subprocess.check_output([
-    "./summarize_kmer",
+    args.bindir + "/summarize_kmer",
     "--A-seqs", args.A_seqs,
     "--B-seqs", args.B_seqs,
     ] + args_expr + [
