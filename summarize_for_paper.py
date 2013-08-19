@@ -124,7 +124,15 @@ if not args.no_expr:
   WKR = float(kmer_dict["weighted_kmer_frac_present_at_one"])
   ICR = 1.0 * args.num_nucls / (args.num_reads * args.readlen)
 
-print("nucl_F1\t{}".format(matched_dict["unweighted_matched_nucl_F1"]))
-print("tran_F1\t{}".format(oomatched_dict["unweighted_oomatched_tran_F1"]))
+print("nucl_precision\t{}".format(matched_dict["unweighted_matched_nucl_precision"]))
+print("nucl_recall\t{}"   .format(matched_dict["unweighted_matched_nucl_recall"]))
+print("nucl_F1\t{}"       .format(matched_dict["unweighted_matched_nucl_F1"]))
+
+print("tran_precision\t{}".format(oomatched_dict["unweighted_oomatched_tran_precision"]))
+print("tran_recall\t{}"   .format(oomatched_dict["unweighted_oomatched_tran_recall"]))
+print("tran_F1\t{}"       .format(oomatched_dict["unweighted_oomatched_tran_F1"]))
+
 if not args.no_expr:
+  print("WKR\t{}"    .format(WKR))
+  print("ICR\t{}"    .format(ICR))
   print("WKR-ICR\t{}".format(WKR-ICR))
