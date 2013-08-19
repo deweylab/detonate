@@ -164,8 +164,8 @@ void parse_options(boost::program_options::variables_map& vm, int argc, const ch
     ("B-to-A", po::value<std::string>()->required(), "The alignments of B to A.")
     ("alignment-type", po::value<std::string>()->required(), "The type of alignments used, either 'blast' or 'psl'.")
     ("strand-specific",                              "Ignore alignments that are to the reverse strand.")
-    ("frac-identity-thresh", po::value<double>()->required(), "The threshold for frac_identity (wrt both a and b) below which the alignment is not counted.")
-    ("frac-indel-thresh", po::value<double>()->required(), "The threshold for frac_indel (wrt both a and b) below which the alignment is not counted.")
+    ("frac-identity-thresh", po::value<double>()->required(), "The threshold for frac_identity (wrt both a and b) below which an alignment is not counted.")
+    ("frac-indel-thresh", po::value<double>()->required(), "The threshold for frac_indel (wrt both a and b) above which an alignment is not counted.")
     ("output", po::value<std::string>()->required(), "The prefix for all output files.")
   ;
 

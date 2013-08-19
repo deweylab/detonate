@@ -53,6 +53,8 @@ p.add_argument("--strand-specific", action="store_true", help="Ignore alignments
 p.add_argument("--readlen", required=True, type=int, help="The read length.")
 p.add_argument("--num_reads", required=True, type=int, help="The number of reads in the dataset used to make the assembly A.")
 p.add_argument("--num_nucls", required=True, type=int, help="The number of nucleotides in the assembly A.")
+p.add_argument("--frac-identity-thresh", default="0.99", help="The threshold for frac_identity (wrt both a and b) below which an alignment is not counted.")
+p.add_argument("--frac-indel-thresh", default="0.01", help="The threshold for frac_indel (wrt both a and b) above which an alignment is not counted.")
 p.add_argument("--bindir", default=os.path.dirname(os.path.abspath(__file__)), help="The directory where the summarize_* executables are located.")
 p.add_argument("--output", required=True, help="Output useful for debugging will be written here.")
 args = p.parse_args()
@@ -100,8 +102,8 @@ oomatched_output = subprocess.check_output([
   "--B-to-A", args.B_to_A,
   "--alignment-type", "psl",
   strand_specific,
-  "--frac-identity-thresh", "0.99",
-  "--frac-indel-thresh", "0.01",
+  "--frac-identity-thresh", args.frac_identity_thresh,
+  "--frac-indel-thresh", args.frac_indel_thresh,
   "--output", args.output + "/summarize_oomatched_matching"]).decode("utf-8").strip("\n")
 print(oomatched_output, end="", file=open(args.output + "/summarize_oomatched_output", "w"))
 
