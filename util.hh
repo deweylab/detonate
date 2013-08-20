@@ -98,3 +98,55 @@ std::vector<size_t> make_random_permutation(size_t n)
   }
   return x;
 }
+
+char complement(char c)
+{
+  switch (c)
+  {
+    case 'A': return 'T';
+    case 'T': return 'A';
+    case 'C': return 'G';
+    case 'G': return 'C';
+    case 'N': return 'N';
+
+    case 'a': return 't';
+    case 't': return 'a';
+    case 'c': return 'g';
+    case 'g': return 'c';
+    case 'n': return 'n';
+
+    case 'S': return 'S'; // compl(S) = compl({C,G}) = {G,C} = S
+    case 'W': return 'W'; // compl(W) = compl({A,T}) = {T,A} = W
+    case 'M': return 'K'; // compl(M) = compl({A,C}) = {T,G} = K
+    case 'K': return 'M'; // compl(K) = compl({G,T}) = {C,A} = M
+    case 'Y': return 'R'; // compl(Y) = compl({C,T}) = {G,A} = R
+    case 'R': return 'Y'; // compl(R) = compl({A,G}) = {T,C} = Y
+    case 'B': return 'V'; // compl(B) = compl({C,G,T}) = {G,C,A} = V
+    case 'V': return 'B'; // compl(V) = compl({A,C,G}) = {T,G,C} = B
+    case 'D': return 'H'; // compl(D) = compl({A,G,T}) = {T,C,A} = H
+    case 'H': return 'D'; // compl(H) = compl({A,C,T}) = {T,G,A} = D
+
+    case 's': return 's';
+    case 'w': return 'w';
+    case 'm': return 'k';
+    case 'k': return 'm';
+    case 'y': return 'r';
+    case 'r': return 'y';
+    case 'b': return 'v';
+    case 'v': return 'b';
+    case 'd': return 'h';
+    case 'h': return 'd';
+
+    default:
+      throw std::runtime_error("Cannot complement invalid nucleotide.");
+  }
+}
+
+std::string reverse_complement(const std::string& x)
+{
+  std::string y(x);
+  transform(x.begin(), x.end(), y.begin(), complement);
+  reverse(y.begin(), y.end());
+  return y;
+}
+

@@ -362,33 +362,6 @@ void compute_and_print_kmer_stats(
   print_kmer_stats(kmer_stats, prefix, suffix);
 }
 
-char complement(char c)
-{
-  switch (c)
-  {
-    case 'A': return 'T';
-    case 'T': return 'A';
-    case 'C': return 'G';
-    case 'G': return 'C';
-    case 'N': return 'N';
-    case 'a': return 't';
-    case 't': return 'a';
-    case 'c': return 'g';
-    case 'g': return 'c';
-    case 'n': return 'n';
-    default:
-      throw std::runtime_error("Cannot complement invalid nucleotide.");
-  }
-}
-
-std::string reverse_complement(const std::string& x)
-{
-  std::string y(x);
-  transform(x.begin(), x.end(), y.begin(), complement);
-  reverse(y.begin(), y.end());
-  return y;
-}
-
 void parse_options(boost::program_options::variables_map& vm, int argc, const char **argv)
 {
   namespace po = boost::program_options;

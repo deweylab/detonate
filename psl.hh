@@ -5,6 +5,7 @@
 #include "lazycsv.hh"
 #include "line_stream.hh"
 #include "alignment_segment.hh"
+#include "util.hh"
 
 namespace detail
 {
@@ -92,25 +93,6 @@ private:
 
 namespace detail
 {
-  char complement(char c)
-  {
-    switch (c)
-    {
-      case 'A': return 'T';
-      case 'T': return 'A';
-      case 'C': return 'G';
-      case 'G': return 'C';
-      case 'N': return 'N';
-      case 'a': return 't';
-      case 't': return 'a';
-      case 'c': return 'g';
-      case 'g': return 'c';
-      case 'n': return 'n';
-      default:
-        throw std::runtime_error("Cannot complement invalid nucleotide '" + boost::lexical_cast<std::string>(c) + "'.");
-    }
-  }
-
   ////////////////////////////////////////////////////////////////////////////
   // psl_alignment_input_stream is an input stream that produces
   // psl_alignment objects, one per line of the input stream.
