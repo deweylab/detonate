@@ -14,13 +14,9 @@
 #include "mask.hh"
 #include "util.hh"
 
-#define MIN_FRAC_ID (MIN_PCT_ID/100.0)
-
 template<typename AlignmentType>
 struct BestTuple
 {
-  //double frac_identity_wrt_a;
-  //double frac_identity_wrt_b;
   int num_identity;
   AlignmentType al;
   bool is_empty;
@@ -34,13 +30,7 @@ inline bool is_good_enough(const blast_alignment& al) { return al.evalue() <= 1e
 template<typename T, typename S>
 inline bool is_better(const T& al, const S& ref)
 {
-  #if 0
-  double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
-  double d2 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
-  return d1 > 0 || (d1 == 0 && d2 > 0);
-  #else
   return al.num_identity() > ref.num_identity;
-  #endif
 }
 
 inline bool is_valid(const psl_alignment& al, bool strand_specific)
@@ -76,8 +66,6 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
     BestTuple<AlignmentType>& bt = best_from_A[a_idx];
     if (is_valid(al, strand_specific) && is_good_enough(al)) {
       if (bt.is_empty || is_better(al, bt)) {
-        //bt.frac_identity_wrt_a = al.frac_identity_wrt_a();
-        //bt.frac_identity_wrt_b = al.frac_identity_wrt_b();
         bt.num_identity        = al.num_identity();
         bt.al                  = al;
         bt.is_empty            = false;
