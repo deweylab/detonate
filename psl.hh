@@ -70,6 +70,8 @@ public:
   #error "need to define N_POLICY"
   #endif
 
+  bool operator==(const psl_alignment& other) const { return lazy_csv == other.lazy_csv; }
+  bool operator!=(const psl_alignment& other) const { return !(*this == other); }
 
 private:
   lazycsv<21, '\t'> lazy_csv;

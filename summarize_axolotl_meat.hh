@@ -74,33 +74,63 @@ void read_alignments_and_filter_by_best_from_A(std::vector<BestTuple<AlignmentTy
   }
 }
 
+// For each b in B, figure out which alignment from a -> b (for some a in A) is
+// best.
+//
+// Preconditions:
+// - best_to_B needs to be default-initialized of size B.size()
 template<typename AlignmentType>
-void filter_by_best_alignment_to_B(std::vector<std::vector<const AlignmentType *> >& best_to_B,
-                                   const std::vector<BestTuple<AlignmentType> >&     best_from_A,
-                                   const std::map<std::string, size_t>&              B_names_to_idxs)
+void read_alignments_and_filter_by_best_to_B(std::vector<BestTuple<AlignmentType> >&    best_to_B, 
+                                             typename AlignmentType::input_stream_type& input_stream,
+                                             const std::map<std::string, size_t>&       B_names_to_idxs,
+                                             bool                                       strand_specific)
 {
-  BOOST_FOREACH(const BestTuple<AlignmentType>& bt, best_from_A) {
-    if (!bt.is_empty) {
-      size_t b_idx = B_names_to_idxs.find(bt.al.b_name())->second;
-      if (best_to_B[b_idx].size() == 0)
-        best_to_B[b_idx].push_back(&(bt.al));
-      else {
-        assert(best_to_B[b_idx].size() == 1);
-        const AlignmentType *old = best_to_B[b_idx][0];
-        if (!is_better(*old, bt)) // note: not exactly the same as is_better(bt, old) would be
-          best_to_B[b_idx][0] = &(bt.al);
+  AlignmentType al;
+  while (input_stream >> al) {
+    size_t b_idx = B_names_to_idxs.find(al.b_name())->second;
+    BestTuple<AlignmentType>& bt = best_to_B[b_idx];
+    if (is_valid(al, strand_specific) && is_good_enough(al)) {
+      if (bt.is_empty || is_better(al, bt)) {
+        bt.num_identity        = al.num_identity();
+        bt.al                  = al;
+        bt.is_empty            = false;
+      }
+    }
+  }
+}
+
+// Preconditions:
+// - reciprocal_alignments should be NULL-initialized, of size B.size().
+template<typename AlignmentType>
+void filter_only_reciprocal_alignments(std::vector<const AlignmentType *>&           reciprocal_alignments,
+                                       const std::vector<BestTuple<AlignmentType> >& best_from_A,
+                                       const std::vector<BestTuple<AlignmentType> >& best_to_B,
+                                       const std::map<std::string, size_t>&          B_names_to_idxs)
+{
+  for (size_t a_idx = 0; a_idx < best_from_A.size(); ++a_idx) {
+    const BestTuple<AlignmentType>& bt_a = best_from_A[a_idx];
+    if (!bt_a.is_empty) {
+      size_t b_idx = B_names_to_idxs.find(bt_a.al.b_name())->second;
+      const BestTuple<AlignmentType>& bt_b = best_to_B[b_idx];
+      if (!bt_b.is_empty) {
+        if (bt_a.al == bt_b.al) {
+          // If all the above are satisfied, then this is a reciprocal
+          // alignment, so add it to the set of reciprocal alignments.
+          assert(reciprocal_alignments[b_idx] == NULL);
+          reciprocal_alignments[b_idx] = &(bt_a.al);
+        }
       }
     }
   }
 }
 
 template<typename AlignmentType>
-void compute_alignment_stats(std::vector<double>& B_frac_ones,
-                             const std::vector<std::vector<const AlignmentType *> >& best_to_B,
-                             const std::vector<std::string>&                         A,
-                             const std::vector<std::string>&                         B,
-                             const std::vector<double>&                              tau_B,
-                             const std::map<std::string, size_t>&                    A_names_to_idxs)
+void compute_alignment_stats(std::vector<double>&                      B_frac_ones,
+                             const std::vector<const AlignmentType *>& reciprocal_alignments,
+                             const std::vector<std::string>&           A,
+                             const std::vector<std::string>&           B,
+                             const std::vector<double>&                tau_B,
+                             const std::map<std::string, size_t>&      A_names_to_idxs)
 {
   std::vector<size_t> empty_mismatches;
   std::vector<size_t> perm = make_random_permutation(B.size()); // for better load balancing (in case e.g. seqs are ordered by length)
@@ -113,7 +143,8 @@ void compute_alignment_stats(std::vector<double>& B_frac_ones,
       size_t b_idx = perm[b_pre_idx];
       mask b_mask(B[b_idx].size());
 
-      BOOST_FOREACH(const AlignmentType *al, best_to_B[b_idx]) {
+      const AlignmentType *al = reciprocal_alignments[b_idx];
+      if (al != NULL) {
         size_t a_idx = A_names_to_idxs.find(al->a_name())->second;
         BOOST_FOREACH(const alignment_segment& seg, al->segments(A[a_idx], B[b_idx])) {
           b_mask.add_interval_with_exceptions(seg.b_start, seg.b_end, empty_mismatches.begin(), empty_mismatches.end());
@@ -191,19 +222,27 @@ void main_1(const boost::program_options::variables_map& vm)
 
   std::cerr << "Reading alignments and filtering them by A" << std::endl;
   std::vector<BestTuple<AlignmentType> > best_from_A(A_card);
-  typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
-  read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs, strand_specific);
+  {
+    typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
+    read_alignments_and_filter_by_best_from_A(best_from_A, A_to_B_is, A_names_to_idxs, strand_specific);
+  }
 
-  std::cerr << "Filtering alignments by B" << std::endl;
-  std::vector<std::vector<const AlignmentType *> > filtered_best_to_B(B_card);
-  filter_by_best_alignment_to_B(filtered_best_to_B, best_from_A, B_names_to_idxs);
+  std::cerr << "Reading alignments and filtering them by B" << std::endl;
+  std::vector<BestTuple<AlignmentType> > best_to_B(B_card);
+  {
+    typename AlignmentType::input_stream_type A_to_B_is(open_or_throw(vm["A-to-B"].as<std::string>()));
+    read_alignments_and_filter_by_best_to_B(best_to_B, A_to_B_is, B_names_to_idxs, strand_specific);
+  }
+
+  std::cerr << "Filtering reciprocal alignments" << std::endl;
+  std::vector<const AlignmentType *> reciprocal_alignments(B_card, NULL);
+  filter_only_reciprocal_alignments(reciprocal_alignments, best_from_A, best_to_B, B_names_to_idxs);
 
   std::cerr << "Computing uniform transcript-level expression" << std::endl;
   std::vector<double> unif_tau_B(B_card, 1.0/B_card);
 
-
   std::cerr << "Computing unweighted filtered stats" << std::endl;
   std::vector<double> B_frac_ones(B_card);
-  compute_alignment_stats(B_frac_ones, filtered_best_to_B, A, B, unif_tau_B, A_names_to_idxs);
+  compute_alignment_stats(B_frac_ones, reciprocal_alignments, A, B, unif_tau_B, A_names_to_idxs);
   print_plot_output(B_frac_ones, plot_output_fname);
 }

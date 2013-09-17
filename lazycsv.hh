@@ -22,6 +22,9 @@ public:
     update_starts();
   }
 
+  bool operator==(const lazycsv& other) const { return line == other.line; }
+  bool operator!=(const lazycsv& other) const { return !(*this == other); }
+
 private:
   std::string line;
   boost::array<size_t, num_fields + 1> starts;

@@ -50,6 +50,9 @@ public:
   inline  int         qframe()        const { return lazy_csv.at<int>        (21); }
   inline  int         sframe()        const { return lazy_csv.at<int>        (22); }
 
+  bool operator==(const blast_alignment& other) const { return lazy_csv == other.lazy_csv; }
+  bool operator!=(const blast_alignment& other) const { return !(*this == other); }
+
 private:
   lazycsv<23, '\t'> lazy_csv;
 };
