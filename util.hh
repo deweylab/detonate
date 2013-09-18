@@ -138,7 +138,9 @@ char complement(char c)
     case 'h': return 'd';
 
     default:
-      throw std::runtime_error("Cannot complement invalid nucleotide.");
+      std::ostringstream ss;
+      ss << "Cannot complement invalid nucleotide '" << c << "'.";
+      throw std::runtime_error(ss.str());
   }
 }
 
