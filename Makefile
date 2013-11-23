@@ -20,7 +20,7 @@ LIBS    = $(BOOST_LIB) $(LEMON_LIB)
 TEST_LIBS = -lboost_unit_test_framework
 
 .PHONY: all
-all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_kmerpair summarize_multikmer
+all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer
 
 summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
 gp = $(word 1,$(subst _, ,$*))
@@ -44,6 +44,9 @@ summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh
 
 summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
+
+summarize_wkr: summarize_wkr.cpp summarize_wkr_meat.hh
+	$(CC) $(CFLAGS) $(INCLUDE) summarize_wkr.cpp $(LIBS) -o summarize_wkr
 
 summarize_aligned_kmer: summarize_aligned_kmer.cpp summarize_aligned_kmer_meat.hh
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_aligned_kmer.cpp $(LIBS) -o summarize_aligned_kmer
@@ -100,4 +103,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_kmerpair summarize_multikmer ${all_tests}
+	-rm -f ${summarize_jobs} summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer ${all_tests}
