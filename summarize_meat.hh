@@ -5,7 +5,6 @@
 #include <iterator>
 #include <vector>
 #include <list>
-#include <omp.h>
 #include <boost/program_options.hpp>
 #include <boost/foreach.hpp>
 #include "blast.hh"

@@ -20,6 +20,7 @@ boost::shared_ptr<std::ifstream> open_or_throw(const std::string& filename)
   return ifs;
 }
 
+// XXX deprecated; use fasta.hh instead
 void read_fasta_names_and_seqs(const std::string& filename,
                                std::vector<std::string>& seqs,
                                std::vector<std::string>& names,
@@ -39,6 +40,7 @@ void read_fasta_names_and_seqs(const std::string& filename,
   }
 }
 
+// XXX deprecated
 void read_transcript_expression(const std::string& filename,
                                 std::vector<double>& expr,
                                 const std::map<std::string, size_t>& names_to_idxs)
@@ -152,3 +154,10 @@ std::string reverse_complement(const std::string& x)
   return y;
 }
 
+double compute_F1(double precis, double recall)
+{
+  if (precis == 0.0 && recall == 0.0)
+    return 0.0;
+  else
+    return 2*precis*recall/(precis+recall);
+}

@@ -1,20 +1,24 @@
 ifeq ($(shell uname), Linux)
   CC11 = /u/deweylab/sw/gcc-4.7.2/arch/x86_64-redhat-linux-gnu/bin/g++
+  CC = g++ -W
+  OMP = -fopenmp
 endif
 ifeq ($(shell uname), Darwin)
-  CC11 = g++
+  CC11 = clang++ -W -Wno-unused-parameter 
+  CC   = clang++ -W -Wno-unused-parameter
+  OMP  =
 endif
 
-CC = g++
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
-CFLAGS = -g -O3 -W $(DEBUG)
+CFLAGS = -g -O3 $(DEBUG)
 SH_INCLUDE 	  = -I$(shell pwd)/sparsehash
 DL_INCLUDE 	  = -I$(shell pwd)/deweylab
 BOOST_INCLUDE = -I$(shell pwd)/boost
-BOOST_LIB     = -L$(shell pwd)/boost/stage/lib -Wl,-rpath,$(shell pwd)/boost/stage/lib -lboost_program_options -lboost_random
+#BOOST_LIB     = -L$(shell pwd)/boost/stage/lib -Wl,-rpath,$(shell pwd)/boost/stage/lib -lboost_program_options -lboost_random
+BOOST_LIB     = $(shell pwd)/boost/stage/lib/libboost_program_options.a $(shell pwd)/boost/stage/lib/libboost_random.a
 LEMON_INCLUDE = -I$(shell pwd)/lemon/build -I$(shell pwd)/lemon/lemon-main-473c71baff72
-LEMON_LIB     = -L$(shell pwd)/lemon/build/lemon -Wl,-rpath,$(shell pwd)/lemon/build/lemon -lemon -lpthread
+LEMON_LIB     = lemon/build/lemon/libemon.a -lpthread
 INCLUDE = $(SH_INCLUDE) $(DL_INCLUDE) $(BOOST_INCLUDE) $(LEMON_INCLUDE)
 LIBS    = $(BOOST_LIB) $(LEMON_LIB)
 TEST_LIBS = -lboost_unit_test_framework
@@ -22,44 +26,56 @@ TEST_LIBS = -lboost_unit_test_framework
 .PHONY: all
 all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer
 
+force_look:
+	true
+
+boost/finished:
+	cd boost && ./bootstrap.sh && ./b2 && touch finished
+
+lemon/finished:
+	cd lemon && make
+
 summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
 gp = $(word 1,$(subst _, ,$*))
 bp = $(word 2,$(subst _, ,$*))
 np = $(word 3,$(subst _, ,$*))
 mpi = $(word 4,$(subst _, ,$*))
 
+ref-eval: ref-eval.cpp boost/finished lemon/finished
+	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) ref-eval.cpp $(LIBS) -o ref-eval
+
 .PHONY: summarize
-summarize: ${summarize_jobs}
+summarize: ${summarize_jobs} boost/finished lemon/finished
 ${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
-	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) -DMIN_PCT_ID=$(mpi) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)_$(mpi)
+	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) -DMIN_PCT_ID=$(mpi) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)_$(mpi)
 
-summarize_axolotl: summarize_axolotl.cpp summarize_axolotl_meat.hh
-	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_axolotl.cpp $(LIBS) -o summarize_axolotl
+summarize_axolotl: summarize_axolotl.cpp summarize_axolotl_meat.hh boost/finished lemon/finished
+	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) summarize_axolotl.cpp $(LIBS) -o summarize_axolotl
 
-summarize_matched: summarize_matched.cpp summarize_matched_meat.hh
-	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
+summarize_matched: summarize_matched.cpp summarize_matched_meat.hh boost/finished lemon/finished
+	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
 
-summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh
+summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh boost/finished lemon/finished
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_oomatched.cpp $(LIBS) -o summarize_oomatched
 
-summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh
+summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh boost/finished lemon/finished
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
 
-summarize_wkr: summarize_wkr.cpp summarize_wkr_meat.hh
+summarize_wkr: summarize_wkr.cpp summarize_wkr_meat.hh boost/finished lemon/finished
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_wkr.cpp $(LIBS) -o summarize_wkr
 
-summarize_aligned_kmer: summarize_aligned_kmer.cpp summarize_aligned_kmer_meat.hh
+summarize_aligned_kmer: summarize_aligned_kmer.cpp summarize_aligned_kmer_meat.hh boost/finished lemon/finished
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_aligned_kmer.cpp $(LIBS) -o summarize_aligned_kmer
 
-summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh
-	$(CC) -fopenmp $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
+summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh boost/finished lemon/finished
+	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
 
-summarize_kmerpair: summarize_kmerpair.cpp summarize_kmerpair_meat.hh
+summarize_kmerpair: summarize_kmerpair.cpp summarize_kmerpair_meat.hh boost/finished lemon/finished
 	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
 
 all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
 
-test: ${all_tests}
+test: ${all_tests} boost/finished lemon/finished
 	./test_lazycsv
 	./test_line_stream
 	./test_blast
@@ -104,3 +120,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 .PHONY:
 clean:
 	-rm -f ${summarize_jobs} summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer ${all_tests}
+	cd lemon && make clean

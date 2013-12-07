@@ -3,7 +3,8 @@
 #include <boost/array.hpp>
 
 template<size_t num_fields, char sep = ','>
-class lazycsv {
+class lazycsv
+{
 public:
   lazycsv() {}
   lazycsv(const std::string& line) : line(line) { update_starts(); }

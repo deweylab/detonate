@@ -21,20 +21,36 @@ namespace detail
 class psl_alignment
 {
 public:
-  // Realization of Alignment concept
+  // General note: blat uses q for the query and t for the target, whereas our
+  // Alignment concept uses a for the query and b for the target.
+
+  //
+  // Realization of the Alignment concept.
+  //
+
   void parse_line(const std::string& line) { lazy_csv.parse_line(line); }
-  std::string a_name()        const { return q_name(); }
-  std::string b_name()        const { return t_name(); }
-  double      frac_identity_wrt_a() const { return 1.0 * num_identity() / a_length(); }
-  double      frac_identity_wrt_b() const { return 1.0 * num_identity() / b_length(); }
-  // NOTE: these frac_indel_wrt_a or frac_indel_wrt_b are not really correct, unless one is just checking that they are == 0.0...
-  double      frac_indel_wrt_a()    const { return 1.0 * num_indel()    / a_length(); }
-  double      frac_indel_wrt_b()    const { return 1.0 * num_indel()    / b_length(); }
+  std::string a_name()              const { return q_name(); }
+  std::string b_name()              const { return t_name(); }
+  double      frac_identity_wrt_a() const { return 1.0 * num_identity() / q_size(); }
+  double      frac_identity_wrt_b() const { return 1.0 * num_identity() / t_size(); }
+  double      frac_indel_wrt_a()    const { return 1.0 * q_base_insert() / q_size(); }
+  double      frac_indel_wrt_b()    const { return 1.0 * t_base_insert() / t_size(); }
   typedef detail::psl_alignment_input_stream input_stream_type;
   typedef detail::psl_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below
 
-  // For use by psl-specific algorithms:
+  inline bool is_on_valid_strand(bool strand_specific) const
+  {
+    if (!strand_specific)
+      return true;
+    else
+      return strand() == "+";
+  }
+
+  //
+  // Not part of the Alignment concept, but rather for use by psl-specific algorithms.
+  //
+
   int                      matches      () const { return lazy_csv.at <int>        ( 0); } // Number of bases that match that aren't repeats
   int                      mis_matches  () const { return lazy_csv.at <int>        ( 1); } // Number of bases that don't match
   int                      rep_matches  () const { return lazy_csv.at <int>        ( 2); } // Number of bases that match but are part of repeats
@@ -59,16 +75,6 @@ public:
   std::vector<int>         t_starts     () const { return parse_vector<int>        (20); } // Comma-separated list of starting positions of each block in target
 
   int num_identity() const { return matches() + rep_matches(); }
-  int num_indel()    const { return q_base_insert() + t_base_insert(); }
-  #if (N_POLICY == 1)
-  int a_length()     const { return q_size() - n_count(); }
-  int b_length()     const { return t_size() - n_count(); }
-  #elif (N_POLICY == 2)
-  int a_length()     const { return q_size(); }
-  int b_length()     const { return t_size(); }
-  #else
-  #error "need to define N_POLICY"
-  #endif
 
   bool operator==(const psl_alignment& other) const { return lazy_csv == other.lazy_csv; }
   bool operator!=(const psl_alignment& other) const { return !(*this == other); }
@@ -138,7 +144,7 @@ namespace detail
     void check(const std::string& x, const std::string& y)
     {
       if (x != y)
-        throw std::runtime_error("Bad PSL header: expected \n'" + y + "', got \n'" + x + "'.");
+        throw std::runtime_error("Bad PSL header: Expected '" + y + "', got '" + x + "'.");
     }
   };
 
@@ -155,15 +161,19 @@ namespace detail
                                     const alignment_segment,
                                     std::forward_iterator_tag>
   {
-    psl_alignment_segment_iterator() : at_end(true) { /* std::cout << "in default constructor" << std::endl; */ }
+    psl_alignment_segment_iterator()
+    : at_end(true)
+    {}
 
     psl_alignment_segment_iterator(const psl_alignment& al_, const std::string& a, const std::string& b)
     : at_end(false),
       al(&al_),
       i(0),
       block_sizes(al->block_sizes()),
-      a_starts(al->q_starts()), b_starts(al->t_starts()),
-      a(&a), b(&b),
+      a_starts(al->q_starts()),
+      b_starts(al->t_starts()),
+      a(&a),
+      b(&b),
       a_is_rc(al->strand() == "-")
     {
       assert(a_starts.size() == block_sizes.size());

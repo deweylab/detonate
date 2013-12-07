@@ -32,6 +32,14 @@ public:
   typedef detail::blast_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below
 
+  inline bool is_on_valid_strand(bool strand_specific) const
+  {
+    if (!strand_specific)
+      return true;
+    else
+      throw std::runtime_error("Strand-specificity has not been implemented yet for blast alignments.");
+  }
+
   inline int num_identity() const { return nident(); } // right?
   inline int num_indel()    const { return gaps(); } // right?
 
