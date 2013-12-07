@@ -1,11 +1,13 @@
+#include "city.h"
+
 struct kmer_key
 {
-  string::const_iterator begin;
-  string::const_iterator end;
+  const char *begin;
+  const char *end;
   kmer_key() {}
   kmer_key(
-      const string::const_iterator& begin,
-      const string::const_iterator& end)
+      const char *begin,
+      const char *end)
   : begin(begin),
     end(end)
   {}
@@ -13,24 +15,19 @@ struct kmer_key
 
 struct kmer_key_hash
 {
-  hash<std::string> h;
-
   size_t operator()(const kmer_key& k) const
   {
-    return h(std::string(k.begin, k.end));
+    size_t len = k.end - k.begin;
+    return CityHash64(k.begin, len);
   }
-
-  kmer_key_hash()
-  : h()
-  {}
 };
 
 struct kmer_key_equal_to
 {
   bool operator()(const kmer_key& lhs, const kmer_key& rhs) const
   {
-    string::const_iterator i = lhs.begin;
-    string::const_iterator j = rhs.begin;
+    const char *i = lhs.begin;
+    const char *j = rhs.begin;
     for (;;) {
       // If i == end and j == end, return true.
       // If i != end and j != end and *i == *j, continue;
@@ -54,4 +51,3 @@ struct kmer_key_equal_to
     }
   }
 };
-

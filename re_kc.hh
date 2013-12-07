@@ -44,9 +44,10 @@ void count_kmers_in_A(
     for (size_t which = 0; which < num_strands; ++which) {
       const string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
-        string::const_iterator beg = a.begin();
-        string::const_iterator end = a.begin() + kmerlen;
-        for (; end != a.end(); ++beg, ++end)
+        const char *a_end = a.c_str() + a.size();
+        const char *beg = a.c_str();
+        const char *end = a.c_str() + kmerlen;
+        for (; end != a_end; ++beg, ++end)
           ht[kmer_key(beg, end)].is_present_in_A = true;
         ht[kmer_key(beg, end)].is_present_in_A = true;
       }
@@ -71,9 +72,10 @@ void count_kmers_in_B(
       const string& b = which == 0 ? B[i] : B_rc[i];
       if (b.size() >= kmerlen) {
         double c = tau_B[i];
-        string::const_iterator beg = b.begin();
-        string::const_iterator end = b.begin() + kmerlen;
-        for (; end != b.end(); ++beg, ++end)
+        const char *b_end = b.c_str() + b.size();
+        const char *beg = b.c_str();
+        const char *end = b.c_str() + kmerlen;
+        for (; end != b_end; ++beg, ++end)
           ht[kmer_key(beg, end)].weight_in_B += c; // relies on default init to 0
         ht[kmer_key(beg, end)].weight_in_B += c; // relies on default init to 0
       }

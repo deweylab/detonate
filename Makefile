@@ -12,15 +12,16 @@ endif
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
 CFLAGS = -g -O3 $(DEBUG)
-SH_INCLUDE 	  = -I$(shell pwd)/sparsehash
-DL_INCLUDE 	  = -I$(shell pwd)/deweylab
-BOOST_INCLUDE = -I$(shell pwd)/boost
-#BOOST_LIB     = -L$(shell pwd)/boost/stage/lib -Wl,-rpath,$(shell pwd)/boost/stage/lib -lboost_program_options -lboost_random
-BOOST_LIB     = $(shell pwd)/boost/stage/lib/libboost_program_options.a $(shell pwd)/boost/stage/lib/libboost_random.a
-LEMON_INCLUDE = -I$(shell pwd)/lemon/build -I$(shell pwd)/lemon/lemon-main-473c71baff72
+SH_INCLUDE 	  = -Isparsehash
+DL_INCLUDE 	  = -Ideweylab
+BOOST_INCLUDE = -Iboost
+BOOST_LIB     = boost/stage/lib/libboost_program_options.a boost/stage/lib/libboost_random.a
+LEMON_INCLUDE = -Ilemon/build -Ilemon/lemon-main-473c71baff72
 LEMON_LIB     = lemon/build/lemon/libemon.a -lpthread
-INCLUDE = $(SH_INCLUDE) $(DL_INCLUDE) $(BOOST_INCLUDE) $(LEMON_INCLUDE)
-LIBS    = $(BOOST_LIB) $(LEMON_LIB)
+CITY_INCLUDE  = -Icity/install/include
+CITY_LIB      = city/install/lib/libcityhash.a
+INCLUDE = $(SH_INCLUDE) $(DL_INCLUDE) $(BOOST_INCLUDE) $(LEMON_INCLUDE) $(CITY_INCLUDE)
+LIBS    = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB)
 TEST_LIBS = -lboost_unit_test_framework
 
 .PHONY: all
@@ -35,13 +36,16 @@ boost/finished:
 lemon/finished:
 	cd lemon && make
 
+city/finished:
+	cd city && make
+
 summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
 gp = $(word 1,$(subst _, ,$*))
 bp = $(word 2,$(subst _, ,$*))
 np = $(word 3,$(subst _, ,$*))
 mpi = $(word 4,$(subst _, ,$*))
 
-ref-eval: ref-eval.cpp boost/finished lemon/finished
+ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished
 	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) ref-eval.cpp $(LIBS) -o ref-eval
 
 .PHONY: summarize
