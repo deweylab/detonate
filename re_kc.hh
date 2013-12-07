@@ -44,12 +44,10 @@ void count_kmers_in_A(
     for (size_t which = 0; which < num_strands; ++which) {
       const string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
-        const char *a_end = a.c_str() + a.size();
         const char *beg = a.c_str();
-        const char *end = a.c_str() + kmerlen;
-        for (; end != a_end; ++beg, ++end)
-          ht[kmer_key(beg, end)].is_present_in_A = true;
-        ht[kmer_key(beg, end)].is_present_in_A = true;
+        const char *a_end = a.c_str() + a.size() + 1 - kmerlen;
+        for (; beg != a_end; ++beg)
+          ht[beg].is_present_in_A = true;
       }
     }
   }
@@ -72,28 +70,12 @@ void count_kmers_in_B(
       const string& b = which == 0 ? B[i] : B_rc[i];
       if (b.size() >= kmerlen) {
         double c = tau_B[i];
-        const char *b_end = b.c_str() + b.size();
         const char *beg = b.c_str();
-        const char *end = b.c_str() + kmerlen;
-        for (; end != b_end; ++beg, ++end)
-          ht[kmer_key(beg, end)].weight_in_B += c; // relies on default init to 0
-        ht[kmer_key(beg, end)].weight_in_B += c; // relies on default init to 0
+        const char *b_end = b.c_str() + b.size() + 1 - kmerlen;
+        for (; beg != b_end; ++beg)
+          ht[beg].weight_in_B += c; // relies on default init to 0
       }
     }
-  }
-}
-
-void normalize_kmer_distributions(kmer_hash_map& ht)
-{
-  typedef std::pair<const kmer_key, kmer_info> X;
-
-  double denom = 0;
-  BOOST_FOREACH(const X& x, ht) {
-    denom += x.second.weight_in_B;
-  }
-
-  BOOST_FOREACH(X& x, ht) {
-    x.second.weight_in_B /= denom;
   }
 }
 
@@ -130,7 +112,7 @@ kmer_hash_map build_hash_table(
   std::cerr << "...estimated number of hash table entries: " << max_entries << std::endl;
 
   // Create hash table.
-  kmer_hash_map ht(max_entries, kmer_key_hash(), kmer_key_equal_to());
+  kmer_hash_map ht(max_entries, kmer_key_hash(kmerlen), kmer_key_equal_to(kmerlen));
 
   // Add kmers to the hash table.
   count_kmers_in_A(ht, A, A_rc,        kmerlen, strand_specific);

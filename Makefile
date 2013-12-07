@@ -125,3 +125,4 @@ test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
 clean:
 	-rm -f ${summarize_jobs} summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer ${all_tests}
 	cd lemon && make clean
+	cd city && make clean
