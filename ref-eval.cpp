@@ -45,7 +45,11 @@ void add_options(boost::program_options::options_description& desc)
         "The weighted variants require --A-expr and --B-expr "
         "to be specified.\n"
         "\n"
-        "Required unless --paper is given.\n")
+        "The distinction between weighted and unweighted variants "
+        "doesn't make sense for the kc score, so this option is "
+        "ignored by the kc score.\n"
+        "\n"
+        "Required unless --paper or only --score=kc is given.\n")
     ("paper", 
         "If this flag is present, the reference-based scores "
         "described in the main text of the paper corresponding "
@@ -131,6 +135,21 @@ void add_options(boost::program_options::options_description& desc)
         "  - z \tis the number of bases in the oracleset sequence.\n"
         "\n"
         "Default: 0.01.")
+    ("hash-table-type", po::value<std::string>(),
+        "The type of hash table to use, either \"sparse\" or \"dense\". "
+        "This is only relevant for kc and kmer scores. The sparse table "
+        "is slower but uses less memory. The dense table is faster "
+        "but uses more memory. Default: \"sparse\".\n")
+    ("hash-table-fudge-factor", po::value<double>(),
+        "This is only relevant for kc and kmer scores. When the hash "
+        "table is created, its initial capacity is set as the total "
+        "worst-case number of possible kmers in the assembly and "
+        "oracleset, based on each sequence's length, divided by the "
+        "fudge factor. The default, 2.0, is often reasonable because "
+        "(1) most kmers should be shared by the assembly and the "
+        "oracleset, and (2) many kmers will be repeated several "
+        "times. However, if you have a lot of memory or a really bad "
+        "assembly, you could try a smaller number. Default: 2.0.")
   ;
 }
 
@@ -142,6 +161,9 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   if (vm.count("paper")) {
     if (vm.count("scores") || vm.count("weighted"))
       throw po::error("--scores and --weighted are incompatible with --paper.");
+  }
+  else if (vm.count("scores") && vm["scores"].as<std::string>() == "kc" && vm.count("weighted")) {
+    throw po::error("--weighted is not needed if only --scores=kc is given.");
   }
   else if (vm.count("scores") || vm.count("weighted")) {
     if (!vm.count("scores"))
@@ -256,6 +278,36 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
     o.contig_max_frac_indel = vm["contig-max-frac-indel"].as<double>();
   else
     o.contig_max_frac_indel = 0.01;
+
+  // Parse hash-table-type.
+  if (o.kc || o.kmer) {
+    if (vm.count("hash-table-type")) {
+      o.hash_table_type = vm["hash-table-type"].as<std::string>();
+      if (o.hash_table_type != "sparse" && o.hash_table_type != "dense")
+        throw po::error("Invalid value for --hash-table-type: " + o.hash_table_type);
+    } else {
+      o.hash_table_type = "sparse";
+    }
+  } else {
+    if (vm.count("hash-table-type"))
+      throw po::error("--hash-table-type is not needed except for kmer and kc scores.");
+  }
+
+  // Parse hash-table-fudge-factor.
+  if (o.kc || o.kmer) {
+    if (vm.count("hash-table-fudge-factor")) {
+      o.hash_table_fudge_factor = vm["hash-table-fudge-factor"].as<double>();
+      if (o.hash_table_fudge_factor < 0)
+        //throw po::error("Invalid value for --hash-table-fudge-factor: " + boost::lexical_cast<std::string>(o.hash_table_fudge_factor));
+        throw po::error("Invalid value for --hash-table-fudge-factor: " + vm["hash-table-fudge-factor"].as<std::string>());
+    } else {
+      o.hash_table_fudge_factor = 2.0;
+    }
+  } else {
+    if (vm.count("hash-table-fudge-factor"))
+      throw po::error("--hash-table-fudge-factor is not needed except for kmer and kc scores.");
+  }
+
 }
 
 int main(int argc, const char **argv)

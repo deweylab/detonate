@@ -42,6 +42,10 @@ struct opts
   double contig_min_frac_identity;
   double contig_max_frac_indel;
 
+  // Hash table
+  std::string hash_table_type;
+  double hash_table_fudge_factor;
+
   opts()
   :
     // Scores
@@ -82,7 +86,11 @@ struct opts
 
     // Contig thresholds
     contig_min_frac_identity(2.0),
-    contig_max_frac_indel(-1.0)
+    contig_max_frac_indel(-1.0),
+
+    // Hash table
+    hash_table_type(""),
+    hash_table_fudge_factor(-1.0)
   {}
 };
 

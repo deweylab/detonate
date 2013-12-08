@@ -5,13 +5,11 @@
 #include <iterator>
 #include <string>
 #include <vector>
-#include <list>
 #include <boost/foreach.hpp>
 #include <sparsehash/sparse_hash_map>
-//#include <sparsehash/dense_hash_map>
+#include <sparsehash/dense_hash_map>
 #include "util.hh"
 #include "kmer_key.hh"
-using namespace std;
 
 namespace re {
 namespace kc {
@@ -26,11 +24,33 @@ struct kmer_info
   {}
 };
 
-typedef google::sparse_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> kmer_hash_map;
-//typedef google::dense_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> kmer_hash_map;
+typedef google::sparse_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> sparse_kmer_map;
+typedef google::dense_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> dense_kmer_map;
 
+template<typename Ht>
+struct empty_key_initializer
+{
+  empty_key_initializer(Ht&, size_t)
+  {}
+};
+
+template<>
+struct empty_key_initializer<dense_kmer_map>
+{
+  std::string empty_string;
+  const char *empty_key;
+
+  empty_key_initializer(dense_kmer_map& ht, size_t kmerlen)
+  : empty_string(kmerlen, ' '),
+    empty_key(empty_string.c_str())
+  {
+    ht.set_empty_key(empty_key);
+  }
+};
+
+template<typename Ht>
 void count_kmers_in_A(
-    kmer_hash_map& ht,
+    Ht& ht,
     const vector<string>& A,
     const vector<string>& A_rc,
     size_t kmerlen,
@@ -53,8 +73,9 @@ void count_kmers_in_A(
   }
 }
 
+template<typename Ht>
 void count_kmers_in_B(
-    kmer_hash_map& ht,
+    Ht& ht,
     const vector<string>& B,
     const vector<string>& B_rc,
     const vector<double>& tau_B,
@@ -82,47 +103,23 @@ void count_kmers_in_B(
 size_t estimate_hashtable_size(
     const vector<string>& A,
     const vector<string>& B,
-    size_t kmerlen)
+    size_t kmerlen,
+    double hash_table_fudge_factor)
 {
-  // The fudge factor is based partly on empirical observation and partly on
-  // the assumption that most kmers will be shared between the oracleset and
-  // the assembly.
-  size_t fudge_factor = 2;
   size_t max_entries = 0;
   BOOST_FOREACH(const string& a, A)
     if (a.size() >= kmerlen)
-      max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
-  BOOST_FOREACH(const string& a, B)
-    if (a.size() >= kmerlen)
-      max_entries += 2 * (a.size() + 1 - kmerlen) / fudge_factor;
+      max_entries += static_cast<size_t>(0.5 +
+        2 * (a.size() + 1 - kmerlen) / hash_table_fudge_factor);
+  BOOST_FOREACH(const string& b, B)
+    if (b.size() >= kmerlen)
+      max_entries += static_cast<size_t>(0.5 +
+        2 * (b.size() + 1 - kmerlen) / hash_table_fudge_factor);
   return max_entries;
 }
 
-kmer_hash_map build_hash_table(
-    const vector<string>& A,
-    const vector<string>& A_rc, 
-    const vector<string>& B,
-    const vector<string>& B_rc,
-    const vector<double>& tau_B,
-    size_t kmerlen,
-    bool strand_specific)
-{
-  // Figure out roughly how many entries to expect in the hash table.
-  size_t max_entries = estimate_hashtable_size(A, B, kmerlen);
-  std::cerr << "...estimated number of hash table entries: " << max_entries << std::endl;
-
-  // Create hash table.
-  kmer_hash_map ht(max_entries, kmer_key_hash(kmerlen), kmer_key_equal_to(kmerlen));
-
-  // Add kmers to the hash table.
-  count_kmers_in_A(ht, A, A_rc,        kmerlen, strand_specific);
-  count_kmers_in_B(ht, B, B_rc, tau_B, kmerlen, strand_specific);
-  std::cerr << "...actual number of hash table entries: " << ht.size() << std::endl;
-
-  return ht;
-}
-
-double compute_kmer_recall(const kmer_hash_map& ht)
+template<typename Ht>
+double compute_kmer_recall(const Ht& ht)
 {
   typedef std::pair<const kmer_key, kmer_info> X;
   double numer = 0.0, denom = 0.0;
@@ -143,6 +140,41 @@ double compute_inverse_compression_rate(
   return 1.0 * num_bases_in_A / (o.num_reads * o.readlen);
 }
 
+template<typename Ht>
+void main_1(
+    const opts& o,
+    const fasta& A,
+    const fasta& B,
+    const expr& tau_A,
+    const expr& tau_B,
+    const expr& unif_A,
+    const expr& unif_B)
+{
+  std::cerr << "Reverse complementing the sequences..." << std::flush;
+  std::vector<std::string> A_rc, B_rc;
+  transform(A.seqs.begin(), A.seqs.end(), back_inserter(A_rc), reverse_complement);
+  transform(B.seqs.begin(), B.seqs.end(), back_inserter(B_rc), reverse_complement);
+  std::cerr << "done." << std::endl;
+
+  size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.readlen, o.hash_table_fudge_factor);
+  std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::flush;
+  Ht ht(max_entries, kmer_key_hash(o.readlen), kmer_key_equal_to(o.readlen));
+  empty_key_initializer<Ht> eki(ht, o.readlen);
+  std::cerr << "done." << std::endl;
+
+  std::cerr << "Populating the hash table..." << std::flush;
+  count_kmers_in_A(ht, A.seqs, A_rc,        o.readlen, o.strand_specific);
+  count_kmers_in_B(ht, B.seqs, B_rc, tau_B, o.readlen, o.strand_specific);
+  std::cerr << "done; hash table contains " << ht.size() << " entries." << std::endl;
+
+  double wkr = compute_kmer_recall(ht);
+  double icr = compute_inverse_compression_rate(o, A);
+
+  std::cout << "weighted_kmer_recall\t" << wkr << std::endl;
+  std::cout << "inverse_compression_rate\t" << icr << std::endl;
+  std::cout << "kmer_compression_score\t" << wkr - icr << std::endl;
+}
+
 void main(
     const opts& o,
     const fasta& A,
@@ -153,36 +185,14 @@ void main(
     const expr& unif_B)
 {
   if (o.kc) {
-    if (false) {
-    //if (vm.count("estimate-hashtable-size")) {
-      std::cout << estimate_hashtable_size(A.seqs, B.seqs, o.readlen) * sizeof(kmer_info) << std::endl;
-      return;
-    }
 
-    std::cerr << "Reverse complementing the sequences..." << std::flush;
-    std::vector<std::string> A_rc, B_rc;
-    transform(A.seqs.begin(), A.seqs.end(), back_inserter(A_rc), reverse_complement);
-    transform(B.seqs.begin(), B.seqs.end(), back_inserter(B_rc), reverse_complement);
-    std::cerr << "done." << std::endl;
+    if (o.hash_table_type == "sparse")
+      main_1<sparse_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    else if (o.hash_table_type == "dense")
+      main_1<dense_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    else
+      throw std::runtime_error("Unknown hash map type.");
 
-    std::cerr << "Building the hash table..." << std::endl;
-    kmer_hash_map ht = build_hash_table(A.seqs, A_rc, B.seqs, B_rc, tau_B, o.readlen, o.strand_specific);
-    std::cerr << "...done." << std::endl;
-
-    double wkr = compute_kmer_recall(ht);
-    double icr = compute_inverse_compression_rate(o, A);
-
-    std::cout << "weighted_kmer_recall\t" << wkr << std::endl;
-    std::cout << "inverse_compression_rate\t" << icr << std::endl;
-    std::cout << "kmer_compression_score\t" << wkr - icr << std::endl;
-
-    // compute_kmer_recall(A.seqs, A_rc, B.seqs, B_rc, unif_B, "unweighted_kmer", "at_one",    o.readlen,   o.strand_specific);
-
-    // expr dc_unif_B(B.card, 1.0);
-    // compute_kmer_recall(A.seqs, A_rc, B.seqs, B_rc, dc_unif_B, "dc_unweighted_kmer", "at_one",    o.readlen,   o.strand_specific);
-
-    // // compute_kmer_recall(A.seqs, A_rc, B.seqs, B_rc, tau_B, "weighted_kmer", "at_double", o.readlen*2, o.strand_specific);
-    // // compute_kmer_recall(A.seqs, A_rc, B.seqs, B_rc, tau_B, "weighted_kmer", "at_half",   o.readlen/2, o.strand_specific);
   }
 }
 
