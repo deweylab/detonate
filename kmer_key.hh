@@ -1,3 +1,4 @@
+#pragma once
 #include "city.h"
 
 typedef const char * kmer_key;

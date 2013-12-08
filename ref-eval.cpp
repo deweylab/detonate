@@ -8,6 +8,7 @@
 #include "util.hh"
 #include "re_matched.hh"
 #include "re_oomatched.hh"
+#include "re_kmer.hh"
 #include "re_kc.hh"
 
 void add_options(boost::program_options::options_description& desc)
@@ -357,6 +358,7 @@ int main(int argc, const char **argv)
     re::matched  ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
     re::oomatched::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
     re::kc       ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    re::kmer     ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
 
     std::cerr << "Done!" << std::endl;
 
