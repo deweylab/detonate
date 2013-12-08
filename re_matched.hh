@@ -1,18 +1,15 @@
 #pragma once
 #include <iostream>
-#include <fstream>
-#include <sstream>
-#include <iterator>
 #include <vector>
-#include <list>
 #include <boost/foreach.hpp>
-#define N_POLICY 2
 #include "blast.hh"
 #include "psl.hh"
 #include "pairset.hh"
 #include "kpairset.hh"
 #include "kmerset.hh"
 #include "mask.hh"
+#include "blast.hh"
+#include "psl.hh"
 #include "util.hh"
 
 namespace re {
@@ -389,29 +386,29 @@ void compute(const opts& o,
              const std::string& prefix)
 {
   double precis = compute_recall<Helper>(o, B, A, tau_A, B_to_A);
-  std::cout << prefix << "_precision\t" << precis << std::endl;
+  std::cout << prefix << "precision\t" << precis << std::endl;
 
   double recall = compute_recall<Helper>(o, A, B, tau_B, A_to_B);
-  std::cout << prefix << "_recall\t" << recall << std::endl;
+  std::cout << prefix << "recall\t" << recall << std::endl;
 
   double F1 = compute_F1(precis, recall);
-  std::cout << prefix << "_F1\t" << F1 << std::endl;
+  std::cout << prefix << "F1\t" << F1 << std::endl;
 }
 
-void compute_all(const opts& o,
-                 const fasta& A,
-                 const fasta& B,
-                 const expr& tau_A,
-                 const expr& tau_B,
-                 std::vector<tagged_alignment> A_to_B,
-                 std::vector<tagged_alignment> B_to_A,
-                 const std::string& prefix)
+template<typename Helper>
+void main_2(const opts& o,
+            const fasta& A,
+            const fasta& B,
+            const expr& tau_A,
+            const expr& tau_B,
+            const expr& unif_A,
+            const expr& unif_B,
+            std::vector<tagged_alignment> A_to_B,
+            std::vector<tagged_alignment> B_to_A,
+            const std::string& prefix)
 {
-  if (o.nucl) compute<nucl_helper>(o, A, B, tau_A, tau_B, A_to_B, B_to_A, prefix + "_nucl");
-  if (o.pair) compute<pair_helper>(o, A, B, tau_A, tau_B, A_to_B, B_to_A, prefix + "_pair");
-  //if (o.kpair) compute<kpair_helper>(o, A, B, tau_A, tau_B, A_to_B, B_to_A, prefix + "_kpair");
-  //if (o.kmer) compute<kmer_helper>(o, A, B, tau_A, tau_B, A_to_B, B_to_A, prefix + "_kmer");
-  //if (o.tran) compute<kmer_helper>(o, A, B, tau_A, tau_B, A_to_B, B_to_A, prefix + "_tran");
+  if (o.weighted)   compute<Helper>(o, A, B, tau_A,  tau_B,  A_to_B, B_to_A, "weighted_" + prefix);
+  if (o.unweighted) compute<Helper>(o, A, B, unif_A, unif_B, A_to_B, B_to_A, "unweighted_" + prefix);
 }
 
 template<typename Al>
@@ -423,14 +420,17 @@ void main_1(const opts& o,
             const expr& unif_A,
             const expr& unif_B)
 {
-  std::cerr << "Reading the alignments..." << std::flush;
+  std::cerr << "Reading the alignments and extracting intervals..." << std::flush;
   std::vector<tagged_alignment> A_to_B, B_to_A;
   read_alignments<Al>(A_to_B, o.A_to_B, A.seqs, B.seqs, A.names_to_idxs, B.names_to_idxs, o.strand_specific, o.readlen);
   read_alignments<Al>(B_to_A, o.B_to_A, B.seqs, A.seqs, B.names_to_idxs, A.names_to_idxs, o.strand_specific, o.readlen);
   std::cerr << "done." << std::endl;
 
-  if (o.weighted)   compute_all(o, A, B, tau_A,  tau_B,  A_to_B, B_to_A, "weighted");
-  if (o.unweighted) compute_all(o, A, B, unif_A, unif_B, A_to_B, B_to_A, "unweighted");
+  if (o.nucl) main_2<nucl_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "nucl_");
+  if (o.pair) main_2<pair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "pair_");
+  //if (o.kpair) main_2<kpair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "kpair_");
+  //if (o.kmer) main_2<kmer_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "kmer_");
+  //if (o.tran) main_2<kmer_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "tran_");
 }
 
 void main(const opts& o,

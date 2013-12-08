@@ -1,15 +1,12 @@
 #pragma once
 #include <iostream>
 #include <vector>
-#include <boost/program_options.hpp>
 #include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/algorithm/string/join.hpp>
 #include <lemon/matching.h>
 #include <lemon/smart_graph.h>
 #include <lemon/concepts/graph.h>
 #include <lemon/concepts/maps.h>
-#define N_POLICY 2
 #include "blast.hh"
 #include "psl.hh"
 #include "util.hh"
@@ -145,17 +142,19 @@ void main_1(const opts& o,
   double frac_indel_thresh = 0.01; // vm["frac-indel-thresh"].as<double>();
 
   result recall = compute_recall<Al>(o, A_to_B_is, A, B, tau_B, frac_identity_thresh, frac_indel_thresh);
-  if (o.weighted)   std::cout << "weighted_contig_recall\t"   << recall.weighted   << std::endl;
-  if (o.unweighted) std::cout << "unweighted_contig_recall\t" << recall.unweighted << std::endl;
-
   result precis = compute_recall<Al>(o, B_to_A_is, B, A, tau_A, frac_identity_thresh, frac_indel_thresh);
-  if (o.weighted)   std::cout << "weighted_contig_precision\t"   << precis.weighted   << std::endl;
-  if (o.unweighted) std::cout << "unweighted_contig_precision\t" << precis.unweighted << std::endl;
 
-  if (o.weighted)   std::cout << "weighted_contig_F1\t"   << compute_F1(precis.weighted,   recall.weighted)   << std::endl;
-  if (o.unweighted) std::cout << "unweighted_contig_F1\t" << compute_F1(precis.unweighted, recall.unweighted) << std::endl;
+  if (o.weighted) {
+    std::cout << "weighted_contig_recall\t"   << recall.weighted   << std::endl;
+    std::cout << "weighted_contig_precision\t"   << precis.weighted   << std::endl;
+    std::cout << "weighted_contig_F1\t"   << compute_F1(precis.weighted,   recall.weighted)   << std::endl;
+  }
 
-  std::cout << std::flush;
+  if (o.unweighted) {
+    std::cout << "unweighted_contig_recall\t" << recall.unweighted << std::endl;
+    std::cout << "unweighted_contig_precision\t" << precis.unweighted << std::endl;
+    std::cout << "unweighted_contig_F1\t" << compute_F1(precis.unweighted, recall.unweighted) << std::endl;
+  }
 }
 
 void main(const opts& o,
