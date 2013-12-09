@@ -3,7 +3,6 @@
 #define BOOST_TEST_MODULE test_psl
 #include <boost/test/unit_test.hpp>
 #include <boost/foreach.hpp>
-#define N_POLICY 1
 #include "psl.hh"
 
 BOOST_AUTO_TEST_CASE(alignment_concept)
@@ -15,9 +14,9 @@ BOOST_AUTO_TEST_CASE(alignment_concept)
   BOOST_CHECK_EQUAL(al.a_name(), "Locus_1_Transcript_1/48_Confidence_0.136_Length_1158");
   BOOST_CHECK_EQUAL(al.b_name(), "Locus_1_Transcript_25/41_Confidence_0.222_Length_1952");
   BOOST_CHECK_EQUAL(al.frac_identity_wrt_a(), 1.0*(79+0)/1158);
-  BOOST_CHECK_EQUAL(al.frac_indel_wrt_a(), 1.0*(10+7)/1158);
+  BOOST_CHECK_EQUAL(al.frac_indel_wrt_a(), 1.0*10/1158);
   BOOST_CHECK_EQUAL(al.frac_identity_wrt_b(), 1.0*(79+0)/1952);
-  BOOST_CHECK_EQUAL(al.frac_indel_wrt_b(), 1.0*(10+7)/1952);
+  BOOST_CHECK_EQUAL(al.frac_indel_wrt_b(), 1.0*7/1952);
 }
 
 BOOST_AUTO_TEST_CASE(single_interval_realistic_usage)
