@@ -1,0 +1,3 @@
+This directory contains a small subset of Colin Dewey's libdeweylab library,
+namely, the subset needed to read FASTA files. I changed this subset of the
+library (in a very hacky way) to be header-only.
