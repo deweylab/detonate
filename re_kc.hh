@@ -51,8 +51,8 @@ struct empty_key_initializer<dense_kmer_map>
 template<typename Ht>
 void count_kmers_in_A(
     Ht& ht,
-    const vector<string>& A,
-    const vector<string>& A_rc,
+    const std::vector<std::string>& A,
+    const std::vector<std::string>& A_rc,
     size_t kmerlen,
     bool strand_specific)
 {
@@ -62,7 +62,7 @@ void count_kmers_in_A(
   size_t num_strands = strand_specific ? 1 : 2;
   for (size_t i = 0; i < A.size(); ++i) {
     for (size_t which = 0; which < num_strands; ++which) {
-      const string& a = which == 0 ? A[i] : A_rc[i];
+      const std::string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
         const char *beg = a.c_str();
         const char *a_end = a.c_str() + a.size() + 1 - kmerlen;
@@ -76,9 +76,9 @@ void count_kmers_in_A(
 template<typename Ht>
 void count_kmers_in_B(
     Ht& ht,
-    const vector<string>& B,
-    const vector<string>& B_rc,
-    const vector<double>& tau_B,
+    const std::vector<std::string>& B,
+    const std::vector<std::string>& B_rc,
+    const std::vector<double>& tau_B,
     size_t kmerlen,
     bool strand_specific)
 {
@@ -88,7 +88,7 @@ void count_kmers_in_B(
   size_t num_strands = strand_specific ? 1 : 2;
   for (size_t i = 0; i < B.size(); ++i) {
     for (size_t which = 0; which < num_strands; ++which) {
-      const string& b = which == 0 ? B[i] : B_rc[i];
+      const std::string& b = which == 0 ? B[i] : B_rc[i];
       if (b.size() >= kmerlen) {
         double c = tau_B[i];
         const char *beg = b.c_str();
@@ -101,17 +101,17 @@ void count_kmers_in_B(
 }
 
 size_t estimate_hashtable_size(
-    const vector<string>& A,
-    const vector<string>& B,
+    const std::vector<std::string>& A,
+    const std::vector<std::string>& B,
     size_t kmerlen,
     double hash_table_fudge_factor)
 {
   size_t max_entries = 0;
-  BOOST_FOREACH(const string& a, A)
+  BOOST_FOREACH(const std::string& a, A)
     if (a.size() >= kmerlen)
       max_entries += static_cast<size_t>(0.5 +
         2 * (a.size() + 1 - kmerlen) / hash_table_fudge_factor);
-  BOOST_FOREACH(const string& b, B)
+  BOOST_FOREACH(const std::string& b, B)
     if (b.size() >= kmerlen)
       max_entries += static_cast<size_t>(0.5 +
         2 * (b.size() + 1 - kmerlen) / hash_table_fudge_factor);

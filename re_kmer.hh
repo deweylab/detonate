@@ -56,9 +56,9 @@ struct empty_key_initializer<dense_kmer_map>
 template<typename Ht, size_t A_or_B>
 void count_kmers(
     Ht& ht,
-    const vector<string>& A,
-    const vector<string>& A_rc,
-    const vector<double>& tau_A,
+    const std::vector<std::string>& A,
+    const std::vector<std::string>& A_rc,
+    const std::vector<double>& tau_A,
     size_t kmerlen,
     bool strand_specific)
 {
@@ -70,7 +70,7 @@ void count_kmers(
   size_t num_strands = strand_specific ? 1 : 2;
   for (size_t i = 0; i < A.size(); ++i) {
     for (size_t which = 0; which < num_strands; ++which) {
-      const string& a = which == 0 ? A[i] : A_rc[i];
+      const std::string& a = which == 0 ? A[i] : A_rc[i];
       if (a.size() >= kmerlen) {
         double c = tau_A[i];
         const char *beg = a.c_str();
@@ -101,17 +101,17 @@ void normalize_kmer_distributions(Ht& ht)
 }
 
 size_t estimate_hashtable_size(
-    const vector<string>& A,
-    const vector<string>& B,
+    const std::vector<std::string>& A,
+    const std::vector<std::string>& B,
     size_t kmerlen,
     double hash_table_fudge_factor)
 {
   size_t max_entries = 0;
-  BOOST_FOREACH(const string& a, A)
+  BOOST_FOREACH(const std::string& a, A)
     if (a.size() >= kmerlen)
       max_entries += static_cast<size_t>(0.5 +
         2 * (a.size() + 1 - kmerlen) / hash_table_fudge_factor);
-  BOOST_FOREACH(const string& b, B)
+  BOOST_FOREACH(const std::string& b, B)
     if (b.size() >= kmerlen)
       max_entries += static_cast<size_t>(0.5 +
         2 * (b.size() + 1 - kmerlen) / hash_table_fudge_factor);
