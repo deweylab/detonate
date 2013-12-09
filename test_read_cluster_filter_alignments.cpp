@@ -1,10 +1,8 @@
 #include <string>
 #include <iostream>
 #define BOOST_TEST_MODULE test_read_cluster_filter_alignments
-#define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 #include <boost/foreach.hpp>
-#include "summarize_meat.hh"
 #include "fake_alignment.hh"
 
 void check_equal_sets(std::set<std::string> set1, std::set<std::string> set2)

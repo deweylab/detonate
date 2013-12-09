@@ -2,7 +2,6 @@
 #include <fstream>
 #include <string>
 #define BOOST_TEST_MODULE test_line_stream
-#define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 #include "line_stream.hh"
 

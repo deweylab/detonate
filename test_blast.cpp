@@ -1,7 +1,6 @@
 #include <string>
 #include <iostream>
 #define BOOST_TEST_MODULE test_blast
-#define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 #include <boost/foreach.hpp>
 #include "blast.hh"

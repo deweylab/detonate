@@ -45,7 +45,7 @@ SH_INCLUDE 	  = -Isparsehash/include
 DL_INCLUDE 	  = -Ideweylab
 INCLUDE = $(BOOST_INCLUDE) $(LEMON_INCLUDE) $(CITY_INCLUDE) $(SH_INCLUDE) $(DL_INCLUDE)
 LIBS    = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB)
-TEST_LIBS = -lboost_unit_test_framework
+TEST_LIBS = boost/stage/lib/libboost_unit_test_framework.a
 
 .PHONY: all
 all: ref-eval
@@ -132,7 +132,7 @@ test_compute_alignment_stats: test_compute_alignment_stats.cpp
 test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 	$(CC11) $(CFLAGS) $(INCLUDE) test_alignment_segment.cpp $(LIBS) $(TEST_LIBS) -o test_alignment_segment
 
-test_re_matched: test_re_matched.cpp re_matched_meat.hh
+test_re_matched: test_re_matched.cpp re_matched.hh
 	$(CC11) $(CFLAGS) $(INCLUDE) test_re_matched.cpp $(LIBS) $(TEST_LIBS) -o test_re_matched
 
 .PHONY:

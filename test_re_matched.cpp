@@ -3,7 +3,6 @@
 #include <random>       // std::default_random_engine
 #include <chrono>       // std::chrono::system_clock
 #define BOOST_TEST_MODULE test_summarize_matched_meat
-#define BOOST_TEST_DYN_LINK
 #include <boost/test/floating_point_comparison.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/foreach.hpp>
