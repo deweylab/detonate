@@ -1,18 +1,22 @@
 ifeq ($(shell uname), Linux)
-  CC11 = /u/deweylab/sw/gcc-4.7.2/arch/x86_64-redhat-linux-gnu/bin/g++
   CC = g++ -W
+  CC11 = g++ -std=c++11 
   OMP = -fopenmp
+  HASH_FUN_H = "<tr1/functional>"
+  HASH_NAMESPACE = "std::tr1"
 endif
 ifeq ($(shell uname), Darwin)
   CC11 = clang++ -W -Wno-unused-parameter 
   CC   = clang++ -W -Wno-unused-parameter
   OMP  =
+  HASH_FUN_H = "<functional>"
+  HASH_NAMESPACE = "std"
 endif
 
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
 CFLAGS = -g -O3 $(DEBUG)
-SH_INCLUDE 	  = -Isparsehash
+SH_INCLUDE 	  = -Isparsehash -DHASH_FUN_H=$(HASH_FUN_H) -DHASH_NAMESPACE=$(HASH_NAMESPACE)
 DL_INCLUDE 	  = -Ideweylab
 BOOST_INCLUDE = -Iboost
 BOOST_LIB     = boost/stage/lib/libboost_program_options.a boost/stage/lib/libboost_random.a
@@ -93,16 +97,16 @@ test_mask: test_mask.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_mask.cpp $(LIBS) $(TEST_LIBS) -o test_mask
 
 test_read_cluster_filter_alignments: test_read_cluster_filter_alignments.cpp
-	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_read_cluster_filter_alignments.cpp $(LIBS) $(TEST_LIBS) -o test_read_cluster_filter_alignments
+	$(CC11) $(CFLAGS) $(INCLUDE) test_read_cluster_filter_alignments.cpp $(LIBS) $(TEST_LIBS) -o test_read_cluster_filter_alignments
 
 test_compute_alignment_stats: test_compute_alignment_stats.cpp
-	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
+	$(CC11) $(CFLAGS) $(INCLUDE) test_compute_alignment_stats.cpp $(LIBS) $(TEST_LIBS) -o test_compute_alignment_stats
 
 test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
-	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_alignment_segment.cpp $(LIBS) $(TEST_LIBS) -o test_alignment_segment
+	$(CC11) $(CFLAGS) $(INCLUDE) test_alignment_segment.cpp $(LIBS) $(TEST_LIBS) -o test_alignment_segment
 
 test_re_matched: test_re_matched.cpp re_matched_meat.hh
-	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_re_matched.cpp $(LIBS) $(TEST_LIBS) -o test_re_matched
+	$(CC11) $(CFLAGS) $(INCLUDE) test_re_matched.cpp $(LIBS) $(TEST_LIBS) -o test_re_matched
 
 .PHONY:
 clean:
