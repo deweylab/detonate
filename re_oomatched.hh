@@ -18,6 +18,10 @@ struct result
 {
   double weighted;
   double unweighted;
+  result()
+  : weighted(-1),
+    unweighted(-1)
+  {}
 };
 
 template<typename V, typename S>
