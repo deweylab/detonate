@@ -3,16 +3,26 @@
 # ------------------
 
 # You should edit the following variables as needed for your system.
+#
+# Notes:
+#
+# - CC11 is only needed to build the tests. You can ignore it if you just want
+#   to build the main REF-EVAL package.
+#
+# - OMP should be -fopenmp if OpenMP is suppported by your compiler, and you
+#   want to be able to run in multithreaded mode. OpenMP is supported by GCC
+#   and by the latest version of Clang, but not (as of this writing) by the
+#   version of Clang distributed by Apple.
 
 ifeq ($(shell uname), Linux)
   CC   = g++
-  CC11 = g++ -std=c++11 
+  CC11 = $(CC) -std=c++11 
   OMP  = -fopenmp
 endif
 
 ifeq ($(shell uname), Darwin)
   CC   = clang++
-  CC11 = clang++ -std=c++11 
+  CC11 = $(CC) -std=c++11 
   OMP  =
 endif
 

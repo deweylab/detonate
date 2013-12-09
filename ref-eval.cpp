@@ -163,8 +163,9 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
     if (vm.count("scores") || vm.count("weighted"))
       throw po::error("--scores and --weighted are incompatible with --paper.");
   }
-  else if (vm.count("scores") && vm["scores"].as<std::string>() == "kc" && vm.count("weighted")) {
-    throw po::error("--weighted is not needed if only --scores=kc is given.");
+  else if (vm.count("scores") && vm["scores"].as<std::string>() == "kc") {
+    if (vm.count("weighted"))
+      throw po::error("--weighted is not needed if only --scores=kc is given.");
   }
   else if (vm.count("scores") || vm.count("weighted")) {
     if (!vm.count("scores"))
@@ -216,16 +217,24 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   o.B_seqs = vm["B-seqs"].as<std::string>();
 
   // Parse expression.
-  if (o.weighted || o.paper) {
+  if (o.weighted) {
     if (!vm.count("A-expr"))
-      throw po::error("--A-expr is required for weighted variants of scores, and for the kc score.");
+      throw po::error("--A-expr is required for weighted variants of scores.");
     if (!vm.count("B-expr"))
-      throw po::error("--B-expr is required for weighted variants of scores, and for the kc score.");
+      throw po::error("--B-expr is required for weighted variants of scores.");
     o.A_expr = vm["A-expr"].as<std::string>();
     o.B_expr = vm["B-expr"].as<std::string>();
-  } else {
+  }
+  else if (o.kc || o.paper) {
     if (vm.count("A-expr"))
-      throw po::error("--A-expr is not needed except for weighted variants of scores and the kc score.");
+      throw po::error("--A-expr is not needed except for weighted variants of scores.");
+    if (!vm.count("B-expr"))
+      throw po::error("--B-expr is required for for the kc score.");
+    o.B_expr = vm["B-expr"].as<std::string>();
+  }
+  else {
+    if (vm.count("A-expr"))
+      throw po::error("--A-expr is not needed except for weighted variants of scores.");
     if (vm.count("B-expr"))
       throw po::error("--B-expr is not needed except for weighted variants of scores and the kc score.");
   }
@@ -351,11 +360,16 @@ int main(int argc, const char **argv)
     std::cerr << "done." << std::endl;
 
     expr tau_A, tau_B;
-    if (o.weighted || o.paper) {
+    if (o.weighted) {
       std::cerr << "Reading the expression..." << std::flush;
       tau_A.resize(A.card);
       tau_B.resize(B.card);
       read_rsem_expr(tau_A, o.A_expr, A);
+      read_rsem_expr(tau_B, o.B_expr, B);
+      std::cerr << "done." << std::endl;
+    } else if (o.kc || o.paper) {
+      std::cerr << "Reading the expression..." << std::flush;
+      tau_B.resize(B.card);
       read_rsem_expr(tau_B, o.B_expr, B);
       std::cerr << "done." << std::endl;
     }
