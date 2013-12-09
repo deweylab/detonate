@@ -145,10 +145,7 @@ void main_1(
     const opts& o,
     const fasta& A,
     const fasta& B,
-    const expr& tau_A,
-    const expr& tau_B,
-    const expr& unif_A,
-    const expr& unif_B)
+    const expr& tau_B)
 {
   std::cerr << "Reverse complementing the sequences..." << std::flush;
   std::vector<std::string> A_rc, B_rc;
@@ -179,16 +176,13 @@ void main(
     const opts& o,
     const fasta& A,
     const fasta& B,
-    const expr& tau_A,
-    const expr& tau_B,
-    const expr& unif_A,
-    const expr& unif_B)
+    const expr& tau_B)
 {
   if (o.kc || o.paper) {
     if (o.hash_table_type == "sparse")
-      main_1<sparse_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+      main_1<sparse_kmer_map>(o, A, B, tau_B);
     else if (o.hash_table_type == "dense")
-      main_1<dense_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+      main_1<dense_kmer_map>(o, A, B, tau_B);
     else
       throw std::runtime_error("Unknown hash map type.");
   }

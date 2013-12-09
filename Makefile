@@ -5,14 +5,14 @@
 # You should edit the following variables as needed for your system.
 
 ifeq ($(shell uname), Linux)
-  CC   = g++ -W
-  CC11 = g++ -W -std=c++11 
+  CC   = g++
+  CC11 = g++ -std=c++11 
   OMP  = -fopenmp
 endif
 
 ifeq ($(shell uname), Darwin)
-  CC   = clang++ -W -Wno-unused-parameter
-  CC11 = clang++ -W -Wno-unused-parameter -std=c++11 
+  CC   = clang++
+  CC11 = clang++ -std=c++11 
   OMP  =
 endif
 
@@ -24,8 +24,8 @@ endif
 
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
-CFLAGS = -g -O3 $(DEBUG)
-BOOST_INCLUDE = -Iboost
+CFLAGS = -W -g -O3 $(DEBUG)
+BOOST_INCLUDE = -isystem boost
 BOOST_LIB     = boost/stage/lib/libboost_program_options.a boost/stage/lib/libboost_random.a
 LEMON_INCLUDE = -Ilemon/build -Ilemon/lemon-main-473c71baff72
 LEMON_LIB     = lemon/build/lemon/libemon.a -lpthread

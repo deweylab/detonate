@@ -129,9 +129,7 @@ void main_1(const opts& o,
             const fasta& A,
             const fasta& B,
             const expr& tau_A,
-            const expr& tau_B,
-            const expr& unif_A,
-            const expr& unif_B)
+            const expr& tau_B)
 {
   typename Al::input_stream_type A_to_B_is(open_or_throw(o.A_to_B));
   typename Al::input_stream_type B_to_A_is(open_or_throw(o.B_to_A));
@@ -156,16 +154,14 @@ void main(const opts& o,
           const fasta& A,
           const fasta& B,
           const expr& tau_A,
-          const expr& tau_B,
-          const expr& unif_A,
-          const expr& unif_B)
+          const expr& tau_B)
 {
   if (o.contig || o.paper) {
     if (o.alignment_type == "blast")
-      main_1<blast_alignment>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+      main_1<blast_alignment>(o, A, B, tau_A, tau_B);
       //throw std::runtime_error("tran is not implemented for blast alignments yet.");
     else if (o.alignment_type == "psl")
-      main_1<psl_alignment>  (o, A, B, tau_A, tau_B, unif_A, unif_B);
+      main_1<psl_alignment>  (o, A, B, tau_A, tau_B);
   }
 }
 

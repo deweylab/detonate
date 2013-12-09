@@ -336,7 +336,7 @@ int main(int argc, const char **argv)
     po::store(po::parse_command_line(argc, argv, desc), vm);
 
     if (vm.count("help")) {
-      std::cerr << desc << std::endl;
+      std::cout << desc << std::endl;
       exit(0);
     }
 
@@ -367,8 +367,8 @@ int main(int argc, const char **argv)
     }
 
     re::matched  ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
-    re::oomatched::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
-    re::kc       ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    re::oomatched::main(o, A, B, tau_A, tau_B);
+    re::kc       ::main(o, A, B,        tau_B);
     re::kmer     ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
 
     std::cerr << "Done!" << std::endl;
