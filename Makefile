@@ -25,60 +25,43 @@ LIBS    = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB)
 TEST_LIBS = -lboost_unit_test_framework
 
 .PHONY: all
-all: summarize summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer
-
-force_look:
-	true
+all: ref-eval
 
 boost/finished:
-	cd boost && ./bootstrap.sh && ./b2 && touch finished
+	@echo 
+	@echo -----------------------------------------------
+	@echo - Building a subset of the Boost C++ library. -
+	@echo -----------------------------------------------
+	@echo 
+	cd boost && $(MAKE)
 
 lemon/finished:
-	cd lemon && make
+	@echo 
+	@echo -------------------------------------
+	@echo - Building the Lemon graph library. -
+	@echo -------------------------------------
+	@echo 
+	cd lemon && $(MAKE)
 
 city/finished:
-	cd city && make
-
-summarize_jobs := $(foreach gp, 1 2 3 4 5 6, $(foreach bp, 1 2 3 4 5, $(foreach np, 1 2, $(foreach mpi, 80 95, summarize_${gp}_${bp}_${np}_${mpi}))))
-gp = $(word 1,$(subst _, ,$*))
-bp = $(word 2,$(subst _, ,$*))
-np = $(word 3,$(subst _, ,$*))
-mpi = $(word 4,$(subst _, ,$*))
+	@echo 
+	@echo ----------------------------------
+	@echo - Building the CityHash library. -
+	@echo ----------------------------------
+	@echo 
+	cd city && $(MAKE)
 
 ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished
+	@echo 
+	@echo -----------------------------
+	@echo - Building REF-EVAL itself. -
+	@echo -----------------------------
+	@echo 
 	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) ref-eval.cpp $(LIBS) -o ref-eval
 
-.PHONY: summarize
-summarize: ${summarize_jobs} boost/finished lemon/finished
-${summarize_jobs}: summarize_%: summarize.cpp summarize_meat.hh
-	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) -DGOOD_POLICY=$(gp) -DBETTER_POLICY=$(bp) -DN_POLICY=$(np) -DMIN_PCT_ID=$(mpi) summarize.cpp $(LIBS) -o summarize_$(gp)_$(bp)_$(np)_$(mpi)
+all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_re_matched
 
-summarize_axolotl: summarize_axolotl.cpp summarize_axolotl_meat.hh boost/finished lemon/finished
-	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) summarize_axolotl.cpp $(LIBS) -o summarize_axolotl
-
-summarize_matched: summarize_matched.cpp summarize_matched_meat.hh boost/finished lemon/finished
-	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) summarize_matched.cpp $(LIBS) -o summarize_matched
-
-summarize_oomatched: summarize_oomatched.cpp summarize_oomatched_meat.hh boost/finished lemon/finished
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_oomatched.cpp $(LIBS) -o summarize_oomatched
-
-summarize_kmer: summarize_kmer.cpp summarize_kmer_meat.hh boost/finished lemon/finished
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmer.cpp $(LIBS) -o summarize_kmer
-
-summarize_wkr: summarize_wkr.cpp summarize_wkr_meat.hh boost/finished lemon/finished
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_wkr.cpp $(LIBS) -o summarize_wkr
-
-summarize_aligned_kmer: summarize_aligned_kmer.cpp summarize_aligned_kmer_meat.hh boost/finished lemon/finished
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_aligned_kmer.cpp $(LIBS) -o summarize_aligned_kmer
-
-summarize_multikmer: summarize_multikmer.cpp summarize_multikmer_meat.hh boost/finished lemon/finished
-	$(CC) $(OMP) $(CFLAGS) $(INCLUDE) summarize_multikmer.cpp $(LIBS) -o summarize_multikmer
-
-summarize_kmerpair: summarize_kmerpair.cpp summarize_kmerpair_meat.hh boost/finished lemon/finished
-	$(CC) $(CFLAGS) $(INCLUDE) summarize_kmerpair.cpp $(LIBS) -o summarize_kmerpair
-
-all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_summarize_matched
-
+.PHONY: test
 test: ${all_tests} boost/finished lemon/finished
 	./test_lazycsv
 	./test_line_stream
@@ -89,7 +72,7 @@ test: ${all_tests} boost/finished lemon/finished
 	./test_read_cluster_filter_alignments
 	./test_compute_alignment_stats
 	./test_alignment_segment
-	./test_summarize_matched
+	./test_re_matched
 
 test_lazycsv: test_lazycsv.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) test_lazycsv.cpp $(LIBS) $(TEST_LIBS) -o test_lazycsv
@@ -118,11 +101,12 @@ test_compute_alignment_stats: test_compute_alignment_stats.cpp
 test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_alignment_segment.cpp $(LIBS) $(TEST_LIBS) -o test_alignment_segment
 
-test_summarize_matched: test_summarize_matched.cpp summarize_matched_meat.hh
-	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_summarize_matched.cpp $(LIBS) $(TEST_LIBS) -o test_summarize_matched
+test_re_matched: test_re_matched.cpp re_matched_meat.hh
+	$(CC11) -std=c++11 $(CFLAGS) $(INCLUDE) test_re_matched.cpp $(LIBS) $(TEST_LIBS) -o test_re_matched
 
 .PHONY:
 clean:
-	-rm -f ${summarize_jobs} summarize_axolotl summarize_matched summarize_oomatched summarize_aligned_kmer summarize_kmer summarize_wkr summarize_kmerpair summarize_multikmer ${all_tests}
-	cd lemon && make clean
-	cd city && make clean
+	-rm -f ref-eval ${all_tests}
+	-cd boost && $(MAKE) clean
+	-cd lemon && $(MAKE) clean
+	-cd city && $(MAKE) clean
