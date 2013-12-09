@@ -8,16 +8,12 @@ ifeq ($(shell uname), Linux)
   CC   = g++ -W
   CC11 = g++ -W -std=c++11 
   OMP  = -fopenmp
-  HASH_FUN_H = "<tr1/functional>"
-  HASH_NAMESPACE = "std::tr1"
 endif
 
 ifeq ($(shell uname), Darwin)
   CC   = clang++ -W -Wno-unused-parameter
   CC11 = clang++ -W -Wno-unused-parameter -std=c++11 
   OMP  =
-  HASH_FUN_H = "<functional>"
-  HASH_NAMESPACE = "std"
 endif
 
 # ------------------------
@@ -29,15 +25,15 @@ endif
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
 CFLAGS = -g -O3 $(DEBUG)
-SH_INCLUDE 	  = -Isparsehash -DHASH_FUN_H=$(HASH_FUN_H) -DHASH_NAMESPACE=$(HASH_NAMESPACE)
-DL_INCLUDE 	  = -Ideweylab
 BOOST_INCLUDE = -Iboost
 BOOST_LIB     = boost/stage/lib/libboost_program_options.a boost/stage/lib/libboost_random.a
 LEMON_INCLUDE = -Ilemon/build -Ilemon/lemon-main-473c71baff72
 LEMON_LIB     = lemon/build/lemon/libemon.a -lpthread
 CITY_INCLUDE  = -Icity/install/include
 CITY_LIB      = city/install/lib/libcityhash.a
-INCLUDE = $(SH_INCLUDE) $(DL_INCLUDE) $(BOOST_INCLUDE) $(LEMON_INCLUDE) $(CITY_INCLUDE)
+SH_INCLUDE 	  = -Isparsehash/include
+DL_INCLUDE 	  = -Ideweylab
+INCLUDE = $(BOOST_INCLUDE) $(LEMON_INCLUDE) $(CITY_INCLUDE) $(SH_INCLUDE) $(DL_INCLUDE)
 LIBS    = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB)
 TEST_LIBS = -lboost_unit_test_framework
 
@@ -68,7 +64,15 @@ city/finished:
 	@echo 
 	cd city && $(MAKE)
 
-ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished
+sparsehash/finished:
+	@echo 
+	@echo ------------------------------------
+	@echo - Building the SparseHash library. -
+	@echo ------------------------------------
+	@echo 
+	cd sparsehash && $(MAKE)
+
+ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sparsehash/finished
 	@echo 
 	@echo -----------------------------
 	@echo - Building REF-EVAL itself. -
@@ -127,3 +131,4 @@ clean:
 	-cd boost && $(MAKE) clean
 	-cd lemon && $(MAKE) clean
 	-cd city && $(MAKE) clean
+	-cd sparsehash && $(MAKE) clean
