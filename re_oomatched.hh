@@ -81,13 +81,13 @@ result compute_recall(
   // Run the matching procedure.
   lemon::MaxWeightedMatching<lemon::SmartGraph, lemon::SmartGraph::EdgeMap<double> > wei_mm(graph, wei_map);
   lemon::MaxMatching<lemon::SmartGraph> unw_mm(graph);
-  if (o.weighted)   wei_mm.run();
-  if (o.unweighted) unw_mm.run();
+  if (o.weighted)              wei_mm.run();
+  if (o.unweighted || o.paper) unw_mm.run();
 
   // Compute the recall.
   result recall;
-  if (o.weighted)   recall.weighted   = wei_mm.matchingWeight();
-  if (o.unweighted) recall.unweighted = 1.0*unw_mm.matchingSize()/B.card;
+  if (o.weighted)              recall.weighted   = wei_mm.matchingWeight();
+  if (o.unweighted || o.paper) recall.unweighted = 1.0*unw_mm.matchingSize()/B.card;
 
   // // Output the weighted matching.
   // ofstream wei_fo(wei_mm_fname.c_str());
@@ -150,7 +150,7 @@ void main_1(const opts& o,
     std::cout << "weighted_contig_F1\t"   << compute_F1(precis.weighted,   recall.weighted)   << std::endl;
   }
 
-  if (o.unweighted) {
+  if (o.unweighted || o.paper) {
     std::cout << "unweighted_contig_recall\t" << recall.unweighted << std::endl;
     std::cout << "unweighted_contig_precision\t" << precis.unweighted << std::endl;
     std::cout << "unweighted_contig_F1\t" << compute_F1(precis.unweighted, recall.unweighted) << std::endl;
@@ -165,7 +165,7 @@ void main(const opts& o,
           const expr& unif_A,
           const expr& unif_B)
 {
-  if (o.contig) {
+  if (o.contig || o.paper) {
     if (o.alignment_type == "blast")
       main_1<blast_alignment>(o, A, B, tau_A, tau_B, unif_A, unif_B);
       //throw std::runtime_error("tran is not implemented for blast alignments yet.");

@@ -18,6 +18,9 @@ struct opts
   bool weighted;
   bool unweighted;
 
+  // Paper
+  bool paper;
+
   // Sequences
   std::string A_seqs;
   std::string B_seqs;
@@ -64,6 +67,9 @@ struct opts
     weighted(false),
     unweighted(false),
 
+    // Paper
+    paper(false),
+
     // Sequences
     A_seqs(""),
     B_seqs(""),
@@ -108,6 +114,8 @@ std::ostream& operator<<(std::ostream& os, const opts& o)
 
   if (o.weighted)   os << "weighted"   << "\n";
   if (o.unweighted) os << "unweighted" << "\n";
+
+  if (o.paper) os << "paper" << "\n";
 
   if (o.A_seqs.size()) os << "A_seqs: " << o.A_seqs << "\n";
   if (o.B_seqs.size()) os << "B_seqs: " << o.B_seqs << "\n";

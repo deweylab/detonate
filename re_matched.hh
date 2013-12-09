@@ -430,7 +430,9 @@ void main_1(const opts& o,
   if (o.pair) main_2<pair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "pair_");
   //if (o.kpair) main_2<kpair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "kpair_");
   //if (o.kmer) main_2<kmer_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "kmer_");
-  //if (o.tran) main_2<kmer_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "tran_");
+  //if (o.tran) main_2<tran_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "tran_");
+
+  if (o.paper) compute<nucl_helper>(o, A, B, unif_A, unif_B, A_to_B, B_to_A, "unweighted_nucl_");
 }
 
 void main(const opts& o,
@@ -441,7 +443,7 @@ void main(const opts& o,
           const expr& unif_A,
           const expr& unif_B)
 {
-  if (o.nucl || o.pair) {
+  if (o.nucl || o.pair || o.paper) {
     if (o.alignment_type == "blast")
       main_1<blast_alignment>(o, A, B, tau_A, tau_B, unif_A, unif_B);
     else if (o.alignment_type == "psl")

@@ -184,15 +184,13 @@ void main(
     const expr& unif_A,
     const expr& unif_B)
 {
-  if (o.kc) {
-
+  if (o.kc || o.paper) {
     if (o.hash_table_type == "sparse")
       main_1<sparse_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
     else if (o.hash_table_type == "dense")
       main_1<dense_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
     else
       throw std::runtime_error("Unknown hash map type.");
-
   }
 }
 

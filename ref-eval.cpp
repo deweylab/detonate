@@ -177,26 +177,37 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   }
 
   // Parse scores.
-  std::string scores = vm["scores"].as<std::string>();
-  if (scores.size() == 0)
-    throw po::error("Invalid empty value for --scores.");
-  std::stringstream ss(scores);
-  std::string buf;
-  while (getline(ss, buf, ',')) {
-    if      (buf == "nucl")   { o.nucl   = true; o.alignment_based = true; }
-    else if (buf == "contig") { o.contig = true; o.alignment_based = true; }
-    else if (buf == "pair")   { o.pair   = true; o.alignment_based = true; }
-    else if (buf == "kmer")   { o.kmer   = true; o.alignment_free  = true; }
-    else if (buf == "kc")     { o.kc     = true; o.alignment_free  = true; }
-    else throw po::error("Invalid value for --scores: " + buf);
+  if (vm.count("scores")) {
+    std::string scores = vm["scores"].as<std::string>();
+    if (scores.size() == 0)
+      throw po::error("Invalid empty value for --scores.");
+    std::stringstream ss(scores);
+    std::string buf;
+    while (getline(ss, buf, ',')) {
+      if      (buf == "nucl")   { o.nucl   = true; o.alignment_based = true; }
+      else if (buf == "contig") { o.contig = true; o.alignment_based = true; }
+      else if (buf == "pair")   { o.pair   = true; o.alignment_based = true; }
+      else if (buf == "kmer")   { o.kmer   = true; o.alignment_free  = true; }
+      else if (buf == "kc")     { o.kc     = true; o.alignment_free  = true; }
+      else throw po::error("Invalid value for --scores: " + buf);
+    }
   }
 
   // Parse weighted.
-  std::string weighted = vm["weighted"].as<std::string>();
-  if      (weighted == "yes")  o.weighted   = true;
-  else if (weighted == "no")   o.unweighted = true;
-  else if (weighted == "both") o.weighted = o.unweighted = true;
-  else throw po::error("Invalid value for --weighted: " + weighted);
+  if (vm.count("weighted")) {
+    std::string weighted = vm["weighted"].as<std::string>();
+    if      (weighted == "yes")  o.weighted   = true;
+    else if (weighted == "no")   o.unweighted = true;
+    else if (weighted == "both") o.weighted = o.unweighted = true;
+    else throw po::error("Invalid value for --weighted: " + weighted);
+  }
+
+  // Parse paper.
+  if (vm.count("paper")) {
+    o.paper = true;
+    o.alignment_based = true;
+    o.alignment_free = true;
+  }
 
   // Parse sequences.
   if (!vm.count("A-seqs")) throw po::error("--A-seqs is required.");
@@ -205,18 +216,18 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   o.B_seqs = vm["B-seqs"].as<std::string>();
 
   // Parse expression.
-  if (o.weighted) {
+  if (o.weighted || o.paper) {
     if (!vm.count("A-expr"))
-      throw po::error("--A-expr is required for weighted variants of scores.");
+      throw po::error("--A-expr is required for weighted variants of scores, and for the kc score.");
     if (!vm.count("B-expr"))
-      throw po::error("--B-expr is required for weighted variants of scores.");
+      throw po::error("--B-expr is required for weighted variants of scores, and for the kc score.");
     o.A_expr = vm["A-expr"].as<std::string>();
     o.B_expr = vm["B-expr"].as<std::string>();
   } else {
     if (vm.count("A-expr"))
-      throw po::error("--A-expr is not needed except for weighted variants of scores.");
+      throw po::error("--A-expr is not needed except for weighted variants of scores and the kc score.");
     if (vm.count("B-expr"))
-      throw po::error("--B-expr is not needed except for weighted variants of scores.");
+      throw po::error("--B-expr is not needed except for weighted variants of scores and the kc score.");
   }
 
   // Parse alignments.
@@ -259,7 +270,7 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   o.readlen = vm["readlen"].as<size_t>();
 
   // Parse num reads.
-  if (o.kc) {
+  if (o.kc || o.paper) {
     if (!vm.count("num_reads"))
       throw po::error("--num_reads is required for kc scores.");
     o.num_reads = vm["num_reads"].as<size_t>();
@@ -281,7 +292,7 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
     o.contig_max_frac_indel = 0.01;
 
   // Parse hash-table-type.
-  if (o.kc || o.kmer) {
+  if (o.kc || o.kmer || o.paper) {
     if (vm.count("hash-table-type")) {
       o.hash_table_type = vm["hash-table-type"].as<std::string>();
       if (o.hash_table_type != "sparse" && o.hash_table_type != "dense")
@@ -295,7 +306,7 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   }
 
   // Parse hash-table-fudge-factor.
-  if (o.kc || o.kmer) {
+  if (o.kc || o.kmer || o.paper) {
     if (vm.count("hash-table-fudge-factor")) {
       o.hash_table_fudge_factor = vm["hash-table-fudge-factor"].as<double>();
       if (o.hash_table_fudge_factor < 0)
@@ -340,7 +351,7 @@ int main(int argc, const char **argv)
     std::cerr << "done." << std::endl;
 
     expr tau_A, tau_B;
-    if (o.weighted) {
+    if (o.weighted || o.paper) {
       std::cerr << "Reading the expression..." << std::flush;
       tau_A.resize(A.card);
       tau_B.resize(B.card);
@@ -350,7 +361,7 @@ int main(int argc, const char **argv)
     }
 
     expr unif_A, unif_B;
-    if (o.unweighted) {
+    if (o.unweighted || o.paper) {
       unif_A.assign(A.card, 1.0/A.card);
       unif_B.assign(B.card, 1.0/B.card);
     }
