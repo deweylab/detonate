@@ -146,6 +146,7 @@ test_re_matched: test_re_matched.cpp re_matched.hh
 .PHONY:
 clean:
 	-rm -f ref-eval ${all_tests}
+	-rm -rf *.dSYM
 	-cd boost && $(MAKE) clean
 	-cd lemon && $(MAKE) clean
 	-cd city && $(MAKE) clean
