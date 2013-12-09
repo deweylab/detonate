@@ -1,17 +1,30 @@
+# ------------------
+# - Configuration. -
+# ------------------
+
+# You should edit the following variables as needed for your system.
+
 ifeq ($(shell uname), Linux)
-  CC = g++ -W
-  CC11 = g++ -std=c++11 
-  OMP = -fopenmp
+  CC   = g++ -W
+  CC11 = g++ -W -std=c++11 
+  OMP  = -fopenmp
   HASH_FUN_H = "<tr1/functional>"
   HASH_NAMESPACE = "std::tr1"
 endif
+
 ifeq ($(shell uname), Darwin)
-  CC11 = clang++ -W -Wno-unused-parameter 
   CC   = clang++ -W -Wno-unused-parameter
+  CC11 = clang++ -W -Wno-unused-parameter -std=c++11 
   OMP  =
   HASH_FUN_H = "<functional>"
   HASH_NAMESPACE = "std"
 endif
+
+# ------------------------
+# - Build specification. -
+# ------------------------
+
+# You shouldn't normally need to edit anything below here.
 
 #DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 DEBUG =
