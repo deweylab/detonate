@@ -143,10 +143,13 @@ test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 test_re_matched: test_re_matched.cpp re_matched.hh
 	$(CXX11) $(CXXFLAGS) $(INC) test_re_matched.cpp $(LIB) $(TEST_LIB) -o test_re_matched
 
-.PHONY:
-clean:
+.PHONY: clean
+top-clean:
 	-rm -f ref-eval ${all_tests}
 	-rm -rf *.dSYM
+
+.PHONY: clean
+clean: top-clean
 	-cd boost && $(MAKE) clean
 	-cd lemon && $(MAKE) clean
 	-cd city && $(MAKE) clean
