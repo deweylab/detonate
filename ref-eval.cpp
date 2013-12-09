@@ -135,7 +135,7 @@ void add_options(boost::program_options::options_description& desc)
         "  - y \tis the number of bases in the assembly sequence, and\n"
         "  - z \tis the number of bases in the oracleset sequence.\n"
         "\n"
-        "Default: 0.01.")
+        "Default: 0.01.\n")
     ("hash-table-type", po::value<std::string>(),
         "The type of hash table to use, either \"sparse\" or \"dense\". "
         "This is only relevant for kc and kmer scores. The sparse table "
@@ -150,7 +150,7 @@ void add_options(boost::program_options::options_description& desc)
         "(1) most kmers should be shared by the assembly and the "
         "oracleset, and (2) many kmers will be repeated several "
         "times. However, if you have a lot of memory or a really bad "
-        "assembly, you could try a smaller number. Default: 2.0.")
+        "assembly, you could try a smaller number. Default: 2.0.\n")
   ;
 }
 
