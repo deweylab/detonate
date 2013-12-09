@@ -1,0 +1,12 @@
+ref-eval
+test_lazycsv
+test_line_stream
+test_blast
+test_psl
+test_pairset
+test_mask
+test_read_cluster_filter_alignments
+test_compute_alignment_stats
+test_alignment_segment
+test_re_matched
+*.dSYM
