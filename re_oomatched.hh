@@ -39,9 +39,7 @@ result compute_recall(
     typename Al::input_stream_type& input_stream,
     const fasta& A,
     const fasta& B,
-    const std::vector<double>& tau_B,
-    double frac_identity_thresh,
-    double frac_indel_thresh)
+    const std::vector<double>& tau_B)
 {
   // Create the graph, and add a node for each contig and oracleset element.
   // Also create a reverse mapping from nodes to indices.
@@ -64,10 +62,10 @@ result compute_recall(
   Al al;
   while (input_stream >> al) {
     if (al.is_on_valid_strand(o.strand_specific) &&
-        al.frac_identity_wrt_a() >= frac_identity_thresh && 
-        al.frac_identity_wrt_b() >= frac_identity_thresh &&
-        al.frac_indel_wrt_a() <= frac_indel_thresh &&
-        al.frac_indel_wrt_b() <= frac_indel_thresh) {
+        al.frac_identity_wrt_a() >= o.contig_min_frac_identity && 
+        al.frac_identity_wrt_b() >= o.contig_min_frac_identity &&
+        al.frac_indel_wrt_a() <= o.contig_max_frac_indel &&
+        al.frac_indel_wrt_b() <= o.contig_max_frac_indel) {
       size_t a_idx = A.names_to_idxs.find(al.a_name())->second;
       size_t b_idx = B.names_to_idxs.find(al.b_name())->second;
       lemon::SmartGraph::Edge edge = graph.addEdge(A_nodes[a_idx], B_nodes[b_idx]);
@@ -138,11 +136,8 @@ void main_1(const opts& o,
   typename Al::input_stream_type A_to_B_is(open_or_throw(o.A_to_B));
   typename Al::input_stream_type B_to_A_is(open_or_throw(o.B_to_A));
 
-  double frac_identity_thresh = 0.99; // vm["frac-identity-thresh"].as<double>();
-  double frac_indel_thresh = 0.01; // vm["frac-indel-thresh"].as<double>();
-
-  result recall = compute_recall<Al>(o, A_to_B_is, A, B, tau_B, frac_identity_thresh, frac_indel_thresh);
-  result precis = compute_recall<Al>(o, B_to_A_is, B, A, tau_A, frac_identity_thresh, frac_indel_thresh);
+  result recall = compute_recall<Al>(o, A_to_B_is, A, B, tau_B);
+  result precis = compute_recall<Al>(o, B_to_A_is, B, A, tau_A);
 
   if (o.weighted) {
     std::cout << "weighted_contig_recall\t"   << recall.weighted   << std::endl;
