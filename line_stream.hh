@@ -18,8 +18,8 @@ public:
     return *this;
   }
 
-  inline operator bool() { return *istrm; }
-  inline bool operator!() { return !*istrm; }
+  inline operator bool() { return static_cast<bool>(*istrm); }
+  inline bool operator!() { return !bool(); }
 
 private:
   boost::shared_ptr<std::istream> istrm;

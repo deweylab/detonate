@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 #include <boost/foreach.hpp>
+#include "expr.hh"
+#include "opts.hh"
 #include "blast.hh"
 #include "psl.hh"
 #include "pairset.hh"
@@ -364,14 +366,15 @@ void process_alignments(HelperType&                   helper,
 }
 
 template<typename Helper>
-double compute_recall(const opts& o,
-                      const fasta& A,
-                      const fasta& B,
+double compute_recall(const std::vector<tagged_alignment>& A_to_B,
+                      size_t A_card,
+                      size_t B_card,
+                      std::vector<size_t> B_lengths,
                       const expr& tau_B,
-                      const std::vector<tagged_alignment>& A_to_B)
+                      size_t readlen)
 {
-  Helper h(B.lengths, tau_B, o.readlen);
-  process_alignments(h, A_to_B, A.card, B.card, o.readlen);
+  Helper h(B_lengths, tau_B, readlen);
+  process_alignments(h, A_to_B, A_card, B_card, readlen);
   return h.get_recall();
 }
 
@@ -385,10 +388,10 @@ void compute(const opts& o,
              std::vector<tagged_alignment> B_to_A,
              const std::string& prefix)
 {
-  double precis = compute_recall<Helper>(o, B, A, tau_A, B_to_A);
+  double precis = compute_recall<Helper>(B_to_A, B.card, A.card, A.lengths, tau_A, o.readlen);
   std::cout << prefix << "precision\t" << precis << std::endl;
 
-  double recall = compute_recall<Helper>(o, A, B, tau_B, A_to_B);
+  double recall = compute_recall<Helper>(A_to_B, A.card, B.card, B.lengths, tau_B, o.readlen);
   std::cout << prefix << "recall\t" << recall << std::endl;
 
   double F1 = compute_F1(precis, recall);
