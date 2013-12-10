@@ -11,4 +11,6 @@ To do so, edit ./Makefile and make changes as appropriate to the section marked
 
 REF-EVAL comes with a number of unit tests. To build and run these tests, run
 "make test" from the current directory. A C++11-compatible compiler is required
-to build some of the tests.
+to build some of the tests. To be clear, the tests are mainly useful for
+developers, not normal users of the software. It isn't necessary for users to
+build or run the tests.

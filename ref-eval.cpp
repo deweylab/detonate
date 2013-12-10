@@ -271,6 +271,8 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
     o.alignment_type = vm["alignment-type"].as<std::string>();
     if (o.alignment_type != "blast" && o.alignment_type != "psl")
       throw po::error("Invalid value for --alignment-type: " + o.alignment_type);
+    if (o.alignment_type == "blast")
+      std::cerr << "Warning: Support for --alignment-type=blast is experimental and has not been thoroughly tested yet." << std::endl;
   } else {
     if (vm.count("A-to-B"))
       throw po::error("--A-to-B is not needed except for alignment-based scores.");

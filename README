@@ -1,422 +1,207 @@
-I. BUILD
---------
-
-To compile, do the following:
-
-- pushd boost && ./bootstrap.sh && ./b2 -j 24 && popd
-
-- pushd lemon && make && popd
-
-- make -j 24
-
-
-II. SCORES USED IN PAPER
-------------------------
-
-To just compute the scores used in our paper, use summarize_for_paper.py. Run
-"python3 summarize_for_paper.py --help" for further details.
-
-The contig recall is defined as follows:
-- Align the assembly A to the oracleset B. Notation: each alignment a->b is
-  between a contig a in A and an oracleset element b in B.
-- Throw out alignments that have incorrect strand-specificity.
-- Throw out alignments whose fraction identity wrt a or b is less than 0.99.
-- Throw out alignments whose fraction indel wrt a or b is greater than 0.01.
-- Construct a bipartite graph from the remaining alignments, in which there is
-  an edge between a and b iff there is a remaining alignment a->b.
-- The recall is the number of edges in the maximum cardinality matching of this
-  graph, divided by the number of sequences in the oracleset B.
-
-The contig precision is defined as follows: Interchange the assembly and
-oracleset, and compute the contig recall.
-
-The contig F1 is the harmonic mean of the precision and recall.
-
-The nucleotide recall is defined as follows:
-- Align the assembly A to the oracleset B. Notation: each alignment a->b is
-  between a contig a in A and an oracleset element b in B.
-- Throw out alignments that have incorrect strand-specificity.
-- Throw out alignments that are shorter than the read length.
-- Add each remaining alignment to a priority queue, with priority equal to the
-  number of identical bases in the alignment.
-- Let numer = 0.
-- While the priority queue is not empty:
-  - Pop the alignment a->b with highest priority.
-  - Add the number of identical bases in the alignment to numer.
-  - Subtract a->b from all the other alignments in the queue and update their
-    priorities.
-- Let denom be the total number of nucleotides in the oracleset B.
-- The recall is numer/denom.
-
-The actual implementation uses a more complicated and efficient algorithm than
-the one above.
-
-Alignment subtraction is defined as follows.
-- An alignment l from a to b can be thought of as a set of pairs of disjoint
-  intervals
-    {([as_1, ae_1], [bs_1, be_1]), ..., ([as_n, ae_n], [bs_n, be_n])},
-  where each pair ([as_i, as_i], [bs_i, be_i]) corresponds to an ungapped
-  segment of the alignment: as_i and ae_i are the segment's start and end
-  positions within a, and bs_i and be_i are the segment's start and end
-  positions within b. In the case of non-strand-specific alignments, bs_i might
-  be greater than be_i.
-- If l is an alignment from a to b, l' is an alignment from a' to b', a != a',
-  and b != b', then the difference l - l' = l.
-- If l is an alignment from a to b, l' is an alignment from a' to b', a == a',
-  and b != b', then the difference l - l' = l'', defined as follows. Each
-  alignment segment of l is compared to the alignment segments of l'. If a
-  segment of l overlaps one of the segments of l' wrt a, it is truncated so as
-  to avoid the overlap. This truncation may result in zero, one, or two
-  replacement alignment segments. (If the overlapping alignment segment of l'
-  is contained strictly within the segment of l, wrt a, two segments will
-  result.)
-- If l is an alignment from a to b, l' is an alignment from a' to b', a != a',
-  and b == b', then the difference l - l' = l'', defined similarly, except
-  overlaps are examined and resolved wrt b.
-
-The nucleotide precision is defined as follows: Interchange the assembly and
-oracleset, and compute the nucleotide recall.
-
-The nucleotide F1 is the harmonic mean of the precision and recall.
+I. BUILDING
+-----------
+
+To build REF-EVAL, simply run "make" from the current directory. This will
+build a single executable (plus a few dependent libraries), ./ref-eval, which
+you can run from the current directory or move elsewhere. (The executable is
+statically linked with the local dependencies, so you don't need to worry about
+the library path.)
+
+If the "make" command fails, you might need to tweak the build process a bit.
+To do so, edit ./Makefile and make changes as appropriate to the section marked
+"Configuration". Then run "make" again.
+
+REF-EVAL comes with a number of unit tests. To build and run these tests, run
+"make test" from the current directory. A C++11-compatible compiler is required
+to build some of the tests. To be clear, the tests are mainly useful for
+developers, not normal users of the software. It isn't necessary for users to
+build or run the tests.
+
+
 
-The rest of this document describes other scores.
-
-III. PRECISION-RECALL-F1
------------------------
-
-After you have run make, there will be a bunch of programs named things like
-summarize_4_3_2_95. These are the main programs of interest for computing
-precision-recall-F1 scores.
-
-The numbers at the end of each program's name indicate certain policy choices.
-(Obviously, it would be better to pass these as command-line arguments, but so
-be it.) The name is broken down as follows:
-
-    summarize_${gp}_${bp}_${np}_${mpi}
-
-where gp is the "good policy", bp is the "better policy", np is the "N policy",
-and mpi is the "minimum percent identity". The definitions and possible values
-for these are detailed under "Policy choices" below. For now, I recommend gp=4,
-bp=3, np=2, and mpi=95 or mpi=80. Thus, you would run summarize_4_3_2_95.
-
-
-II.A. Parameters
-----------------
-
-To run this program (whichever variant you choose), you would do something
-like the following:
-
-    ./summarize_4_3_2_95 --A-seqs trinity_default.fa \
-                         --B-seqs cc_0.fa \
-                         --A-expr trinity_default_expression/expression.isoforms.results \
-                         --B-expr cc_0_expression/expression.isoforms.results \
-                         --A-to-B trinity_default_to_cc_0.psl \
-                         --B-to-A cc_0_to_trinity_default.psl \
-                         --alignment-type psl \
-                         --strand_specific \
-                         --plot-output tmp_plot_output
-
-Here, "A" refers to the assembly, and "B" refers to the reference. (We have
-been using an "oracleset" rather than the collection of reference transcripts
-directly, but that is not necessary, depending on your goals.)
-
-"--A-expr" and "--B-expr" should be the expression.isoforms.results files
-produced by RSEM_eval or classical RSEM. If these are not available, you can
-pass --no-expr instead; in that, case, the "weighted" scores (described below)
-will not be computed.
-
-"--A-to-B" and "--B-to-A" should be the psl files produced by
-
-    blat -minIdentity=80 B.fa A.fa A_to_B.psl
-    blat -minIdentity=80 A.fa B.fa B_to_A.psl
-
-respectively, where (again) A.fa is the assembly and B.fa is the reference.
-
-"--alignment-type" should always be "psl" if you are comparing to a transcript
-reference. 
-
-(If you are comparing to a protein reference, then "--alignment-type" should be
-"blast". In that case, "--A-to-B" and "--B-to-A" should be the results of
-blastx and tblastn, respectively, with outfmt "6 qseqid qlen sseqid slen qstart
-qend sstart send qseq sseq evalue bitscore score length pident nident mismatch
-positive gapopen gaps ppos qframe sframe".)
-
-If you pass "--strand-specific", then it is assumed that all contigs are in the
-same orientation as the reference transcripts. (Only implemented for psl
-alignments.)
-
-"--plot-output" is the prefix of two files that will be created. These are so
-far mainly for our internal use, and you can ignore them for now.
-
-
-II.B. Output
-------------
-
-A bunch of scores are printed on stdout. Each score's name follows the
-following pattern:
-
-  ${wei}_${clu}_${pnt}_${prf}
-
-First, prf is either "precision", "recall", or "F1". Here:
-
-- Recall measures what fraction of items (transcripts, nucleotides, or pairs)
-  from the oracleset are correctly predicted by the assembly. (The definition
-  of "correctly predicted" is determined by the good and better policies,
-  described in "Policy choices" below.)
-
-- Precision measures what fraction of items from the assembly is correctly
-  predicted by the oracleset. In the rest of the document, we only describe how
-  we define and compute recall, because in order to define/compute precision,
-  we simply interchange the assembly and the oracleset and then compute the
-  recall.
-
-- F1 is the harmonic mean of the precision and recall.
-
-Second, pnt is either "pair", "nucl", or "tran". Here:
-
-- Transcript recall measures what fraction of transcripts in the oracleset
-  satisfy the following criterion:
-
-    >= (minimum percent identity) of the transcript's bases are (i) aligned to
-    a base in some contig (in the assembly), and (ii) are identical to that
-    base.
-
-- Nucleotide recall measures what fraction of nucleotides in the oracleset
-  satisfy (i) and (ii) from the previous item.
-
-- Pair recall measures what fraction of pairs of nucleotides in the oracleset
-  satisfy (i) there is a single ungapped alignment segment, with no indels,
-  involving both bases of this pair, (ii) each base in the pair is identical to
-  its corresponding base in the contig.
-
-  For example, consider the reference B (with one transcript) and assembly A
-  (with two contigs), where horizontal position indicates alignment.
-
-      B: b  =  AGCTCGACGT 
-      A: a1 =  AGCT
-         a2 =      CGACGT
-
-  Here, the transcript recall is 0 (because neither a1 nor a2 covers b to >= 95
-  percent), but the nucleotide recall is 1 (becuase a1 and a2 jointly cover b
-  completely). The pair recall is somewhere in between, because the following
-  pairs of b are correctly predicted (represented by an indicator matrix):
-
-          First base
-      S   AGCTCGACGT
-      e A 1111
-      c G 1111
-      o C 1111
-      n T 1111
-      d C     111111
-        G     111111
-      b A     111111
-      a C     111111
-      s G     111111
-      e T     111111
-   
-Third, clu is either "clustered" or "filtered". For filtered recall, we require
-a 1-1 match between contigs and reference transcripts. For clustered recall, we
-allow more than one contig to map to the same reference transcript. (This is
-discussed further under "Algorithm" below.)
-
-Fourth, wei is either "weighted" or "unweighted". 
-
-- For unweighted, each transcript's contribution to the recall is counted
-  equally. 
-  
-- For weighted, each transcript's contribution to the recall is weighted by the
-  TPM of the transcript.
-
-  One way to think about this is that unweighted recall looks at how well
-  "types" of transcripts (etc.) are recovered, while weighted recall looks at
-  how well transcript "tokens" are recovered.
-
-  For example, if the reference has two transcripts b1 and b1, with:
-
-         TPM/1e-6   length   (num identical nucls)  (num identical pairs)
-    ---------------------------------------------------------------------
-    b1   0.3        100      98                     3000                 
-    b2   0.7        200      50                     1275                 
-
-  then unweighted transcript recall is 0.5, but weighted transcript recall is
-  only 0.3. 
-    
-  (This is because b1 has 98% of its nucleotides covered by an alignment and
-  identical to the corresponding base, but b2 only has 25% of its nucleotides
-  covered. Thus, only b1 is counted toward the transcript recall.)
-
-  The interpretation is that 50% of the different types of transcripts were
-  correctly recalled, and 30% of the transcript tokens (molecules) really
-  present in the sample represented by our reads were correctly recalled.
-
-  The definition and interpretation of weighted vs unweighted in the context of
-  pair and nucleotide measures is similar:
-
-      weighted nucl recall = (0.3*98 + 0.7*50) / (0.3*100 + 0.7*200)
-    unweighted nucl recall = (0.5*98 + 0.5*50) / (0.5*100 + 0.5*200)
-                           = (    98 +     50) / (    100 +     200)
-
-      weighted pair recall = (0.3*3000 + 0.7*1275) / (0.3*100*101/2 + 0.7*200*201/2)
-    unweighted pair recall = (0.5*3000 + 0.5*1275) / (0.5*100*101/2 + 0.5*200*201/2)
-                           = (    3000 +     1275) / (    100*101/2 +     200*201/2)
-
-
-II.C. Algorithm
----------------
-
-At a high level, the algorithm to compute the various scores is as follows:
-
-  - Make oracleset, the contiguous fragments of reference transcripts that are
-    covered by at least one read. (As I said earlier, this step is option. You
-    could also use the set of reference transcripts directly. It depends on
-    what you want to do.)
-
-  - Compute recall:
-
-    - Align contigs against oracleset using blat -minIdentity=80.
-
-    - Discard alignments that are not good enough (good policy).
-
-    - For each contig, choose the best alignment (best policy) to some
-      oracleset element. Discard other alignments.
-
-    - If "filtered": [*]
-      - For each oracleset element, choose the best alignment (best policy)
-        from some contig. Discard other alignments.
-
-    - Based on the remaining alignments, calculate the pair, nucleotide, and
-      transcript recall:
-
-      - Pair: The fraction of pairs of oracleset bases that are covered by an
-        alignment (within one segment).
-
-      - Nucleotide: The fraction of oracleset nucleotides that are covered by
-        an alignment.
-
-      - Transcript: The fraction of transcripts in which >= (minimum percent
-        identity) of bases are covered by an alignment.
-
-  - Compute precision: Interchange the oracleset and assembly and do the above.
-
-  - Compute F1 as the harmonic mean of precision and recall.
-
-[*] If "clustered", this step is skipped. The result is that more than one
-alignment (from more than one contig) can involved the same oracleset element.
-
-
-Note that together, "filtered" and the good policy "gp4" simplify the
-algorithm, so that the core part is as follows:
-
-- Align contigs against oracleset using blat -minIdentity=80.
-- For each contig, choose the best alignment to some oracleset element. Discard
-  other alignments.
-- For each oracleset element, choose the best alignment from some contig.
-  Discard other alignments.
-- Based on the remaining alignments, calculate the pair, nucleotide, and
-  transcript recall: ...
-
-
-II.D. Policy choices
---------------------
-
-- The good policy determines which alignments are considered "good enough" to
-  be used. Choices:
-
-  - gp1: al.frac_identity_wrt_a() >= MFI && al.frac_indel_wrt_a() <= 0.0;
-
-  - gp2: (al.frac_identity_wrt_a() >= MFI && al.frac_indel_wrt_a() <= 0.0) ||
-         (al.frac_identity_wrt_b() >= MFI && al.frac_indel_wrt_b() <= 0.0);
-
-  - gp3: al.frac_identity_wrt_a() >= MFI || al.frac_identity_wrt_b() >= MFI;
-
-  - gp4: return true, i.e., all alignments found by blat are good enough
-
-  - gp5: al.frac_identity_wrt_b() >= MFI;
-
-  - gp6: al.frac_identity_wrt_a() >= MFI && al.frac_identity_wrt_b() >= MFI;
-
-  Here, MFI (min fraction identity) is the minimum percent identity, divided by
-  100.
-
-  Some of these choices do not make that much sense, and are kept around for
-  now for our internal convenience.
-
-  I recommend gp4, because it is the simplest and easiest to understand.
-
-  Note: For blast alignments, in addition to the above, all alignments are
-  required to have evalue <= 1e-5.
-
-  Note: If --strand-specific is given, then all alignments are required to put
-  their contig and transcript (i.e., query and target) on the same strand.
-
-- The better policy determines which alignments will be considered better than
-  others, and hence ultimately used. (See description under "Algorithm".)
-  Choices:
-
-  - bp1:
-    return (al.frac_identity_wrt_a() > ref.frac_identity_wrt_a
-            || (al.frac_identity_wrt_a() == ref.frac_identity_wrt_a && al.frac_indel_wrt_a() == ref.frac_indel_wrt_a));
-
-  - bp2:
-    double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
-    double d2 = -(al.frac_indel_wrt_a()  - ref.frac_indel_wrt_a);
-    double d3 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
-    double d4 = -(al.frac_indel_wrt_b()  - ref.frac_indel_wrt_b);
-    return d1 > 0 || (d1 == 0 && d2 > 0)
-                  || (d1 == 0 && d2 == 0 && d3 > 0)
-                  || (d1 == 0 && d2 == 0 && d3 == 0 && d4 > 0);
-
-  - bp3:
-    double d1 = al.frac_identity_wrt_a() - ref.frac_identity_wrt_a;
-    double d2 = al.frac_identity_wrt_b() - ref.frac_identity_wrt_b;
-    return d1 > 0 || (d1 == 0 && d2 > 0);
-
-  - bp4:
-    double d1 = 1.0*al.num_identity() - 1.0*ref.al.num_identity();
-    double d2 = -(1.0*al.num_indel()  - 1.0*ref.al.num_indel());
-    return d1 > 0 || (d1 == 0 && d2 > 0);
-
-  I recommend bp3 because it is most related to the recall score actually
-  trying to be coherently defined. The recall doesn't really care (except for
-  pair) about indels or the raw number of identical bases. It mainly cares
-  about the fraction identity achieved.
-
-- The N policy determines how "N" bases are treated. 
-
-  - np1: "N" != "N", i.e., "N" is special and not equal to itself.
-  
-  - np2: "N" == "N", i.e., "N" is treated like any real base.
-
-  Although np1 makes more sense when one puts it like the above, np2 ends up
-  being simpler to implement consistently. At least for the data we have been
-  using, the difference between np1 and np2 is neglibile. 
-  
-  Therefore, we have been using np2, and this is what I recommend.
-
-- The minimum percent identity is used to determine whether a transcript is
-  considered to have been correctly predicted (i.e., recalled), and also
-  possibly whether an alignment is good enough. See above. Choices are 95% or
-  80%.
-
-  We have been focusing on 95% but 80% is arguably more reasonable, and perhaps
-  also more conventional.
-
-
-
-IV. KMER JENSEN-SHANNON
-------------------------
-
-This program calculates the Jensen-Shannon divergence (and some other info)
-between the distribution over kmers induced by the assembly and the
-distribution over kmers (of the same length) by the reference. Here, k is
-chosen to be the read length.
-
-./summarize_kmer --A-seqs trinity_default.fa \
-                 --B-seqs cc_0.fa \
-                 --A-expr trinity_default_expression/expression.isoforms.results \
-                 --B-expr cc_0_expression/expression.isoforms.results \
-                 --readlen 76
-
-The relevant fields are weighted_kmer_probs_JS_at_one and
-unweighted_kmer_probs_JS_at_one. As in Section II, "weighted" looks at "tokens"
-and "unweighted" looks at "types".
+II. RUNNING
+-----------
+
+To run REF-EVAL, just run ./ref-eval with appropriate options. Here is an
+example:
+
+./ref-eval --scores=nucl,pair \
+           --weighted=both \
+           --A-seqs test/trinity_default.fa \
+           --B-seqs test/cc_0.fa \
+           --A-expr test/trinity_default_expression.isoforms.results \
+           --B-expr test/cc_0_expression.isoforms.results \
+           --A-to-B test/trinity_default_to_cc_0.psl \
+           --B-to-A test/cc_0_to_trinity_default.psl \
+           --alignment-type psl \
+           --readlen 76 \
+           | tee scores.txt
+
+Further details are described in the rest of this section. See also ./ref-eval
+--help for more information.
+
+
+II. A. Score specification
+--------------------------
+
+First, you need to specify which groups of scores to compute, using the
+--scores option, with the values separated by commas (e.g.,
+--scores=nucl,contig,kc). It is more efficient to compute all the scores you
+are interested in using one invocation of REF-EVAL instead of using multiple
+invocations that each compute one score. The available score groups are as
+follows:
+
+  Alignment-based score groups:
+  - nucl:   nucleotide precision, recall, and F1.
+  - contig: contig precision, recall, and F1.
+  - pair:   pair precision, recall, and F1.
+
+  Alignment-free score groups:
+  - kmer:   kmer Kullback-Leibler divergence,
+            Jensen-Shannon divergence, and
+            Hellinger distance.
+  - kc:     kmer recall, number of nucleotides, and
+            kmer compression score.
+
+You also need to specify whether to compute weighted or unweighted variants of
+scores. In weighted variants, the expression levels (TPM) of the contigs and
+oracleset sequences are taken into account (and hence need to be specified).
+Unweighted variants are equivalent to weighted variants with uniform
+expression. To specify whether to compute weighted or unweighted variants of
+scores, or both, use the --weighted option (e.g., --weighted=yes):
+
+  - yes:  compute weighted variants of scores.
+  - no:   compute unweighted variants of scores.
+  - both: compute both weighted and unweighted
+          variants of scores.
+
+As an alternative to the above, if you are only interested in computing the
+scores described in the main text of our paper [1], you can pass the --paper
+flag instead of the --scores and --weighted options. In that case, the
+following scores will be computed:
+
+  Alignment-based scores:
+  - unweighted nucleotide F1
+  - unweighted contig F1
+
+  Alignment-free score groups:
+  - weighted kmer compression score
+
+
+II. B. Assembly and oracleset information
+-----------------------------------------
+
+You need to specify both the assembly (--A-seqs) and the reference or oracleset
+(--B-seqs) to which the assembly is being compared. Both files should be in
+FASTA format.
+
+Depending on the scores groups and/or weighted variants you choose to compute,
+you may need to specify --A-expr, --B-expr, --A-to-B, and --B-to-A.
+
+The options --A-expr and --B-expr specify the assembly and oracleset
+expression, respectively, for use in weighted scores. Their file formats should
+match those produced by RSEM in a file called *.isoforms.results.
+
+The options --A-to-B and --B-to-A specify the alignments of the assembly to the
+oracleset and vice versa. The file format is specified by --alignment-type; it
+can be either --alignment-type=psl or --alignment-type=blast. Currently, BLAST
+support is experimental, and you should use the PSL format if possible.
+
+If the flag --strand-specific is present, it is assumed that all the assembly
+and oracleset sequences have the same orientation. Thus, alignments or kmer
+matches that are to the reverse strand are ignored.
+
+
+II. C. Miscellaneous parameters
+-------------------------------
+
+Several miscellaneous parameters are also of importance. (FIXME: Turn this into
+a narrative.)
+
+  --readlen arg                  The read length of the reads used to build the
+                                 assembly. Required.
+                                 
+  --num_reads arg                The number of reads used to build the 
+                                 assembly. Required for kc scores.
+                                 
+  --contig-min-frac-identity arg This option only applies to contig scores. 
+                                 Alignments with fraction identity less than 
+                                 this threshold are ignored. The fraction 
+                                 identity of an alignment is min(x/y, x/z), 
+                                 where 
+                                 
+                                   - x is the number of bases that are 
+                                       identical in the assembly sequence and 
+                                       the oracleset sequence, according to the
+                                       alignment,
+                                   - y is the number of bases in the assembly 
+                                       sequence, and
+                                   - z is the number of bases in the oracleset 
+                                       sequence.
+                                 
+                                 Default: 0.99.
+                                 
+  --contig-max-frac-indel arg    This option only applies to contig scores. 
+                                 Alignments with fraction indel greater than 
+                                 this threshold are ignored. For psl 
+                                 alignments, the fraction indel of an alignment
+                                 is max(w/y, x/z), where 
+                                 
+                                   - w is the number of bases that are inserted
+                                       in the assembly sequence, according to 
+                                       the alignment ("Q gap bases"),
+                                   - x is the number of bases that are inserted
+                                       in the oracleset sequence, according to 
+                                       the alignment ("T gap bases"),
+                                   - y is the number of bases in the assembly 
+                                       sequence, and
+                                   - z is the number of bases in the oracleset 
+                                       sequence.
+                                 
+                                 For blast alignments, the fraction indel of an
+                                 alignment is max(x/y, x/z), where 
+                                 
+                                   - x is the number of gaps bases that are 
+                                       inserted in the oracleset sequence, 
+                                       according to the alignment ("gaps"),
+                                   - y is the number of bases in the assembly 
+                                       sequence, and
+                                   - z is the number of bases in the oracleset 
+                                       sequence.
+                                 
+                                 Default: 0.01.
+                                 
+  --hash-table-type arg          The type of hash table to use, either "sparse"
+                                 or "dense". This is only relevant for kc and 
+                                 kmer scores. The sparse table is slower but 
+                                 uses less memory. The dense table is faster 
+                                 but uses more memory. Default: "sparse".
+                                 
+  --hash-table-fudge-factor arg  This is only relevant for kc and kmer scores. 
+                                 When the hash table is created, its initial 
+                                 capacity is set as the total worst-case number
+                                 of possible kmers in the assembly and 
+                                 oracleset, based on each sequence's length, 
+                                 divided by the fudge factor. The default, 2.0,
+                                 is often reasonable because (1) most kmers 
+                                 should be shared by the assembly and the 
+                                 oracleset, and (2) many kmers will be repeated
+                                 several times. However, if you have a lot of 
+                                 memory or a really bad assembly, you could try
+                                 a smaller number. Default: 2.0.
+
+II. D. Output
+-------------
+
+REF-EVAL outputs its scores on stdout. Each line of output contains two
+tab-separated fields. The first field contains the score's name, and the second
+field contains the score's value.
+
+Progress and error messages are printed on stderr.
+
+
+
+III. SCORE DEFINITIONS
+----------------------
+
+FIXME: Finish this...
