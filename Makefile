@@ -98,7 +98,7 @@ ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sparsehash/fi
 	@echo 
 	$(CXX) $(OMP) $(CXXFLAGS) $(INC) ref-eval.cpp $(LIB) -o ref-eval
 
-all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_read_cluster_filter_alignments test_compute_alignment_stats test_alignment_segment test_re_matched
+all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_read_cluster_filter_alignments test_alignment_segment test_re_matched
 
 .PHONY: test
 test: ${all_tests} boost/finished lemon/finished
@@ -109,7 +109,6 @@ test: ${all_tests} boost/finished lemon/finished
 	./test_pairset --show_progress
 	./test_mask
 	./test_read_cluster_filter_alignments
-	./test_compute_alignment_stats
 	./test_alignment_segment
 	./test_re_matched
 
@@ -133,9 +132,6 @@ test_mask: test_mask.cpp
 
 test_read_cluster_filter_alignments: test_read_cluster_filter_alignments.cpp
 	$(CXX11) $(CXXFLAGS) $(INC) test_read_cluster_filter_alignments.cpp $(LIB) $(TEST_LIB) -o test_read_cluster_filter_alignments
-
-test_compute_alignment_stats: test_compute_alignment_stats.cpp
-	$(CXX11) $(CXXFLAGS) $(INC) test_compute_alignment_stats.cpp $(LIB) $(TEST_LIB) -o test_compute_alignment_stats
 
 test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 	$(CXX11) $(CXXFLAGS) $(INC) test_alignment_segment.cpp $(LIB) $(TEST_LIB) -o test_alignment_segment
