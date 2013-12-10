@@ -12,15 +12,15 @@
 # - CXX11 is only needed to build the tests. You can ignore it if you just want
 #   to build the main REF-EVAL package. On some systems, the default GCC is
 #   somewhat old (e.g., GCC 4.4.6 on RHEL 6.3), and might not support C++11. In
-#   that case, either just run the tests somewhere else or specify a newer
+#   that case, either just run the tests somewhere else or install a newer
 #   version of GCC and update CXX11 accordingly.
 #
 # - OMP should be -fopenmp if OpenMP is suppported by your compiler, and you
 #   want to be able to run in multithreaded mode. OpenMP is supported by GCC,
 #   but not (as of this writing) by the version of Clang distributed by Apple.
 #   If you want to use -fopenmp on a Mac, it is easy to install GCC from
-#   macports. If you do so, you'll want to update CXX below to use macports'
-#   g++ instead of clang++.
+#   MacPorts (http://www.macports.org/). If you do so, you'll want to update
+#   CXX below to use MacPorts' g++ instead of clang++.
 
 ifeq ($(shell uname), Linux)
   CXX   = g++
@@ -104,7 +104,7 @@ ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sparsehash/fi
 all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_alignment_segment test_re_matched
 
 .PHONY: test
-test: ${all_tests} boost/finished lemon/finished
+test: test_msg ${all_tests} boost/finished lemon/finished city/finished sparsehash/finished
 	./test_lazycsv
 	./test_line_stream
 	./test_blast
@@ -113,6 +113,14 @@ test: ${all_tests} boost/finished lemon/finished
 	./test_mask
 	./test_alignment_segment
 	./test_re_matched
+
+.PHONY: test_msg
+test_msg:
+	@echo 
+	@echo -------------------------------------------
+	@echo - Building and/or running REF-EVAL tests. -
+	@echo -------------------------------------------
+	@echo 
 
 test_lazycsv: test_lazycsv.cpp
 	$(CXX) $(CXXFLAGS) $(INC) test_lazycsv.cpp $(LIB) $(TEST_LIB) -o test_lazycsv

@@ -1,0 +1,14 @@
+To build REF-EVAL, simply run "make" from the current directory. This will
+build a single executable (plus a few dependent libraries), ./ref-eval, which
+you can run from the current directory or move elsewhere. (The executable is
+statically linked with the local dependencies, so you don't need to worry about
+the library path.) For information about how to run REF-EVAL once it is built,
+see ./README.
+
+If the "make" command fails, you might need to tweak the build process a bit.
+To do so, edit ./Makefile and make changes as appropriate to the section marked
+"Configuration". Then run "make" again.
+
+REF-EVAL comes with a number of unit tests. To build and run these tests, run
+"make test" from the current directory. A C++11-compatible compiler is required
+to build some of the tests.
