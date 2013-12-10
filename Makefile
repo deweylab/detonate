@@ -2,7 +2,10 @@
 # - Configuration. -
 # ------------------
 
-# You should edit the following variables as needed for your system.
+# You should edit the following variables as needed for your system. It is very
+# likely that you don't need to edit anything if you just want to build the
+# main ref-eval executable on Linux or Mac. In that case, just type "make" and
+# wait for everything to compile.
 #
 # Notes:
 #
@@ -37,7 +40,7 @@ endif
 
 # You shouldn't normally need to edit anything below here.
 
-CXXFLAGS       = -W -g -O3
+CXXFLAGS       = -W -Wno-unused-parameter -g -O3
 CXXFLAGS_DEBUG = -g3 -fno-inline -O0 -Wall -Wextra 
 BOOST_INC = -Iboost
 BOOST_LIB = boost/stage/lib/libboost_program_options.a boost/stage/lib/libboost_random.a
