@@ -1,0 +1,13 @@
+bcftools/bcftools
+bcftools/libbcf.a
+bcftools/*.o
+misc/*.o
+misc/maq2sam-long
+misc/maq2sam-short
+misc/md5fa
+misc/md5sum-lite
+misc/seqtk
+misc/wgsim
+samtools
+libbam.a
+*.o

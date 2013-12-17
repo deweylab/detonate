@@ -48,18 +48,20 @@ LEMON_INC = -Ilemon/build -Ilemon/lemon-main-473c71baff72
 LEMON_LIB = lemon/build/lemon/libemon.a -lpthread
 CITY_INC  = -Icity/install/include
 CITY_LIB  = city/install/lib/libcityhash.a
+SAM_INC  = -I.
+SAM_LIB  = sam/libbam.a
 SH_INC 	  = -Isparsehash/include
 DL_INC 	  = -Ideweylab
-INC = $(BOOST_INC) $(LEMON_INC) $(CITY_INC) $(SH_INC) $(DL_INC)
-LIB = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB)
+INC = $(BOOST_INC) $(LEMON_INC) $(CITY_INC) $(SAM_INC) $(SH_INC) $(DL_INC)
+LIB = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB) $(SAM_LIB)
 TEST_LIB = boost/stage/lib/libboost_unit_test_framework.a
 
 .PHONY: all
-all: ref-eval
+all: ref-eval ref-eval-build-true-assembly
 
 .PHONY: debug
 debug: CXXFLAGS += $(CXXFLAGS_DEBUG)
-debug: ref-eval
+debug: ref-eval ref-eval-build-true-assembly
 
 boost/finished:
 	@echo 
@@ -85,6 +87,14 @@ city/finished:
 	@echo 
 	cd city && $(MAKE)
 
+sam/libbam.a:
+	@echo 
+	@echo ----------------------------------
+	@echo - Building the CityHash library. -
+	@echo ----------------------------------
+	@echo 
+	cd sam && $(MAKE)
+
 sparsehash/finished:
 	@echo 
 	@echo ------------------------------------
@@ -93,13 +103,21 @@ sparsehash/finished:
 	@echo 
 	cd sparsehash && $(MAKE)
 
-ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sparsehash/finished
+ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
 	@echo 
 	@echo -----------------------------
 	@echo - Building REF-EVAL itself. -
 	@echo -----------------------------
 	@echo 
 	$(CXX) $(OMP) $(CXXFLAGS) $(INC) ref-eval.cpp $(LIB) -o ref-eval
+
+ref-eval-build-true-assembly: ref-eval-build-true-assembly.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
+	@echo 
+	@echo ------------------------------------------------
+	@echo - Building program to build the true assembly. -
+	@echo ------------------------------------------------
+	@echo 
+	$(CXX) $(CXXFLAGS) $(INC) ref-eval-build-true-assembly.cpp $(LIB) -lz -o ref-eval-build-true-assembly
 
 all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_alignment_segment test_re_matched
 
@@ -148,7 +166,7 @@ test_re_matched: test_re_matched.cpp re_matched.hh
 
 .PHONY: clean
 top-clean:
-	-rm -f ref-eval ${all_tests}
+	-rm -f ref-eval ref-eval-build-true-assembly ${all_tests}
 	-rm -rf *.dSYM
 
 .PHONY: clean

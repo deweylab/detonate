@@ -22,6 +22,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <time.h>
 #include <boost/random/random_device.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
@@ -179,4 +180,17 @@ double compute_F1(double precis, double recall)
     return 0.0;
   else
     return 2*precis*recall/(precis+recall);
+}
+
+std::string curtime()
+{
+  time_t t;
+  struct tm *timeinfo;
+  char buf[80];
+
+  time(&t);
+  timeinfo = localtime(&t);
+  strftime(buf, 80, "%Y-%m-%d %H:%M:%S :: ", timeinfo);
+
+  return std::string(buf);
 }
