@@ -387,7 +387,7 @@ void output(
   // }
 }
 
-void print_help(std::ostream& os)
+void print_help()
 {
   std::cout <<
   "Overview\n"
@@ -530,113 +530,6 @@ void print_help(std::ostream& os)
   << std::flush;
 }
 
-boost::program_options::options_description make_options_old()
-{
-  namespace po = boost::program_options;
-
-  po::options_description desc(
-      "General options\n"
-      "---------------\n", 80, 72);
-  desc.add_options()
-    ("help,?", "Display this information.\n");
-
-  po::options_description data(
-      "Input/output specification\n"
-      "--------------------------\n", 80, 72);
-  data.add_options()
-    ("reference", po::value<std::string>(),
-        "\nThe prefix of the reference built by rsem-prepare-reference. "
-        "Required.\n")
-    ("expression", po::value<std::string>(),
-        "\nThe prefix of the expression built by rsem-calculate-expression. "
-        "Required.\n")
-    ("assembly", po::value<std::string>(),
-        "\nA prefix to write the \"true\" assembly or sequence of assemblies "
-        "to. The suffix \"_x.fa\" will be appended to this prefix, where "
-        "x is the overlap size. Required.\n")
-        //"Either:\n"
-        //"(1) \tThe file name to write the assembly to, if --min-overlap is "
-        //      "a single integer.\n"
-        //"Or:\n"
-        //"(2) \tA prefix to write the sequence of assemblies to, if "
-        //      "--min-overlap is a range of integers. For example, if "
-        //      "--output=./truth_ --min-overlap=2,4 is given, "
-        //      "then the assembly with overlap 2 will be written to "
-        //      "./truth_2.fa, etc.\n")
-    ;
-  desc.add(data);
-
-  po::options_description params(
-      "Parameters that change the output\n"
-      "---------------------------------\n", 80, 72);
-  params.add_options()
-    ("min-overlap", po::value<std::string>(),
-        "\nEither:\n"
-        "\n"
-        "(1) \tAn integer that specifies how much overlap between two reads "
-              "is required to merge two reads. For example, if "
-              "--min-overlap=3, then only reads whose chosen alignments "
-              "overlap by at least 3 bases will be joined into contigs. "
-              "If --min-overlap=0, then only reads whose chosen alignments "
-              "are contiguous (or overlap by a positive amount) will be "
-              "joined into contigs.\n"
-        "\n"
-        "Or:\n"
-        "\n"
-        "(2) \tA pair of integers, separated by commas, specifying a range "
-              "of overlap sizes, as described above. For example, if "
-              "--min-overlap=2,4 is given, then three assemblies will be "
-              "produced, corresponding to --min-overlap=2, --min-overlap=3, "
-              "and --min-overlap=4. You might use this option to compute "
-              "ideal assemblies at all overlap sizes, e.g., "
-              "--min-overlap=0,76 for 76-length reads.\n"
-        "\n"
-        "Default: 0.\n")
-    ("min-alignment-prob", po::value<double>(),
-        "\nA number between 0 and 1 (inclusive). "
-        "Any alignment (of a read to a reference transcript) with "
-        "posterior probability, as calculated by RSEM, less than this "
-        "value will be discarded. Noise reads, with posterior probability "
-        "exactly 0, are always discarded. Default: 0.\n")
-    ("alignment-policy", po::value<std::string>(),
-        "\nThe policy used to choose which alignment(s) of each read to "
-        "use in constructing the \"true\" assembly. Options:\n"
-        "\n"
-        "- sample: \tFor each read, sample a single alignment (to some "
-                    "reference transcript) according to the posterior "
-                    "probability that the read follows each alignment, "
-                    "as calculated by RSEM.\n"
-        "- best:   \tFor each read, choose the alignment that maximizes "
-                    "the posterior probability mentioned above. Ties "
-                    "are broken arbitrarily but deterministically (the "
-                    "first alignment in the BAM file is used).\n"
-        "- all:    \tFor each read, use all its alignments. Some reads "
-                    "might end up with more than one alignment. In that "
-                    "case, contigs will be made assuming that the read "
-                    "aligns to each place. (In other words, the read is "
-                    "effectively duplicated, with one copy per alignment.)\n"
-        "\n"
-        "This policy is applied after the thresholding implied by "
-        "--min-alignment-prob. For example, if \"--min-alignment-prob=0.10 "
-        "--alignment-policy=sample\" is given, then (first) all alignments "
-        "with posterior probability less than 0.10 will be discarded, and "
-        "(second), for each read, an alignment will be sampled from among "
-        "the remaining alignments, with the posterior distribution "
-        "renormalized as appropriate. As another example, if "
-        "\"--min-alignment-prob=0.90 --alignment-policy=all\" is given, "
-        "then all alignments with posterior probability at least 0.90 "
-        "will be used.\n"
-        "\n"
-        "Default: sample.\n")
-    // ("breakpoints", po::value<std::string>(),
-    //     "A prefix to write the breakpoints to. Optional. If not given, "
-    //     "the breakpoints will not be written.\n")
-    ;
-  desc.add(params);
-
-  return desc;
-}
-
 boost::program_options::options_description describe_options()
 {
   namespace po = boost::program_options;
@@ -727,7 +620,7 @@ int main(int argc, const char **argv)
     po::store(po::parse_command_line(argc, argv, desc), vm);
 
     if (argc == 1 || vm.count("help")) {
-      print_help(std::cout);
+      print_help();
       exit(0);
     }
 
