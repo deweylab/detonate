@@ -103,12 +103,14 @@ sparsehash/finished:
 	@echo 
 	cd sparsehash && $(MAKE)
 
-ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
+ref-eval: ref-eval.cpp README.ref-eval boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
 	@echo 
 	@echo -----------------------------
 	@echo - Building REF-EVAL itself. -
 	@echo -----------------------------
 	@echo 
+	rm -f re_help.hh
+	awk 'BEGIN { print "#define REF_EVAL_HELP \\" } { gsub(/\\/, "\\\\"); printf("\"%s\\n\"\\\n",  $$0); } END { print "\"\"" }' README.ref-eval > re_help.hh
 	$(CXX) $(OMP) $(CXXFLAGS) $(INC) ref-eval.cpp $(LIB) -o ref-eval
 
 ref-eval-build-true-assembly: ref-eval-build-true-assembly.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished

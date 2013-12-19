@@ -29,148 +29,33 @@
 #include "re_oomatched.hh"
 #include "re_kmer.hh"
 #include "re_kc.hh"
+#include "re_help.hh"
 
-void add_options(boost::program_options::options_description& desc)
+boost::program_options::options_description describe_options()
 {
   namespace po = boost::program_options;
+  po::options_description desc;
   desc.add_options()
     ("help,?", "Display this information.\n")
-    ("scores", po::value<std::string>(),
-        "The score groups to compute, separated by commas "
-        "(e.g., --scores=nucl,contig,kc):\n"
-        "\n"
-        "  Alignment-based score groups:\n"
-        "  - nucl:   \tnucleotide precision, recall, and F1.\n"
-        "  - contig: \tcontig precision, recall, and F1.\n"
-        "  - pair:   \tpair precision, recall, and F1.\n"
-        "\n"
-        "  Alignment-free score groups:\n"
-        "  - kmer:   \tkmer Kullback-Leibler divergence, "
-                      "Jensen-Shannon divergence, and "
-                      "Hellinger distance.\n"
-        "  - kc:     \tkmer recall, number of nucleotides, and "
-                      "kmer compression score.\n"
-        "\n"
-        "Required unless --paper is given.\n")
-    ("weighted", po::value<std::string>(),
-        "A string indicating whether to compute weighted or "
-        "unweighted variants of scores, or both "
-        "(e.g., --weighted=yes):\n"
-        "\n"
-        "  - yes:  \tcompute weighted variants of scores.\n"
-        "  - no:   \tcompute unweighted variants of scores.\n"
-        "  - both: \tcompute both weighted and unweighted "
-                    "variants of scores.\n"
-        "\n"
-        "The weighted variants require --A-expr and --B-expr "
-        "to be specified.\n"
-        "\n"
-        "The distinction between weighted and unweighted variants "
-        "doesn't make sense for the kc score, so this option is "
-        "ignored by the kc score.\n"
-        "\n"
-        "Required unless --paper or only --score=kc is given.\n")
-    ("paper", 
-        "If this flag is present, the reference-based scores "
-        "described in the main text of the paper corresponding "
-        "to this software will be computed. These scores are as "
-        "follows:\n"
-        "\n"
-        "  Alignment-based scores:\n"
-        "  - unweighted nucleotide F1\n"
-        "  - unweighted contig F1\n"
-        "\n"
-        "  Alignment-free score groups:\n"
-        "  - weighted kmer compression score\n"
-        "\n"
-        "For obvious reasons, the --scores and --weighted options "
-        "are incompatible with this flag.\n")
-    ("A-seqs", po::value<std::string>(),
-        "The assembly sequences, in FASTA format. Required.\n")
-    ("B-seqs", po::value<std::string>(),
-        "The oracleset sequences, in FASTA format. Required.\n")
-    ("A-expr", po::value<std::string>(),
-        "The assembly expression, for use in weighted scores, as "
-        "produced by RSEM in a file called *.isoforms.results. "
-        "Required for weighted variants of scores.\n")
-    ("B-expr", po::value<std::string>(),
-        "The oracleset expression, for use in weighted scores, as "
-        "produced by RSEM in a file called *.isoforms.results. "
-        "Required for weighted variants of scores.\n")
-    ("A-to-B", po::value<std::string>(),
-        "The alignments of the assembly to the oracleset. The file "
-        "format is specified by --alignment-type. Required for "
-        "alignment-based scores.\n")
-    ("B-to-A", po::value<std::string>(),
-        "The alignments of the oracleset to the assembly. The file "
-        "format is specified by --alignment-type. Required for "
-        "alignment-based scores.\n")
-    ("alignment-type", po::value<std::string>(),
-        "The type of alignments used, either \"blast\" or \"psl\". "
-        "Required for alignment-based scores.\n")
-    ("strand-specific",
-        "If this flag is present, ignore alignments or kmer matches "
-        "that are to the reverse strand.\n")
-    ("readlen", po::value<size_t>(),
-        //"The read length. Required for kmer and kc scores.\n"
-        "The read length of the reads used to build the assembly. Required.\n") // XXX really shouldn't be
-    ("num_reads", po::value<size_t>(),
-        "The number of reads used to build the assembly. Required "
-        "for kc scores.\n")
-    ("contig-min-frac-identity", po::value<double>(),
-        "This option only applies to contig scores. Alignments with "
-        "fraction identity less than this threshold are ignored. "
-        "The fraction identity of an alignment is min(x/y, x/z), "
-        "where \n"
-        "\n"
-        "  - x \tis the number of bases that are identical in the "
-                 "assembly sequence and the oracleset sequence, "
-                 "according to the alignment,\n"
-        "  - y \tis the number of bases in the assembly sequence, and\n"
-        "  - z \tis the number of bases in the oracleset sequence.\n"
-        "\n"
-        "Default: 0.99.\n")
-    ("contig-max-frac-indel", po::value<double>(),
-        "This option only applies to contig scores. Alignments with "
-        "fraction indel greater than this threshold are ignored. "
-        "For psl alignments, the fraction indel of an alignment "
-        "is max(w/y, x/z), where \n"
-        "\n"
-        "  - w \tis the number of bases that are inserted in the "
-                 "assembly sequence, according to the alignment "
-                 "(\"Q gap bases\"),\n"
-        "  - x \tis the number of bases that are inserted in the "
-                 "oracleset sequence, according to the alignment "
-                 "(\"T gap bases\"),\n"
-        "  - y \tis the number of bases in the assembly sequence, and\n"
-        "  - z \tis the number of bases in the oracleset sequence.\n"
-        "\n"
-        "For blast alignments, the fraction indel of an alignment "
-        "is max(x/y, x/z), where \n"
-        "\n"
-        "  - x \tis the number of gaps bases that are inserted in the "
-                 "oracleset sequence, according to the alignment "
-                 "(\"gaps\"),\n"
-        "  - y \tis the number of bases in the assembly sequence, and\n"
-        "  - z \tis the number of bases in the oracleset sequence.\n"
-        "\n"
-        "Default: 0.01.\n")
-    ("hash-table-type", po::value<std::string>(),
-        "The type of hash table to use, either \"sparse\" or \"dense\". "
-        "This is only relevant for kc and kmer scores. The sparse table "
-        "is slower but uses less memory. The dense table is faster "
-        "but uses more memory. Default: \"sparse\".\n")
-    ("hash-table-fudge-factor", po::value<double>(),
-        "This is only relevant for kc and kmer scores. When the hash "
-        "table is created, its initial capacity is set as the total "
-        "worst-case number of possible kmers in the assembly and "
-        "oracleset, based on each sequence's length, divided by the "
-        "fudge factor. The default, 2.0, is often reasonable because "
-        "(1) most kmers should be shared by the assembly and the "
-        "oracleset, and (2) many kmers will be repeated several "
-        "times. However, if you have a lot of memory or a really bad "
-        "assembly, you could try a smaller number. Default: 2.0.\n")
+    ("scores", po::value<std::string>())
+    ("weighted", po::value<std::string>())
+    ("paper", "Flag")
+    ("A-seqs", po::value<std::string>())
+    ("B-seqs", po::value<std::string>())
+    ("A-expr", po::value<std::string>())
+    ("B-expr", po::value<std::string>())
+    ("A-to-B", po::value<std::string>())
+    ("B-to-A", po::value<std::string>())
+    ("alignment-type", po::value<std::string>())
+    ("strand-specific", "Flag")
+    ("readlen", po::value<size_t>())
+    ("num_reads", po::value<size_t>())
+    ("contig-min-frac-identity", po::value<double>())
+    ("contig-max-frac-indel", po::value<double>())
+    ("hash-table-type", po::value<std::string>())
+    ("hash-table-fudge-factor", po::value<double>())
   ;
+  return desc;
 }
 
 void parse_options(opts& o, boost::program_options::variables_map& vm)
@@ -352,6 +237,11 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
 
 }
 
+void print_help()
+{
+  std::cout << REF_EVAL_HELP << std::endl;
+}
+
 int main(int argc, const char **argv)
 {
   try {
@@ -359,14 +249,12 @@ int main(int argc, const char **argv)
     std::ios::sync_with_stdio(false);
     namespace po = boost::program_options;
 
-    po::options_description desc("Arguments");
-    add_options(desc);
-    
+    po::options_description desc = describe_options();
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
 
-    if (vm.count("help")) {
-      std::cout << desc << std::endl;
+    if (argc == 1 || vm.count("help")) {
+      print_help();
       exit(0);
     }
 
