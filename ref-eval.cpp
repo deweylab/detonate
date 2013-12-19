@@ -49,7 +49,7 @@ boost::program_options::options_description describe_options()
     ("alignment-type", po::value<std::string>())
     ("strand-specific", "Flag")
     ("readlen", po::value<size_t>())
-    ("num_reads", po::value<size_t>())
+    ("num-reads", po::value<size_t>())
     ("contig-min-frac-identity", po::value<double>())
     ("contig-max-frac-indel", po::value<double>())
     ("hash-table-type", po::value<std::string>())
@@ -149,15 +149,17 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
       throw po::error("--A-to-B is required for alignment-based scores.");
     if (!vm.count("B-to-A"))
       throw po::error("--B-to-A is required for alignment-based scores.");
-    if (!vm.count("alignment-type"))
-      throw po::error("--alignment-type is required for alignment-based scores.");
     o.A_to_B = vm["A-to-B"].as<std::string>();
     o.B_to_A = vm["B-to-A"].as<std::string>();
-    o.alignment_type = vm["alignment-type"].as<std::string>();
-    if (o.alignment_type != "blast" && o.alignment_type != "psl")
-      throw po::error("Invalid value for --alignment-type: " + o.alignment_type);
-    if (o.alignment_type == "blast")
-      std::cerr << "Warning: Support for --alignment-type=blast is experimental and has not been thoroughly tested yet." << std::endl;
+    if (!vm.count("alignment-type"))
+      o.alignment_type = "psl";
+    else {
+      o.alignment_type = vm["alignment-type"].as<std::string>();
+      if (o.alignment_type != "blast" && o.alignment_type != "psl")
+        throw po::error("Invalid value for --alignment-type: " + o.alignment_type);
+      if (o.alignment_type == "blast")
+        std::cerr << "Warning: Support for --alignment-type=blast is experimental and has not been thoroughly tested yet." << std::endl;
+    }
   } else {
     if (vm.count("A-to-B"))
       throw po::error("--A-to-B is not needed except for alignment-based scores.");
@@ -186,12 +188,12 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
 
   // Parse num reads.
   if (o.kc || o.paper) {
-    if (!vm.count("num_reads"))
-      throw po::error("--num_reads is required for kc scores.");
-    o.num_reads = vm["num_reads"].as<size_t>();
+    if (!vm.count("num-reads"))
+      throw po::error("--num-reads is required for kc scores.");
+    o.num_reads = vm["num-reads"].as<size_t>();
   } else {
-    if (vm.count("num_reads"))
-      throw po::error("--num_reads is not needed except for kc scores.");
+    if (vm.count("num-reads"))
+      throw po::error("--num-reads is not needed except for kc scores.");
   }
 
   // Parse contig-min-frac-identity.

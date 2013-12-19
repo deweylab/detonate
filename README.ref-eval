@@ -40,7 +40,7 @@ $ rsem-calculate-expression -p 24 --no-bam-output reads.fq B_ref B_expr
 
 Finally, run REF-EVAL:
 
-./ref-eval --scores=nucl,pair,tran,kmer,kc \
+./ref-eval --scores=nucl,pair,contig,kmer,kc \
            --weighted=both \
            --A-seqs A.fa \
            --B-seqs B.fa \
@@ -49,10 +49,12 @@ Finally, run REF-EVAL:
            --A-to-B A_to_B.psl \
            --B-to-A B_to_A.psl \
            --readlen 76 \
+           --num-reads 5000000 \
            | tee scores.txt
 
 The scores will be written to scores.txt. Further details about the arguments
-to REF-EVAL are described below.
+to REF-EVAL are described below. Further details about the scores themselves
+are given under ``Score definitions'' below.
 
 [1] http://genome.ucsc.edu/FAQ/FAQblat.html
 [2] http://deweylab.biostat.wisc.edu/rsem/

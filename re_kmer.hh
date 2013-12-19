@@ -163,6 +163,7 @@ void compute_stats(
   }
   double JS = 0.5*KL_A_to_M + 0.5*KL_B_to_M;
   hellinger = sqrt(hellinger)/sqrt(2.0);
+  total_var *= 0.5;
 
   std::cout << prefix << "_kmer_KL_A_to_M\t"       << KL_A_to_M << std::endl;
   std::cout << prefix << "_kmer_KL_B_to_M\t"       << KL_B_to_M << std::endl;
