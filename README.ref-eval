@@ -189,9 +189,9 @@ Usage: Options that change the output
         identity less than this threshold are ignored. The fraction identity
         of an alignment is min(x/y, x/z), where
 
-          - x is the number of bases that are identical in the assembly
-              sequence and the reference sequence, according to the
-              alignment,
+          - x is the number of bases in the assembly sequence that are 
+              aligned to an identical base in the reference sequence, 
+              according to the alignment,
           - y is the number of bases in the assembly sequence, and
           - z is the number of bases in the reference sequence.
 
