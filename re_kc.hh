@@ -172,10 +172,10 @@ void main_1(
   transform(B.seqs.begin(), B.seqs.end(), back_inserter(B_rc), reverse_complement);
   std::cerr << "done." << std::endl;
 
-  size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.readlen, o.hash_table_fudge_factor);
+  size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.kmerlen, o.hash_table_fudge_factor);
   std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::flush;
-  Ht ht(max_entries, kmer_key_hash(o.readlen), kmer_key_equal_to(o.readlen));
-  empty_key_initializer<Ht> eki(ht, o.readlen);
+  Ht ht(max_entries, kmer_key_hash(o.kmerlen), kmer_key_equal_to(o.kmerlen));
+  empty_key_initializer<Ht> eki(ht, o.kmerlen);
   std::cerr << "done." << std::endl;
 
   std::cerr << "Populating the hash table..." << std::flush;

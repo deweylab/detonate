@@ -60,9 +60,15 @@ struct opts
   size_t readlen;
   size_t num_reads;
 
+  // kmer length
+  size_t kmerlen;
+
   // Contig thresholds
-  double contig_min_frac_identity;
-  double contig_max_frac_indel;
+  double min_frac_identity;
+  double max_frac_indel;
+
+  // Minimum segment length
+  size_t min_segment_len;
 
   // Hash table
   std::string hash_table_type;
@@ -105,13 +111,19 @@ struct opts
     // Strand-specific
     strand_specific(false),
 
-    // Read length
+    // Read length and num reads
     readlen(-1),
     num_reads(0),
 
+    // kmer length
+    kmerlen(-1),
+
     // Contig thresholds
-    contig_min_frac_identity(2.0),
-    contig_max_frac_indel(-1.0),
+    min_frac_identity(2.0),
+    max_frac_indel(-1.0),
+
+    // Minimum segment length
+    min_segment_len(0),
 
     // Hash table
     hash_table_type(""),

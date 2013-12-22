@@ -183,15 +183,15 @@ void main_2(
     const expr& tau_B,
     const std::string& prefix)
 {
-  size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.readlen, o.hash_table_fudge_factor);
+  size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.kmerlen, o.hash_table_fudge_factor);
   std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::flush;
-  Ht ht(max_entries, kmer_key_hash(o.readlen), kmer_key_equal_to(o.readlen));
-  empty_key_initializer<Ht> eki(ht, o.readlen);
+  Ht ht(max_entries, kmer_key_hash(o.kmerlen), kmer_key_equal_to(o.kmerlen));
+  empty_key_initializer<Ht> eki(ht, o.kmerlen);
   std::cerr << "done." << std::endl;
 
   std::cerr << "Populating the hash table..." << std::flush;
-  count_kmers<Ht, 0>(ht, A.seqs, A_rc, tau_A, o.readlen, o.strand_specific);
-  count_kmers<Ht, 1>(ht, B.seqs, B_rc, tau_B, o.readlen, o.strand_specific);
+  count_kmers<Ht, 0>(ht, A.seqs, A_rc, tau_A, o.kmerlen, o.strand_specific);
+  count_kmers<Ht, 1>(ht, B.seqs, B_rc, tau_B, o.kmerlen, o.strand_specific);
   std::cerr << "done; hash table contains " << ht.size() << " entries." << std::endl;
 
   std::cerr << "Normalizing the induced distributions..." << std::flush;

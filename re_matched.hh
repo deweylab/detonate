@@ -236,7 +236,7 @@ struct tran_helper
   }
 };
 
-inline bool is_good_enough(const std::vector<alignment_segment>& segs, size_t min_seg_len)
+inline bool is_good_enough(const std::vector<alignment_segment>& segs, size_t min_segment_len)
 {
   size_t len = 0;
   BOOST_FOREACH(const alignment_segment& seg, segs) {
@@ -245,7 +245,7 @@ inline bool is_good_enough(const std::vector<alignment_segment>& segs, size_t mi
     else
       len += seg.a_start - seg.a_end + 1;
   }
-  return len >= min_seg_len;
+  return len >= min_segment_len;
 }
 
 // Reads alignments, perfoms initial filtering, and converts the alignments to
@@ -258,7 +258,7 @@ void read_alignments(std::vector<tagged_alignment>& alignments,
                      const std::map<std::string, size_t>& A_names_to_idxs,
                      const std::map<std::string, size_t>& B_names_to_idxs,
                      bool strand_specific,
-                     size_t readlen)
+                     size_t min_segment_len)
 {
   try {
     typename Al::input_stream_type input_stream(open_or_throw(filename));
@@ -280,7 +280,7 @@ void read_alignments(std::vector<tagged_alignment>& alignments,
         // Extract the alignment segments.
         typename Al::segments_type segs = al.segments(A[l.a_idx], B[l.b_idx]);
         l.segments.assign(segs.begin(), segs.end());
-        if (is_good_enough(l.segments, readlen))
+        if (is_good_enough(l.segments, min_segment_len))
           alignments.push_back(l);
       }
     }
@@ -296,7 +296,7 @@ void process_alignments(HelperType&                   helper,
                         std::vector<tagged_alignment> alignments, /* passed by value intentionally */
                         size_t                        A_card,
                         size_t                        B_card,
-                        size_t                        readlen)
+                        size_t                        min_segment_len)
 {
   // Compute contributions.
   #pragma omp parallel for
@@ -364,7 +364,7 @@ void process_alignments(HelperType&                   helper,
     // If the alignment has changed, then put it back in the priority queue.
     if (l1_has_changed) {
 
-      if (is_good_enough(l1->segments, readlen)) {
+      if (is_good_enough(l1->segments, min_segment_len)) {
         l1->contribution = helper.compute_contribution(*l1);
         Q.push(l1);
       }
@@ -390,10 +390,10 @@ double compute_recall(const std::vector<tagged_alignment>& A_to_B,
                       size_t B_card,
                       std::vector<size_t> B_lengths,
                       const expr& tau_B,
-                      size_t readlen)
+                      size_t min_segment_len)
 {
-  Helper h(B_lengths, tau_B, readlen);
-  process_alignments(h, A_to_B, A_card, B_card, readlen);
+  Helper h(B_lengths, tau_B, min_segment_len);
+  process_alignments(h, A_to_B, A_card, B_card, min_segment_len);
   return h.get_recall();
 }
 
@@ -407,10 +407,10 @@ void compute(const opts& o,
              std::vector<tagged_alignment> B_to_A,
              const std::string& prefix)
 {
-  double precis = compute_recall<Helper>(B_to_A, B.card, A.card, A.lengths, tau_A, o.readlen);
+  double precis = compute_recall<Helper>(B_to_A, B.card, A.card, A.lengths, tau_A, o.min_segment_len);
   std::cout << prefix << "precision\t" << precis << std::endl;
 
-  double recall = compute_recall<Helper>(A_to_B, A.card, B.card, B.lengths, tau_B, o.readlen);
+  double recall = compute_recall<Helper>(A_to_B, A.card, B.card, B.lengths, tau_B, o.min_segment_len);
   std::cout << prefix << "recall\t" << recall << std::endl;
 
   double F1 = compute_F1(precis, recall);
@@ -444,8 +444,8 @@ void main_1(const opts& o,
 {
   std::cerr << "Reading the alignments and extracting intervals..." << std::flush;
   std::vector<tagged_alignment> A_to_B, B_to_A;
-  read_alignments<Al>(A_to_B, o.A_to_B, A.seqs, B.seqs, A.names_to_idxs, B.names_to_idxs, o.strand_specific, o.readlen);
-  read_alignments<Al>(B_to_A, o.B_to_A, B.seqs, A.seqs, B.names_to_idxs, A.names_to_idxs, o.strand_specific, o.readlen);
+  read_alignments<Al>(A_to_B, o.A_to_B, A.seqs, B.seqs, A.names_to_idxs, B.names_to_idxs, o.strand_specific, o.min_segment_len);
+  read_alignments<Al>(B_to_A, o.B_to_A, B.seqs, A.seqs, B.names_to_idxs, A.names_to_idxs, o.strand_specific, o.min_segment_len);
   std::cerr << "done." << std::endl;
 
   if (o.nucl) main_2<nucl_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "nucl_");

@@ -165,8 +165,8 @@ Usage: Input and output specification
         not recommended.
 
 
-Usage: Options that change the output
--------------------------------------
+Usage: Options that modify the score definitions (and hence output)
+-------------------------------------------------------------------
 
   --strand-specific
 
@@ -176,14 +176,23 @@ Usage: Options that change the output
 
   --readlen arg
 
-        The read length of the reads used to build the assembly. Required.
+        This option only applies to the KC scores. The read length of the reads
+        used to build the assembly, used in the denominator of the ICR.
+        Required for KC scores.
 
   --num-reads arg
 
-        The number of reads used to build the assembly. Required for kc
+        This option only applies to the KC scores. The number of reads used to
+        build the assembly, used in the denominator of the ICR. Required for KC
         scores.
 
-  --contig-min-frac-identity arg
+  --kmerlen arg
+
+        This option only applies to the kmer and KC scores. This is the length
+        (``k'') of the kmers used in the definition of the KC and kmer scores.
+        Required for KC and kmer scores.
+
+  --min-frac-identity arg
 
         This option only applies to contig scores. Alignments with fraction
         identity less than this threshold are ignored. The fraction identity
@@ -197,7 +206,7 @@ Usage: Options that change the output
 
         Default: 0.99.
 
-  --contig-max-frac-indel arg
+  --max-frac-indel arg
 
         This option only applies to contig scores. Alignments with fraction
         indel greater than this threshold are ignored. For psl alignments,
@@ -220,20 +229,26 @@ Usage: Options that change the output
 
         Default: 0.01.
 
+  --min-segment-len arg
 
-Usage: Options that change the algorithm, but not the output
-------------------------------------------------------------
+      This option only applies to nucleotide and pair scores. Alignment
+      segments that contain fewer than this number of bases will be discarded.
+      Default: 100. In the DETONATE paper, this was set to the read length.
+
+
+Usage: Options that modify the algorithm, but not the score definitions
+-----------------------------------------------------------------------
 
   --hash-table-type arg
 
         The type of hash table to use, either ``sparse'' or ``dense''. This
-        is only relevant for kc and kmer scores. The sparse table is slower
+        is only relevant for KC and kmer scores. The sparse table is slower
         but uses less memory. The dense table is faster but uses more memory.
         Default: ``sparse''.
 
   --hash-table-fudge-factor arg
 
-        This is only relevant for kc and kmer scores. When the hash table is
+        This is only relevant for KC and kmer scores. When the hash table is
         created, its initial capacity is set as the total worst-case number
         of possible kmers in the assembly and reference, based on each
         sequence's length, divided by the fudge factor. The default, 2.0, is
@@ -273,12 +288,11 @@ The contig recall is defined as follows:
 - Throw out alignments that are to the reverse strand, if --strand-specific
   is present.
 
-- Throw out alignments whose fraction identity is less than
-  --contig-min-frac-identity (q.v. for the definition of ``fraction
-  identity'').
+- Throw out alignments whose fraction identity is less than --min-frac-identity
+  (q.v. for the definition of ``fraction identity'').
 
-- Throw out alignments whose fraction indel is greater than
-  --contig-max-frac-indel (q.v. for the definition of ``fraction indel'')
+- Throw out alignments whose fraction indel is greater than --max-frac-indel
+  (q.v. for the definition of ``fraction indel'')
 
 - Construct a bipartite graph from the remaining alignments, in which there is
   an edge between a and b iff there is a remaining alignment a->b.

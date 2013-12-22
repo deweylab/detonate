@@ -50,8 +50,10 @@ boost::program_options::options_description describe_options()
     ("strand-specific", "Flag")
     ("readlen", po::value<size_t>())
     ("num-reads", po::value<size_t>())
-    ("contig-min-frac-identity", po::value<double>())
-    ("contig-max-frac-indel", po::value<double>())
+    ("kmerlen", po::value<size_t>())
+    ("min-frac-identity", po::value<double>())
+    ("max-frac-indel", po::value<double>())
+    ("min-segment-len", po::value<size_t>())
     ("hash-table-type", po::value<std::string>())
     ("hash-table-fudge-factor", po::value<double>())
   ;
@@ -174,17 +176,14 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
     o.strand_specific = true;
 
   // Parse read length.
-  // if (o.kmer || o.kc) {
-  //   if (!vm.count("readlen"))
-  //     throw po::error("--readlen is required for kmer and kc scores.");
-  //   o.readlen = vm["readlen"].as<size_t>();
-  // } else {
-  //   if (vm.count("readlen"))
-  //     throw po::error("--readlen is not needed except for kmer and kc scores.");
-  // }
-  if (!vm.count("readlen"))
-    throw po::error("--readlen is required.");
-  o.readlen = vm["readlen"].as<size_t>();
+  if (o.kc || o.paper) {
+    if (!vm.count("readlen"))
+      throw po::error("--readlen is required for kc scores.");
+    o.readlen = vm["readlen"].as<size_t>();
+  } else {
+    if (vm.count("readlen"))
+      throw po::error("--readlen is not needed except for kc scores.");
+  }
 
   // Parse num reads.
   if (o.kc || o.paper) {
@@ -196,17 +195,33 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
       throw po::error("--num-reads is not needed except for kc scores.");
   }
 
-  // Parse contig-min-frac-identity.
-  if (vm.count("contig-min-frac-identity"))
-    o.contig_min_frac_identity = vm["contig-min-frac-identity"].as<double>();
-  else
-    o.contig_min_frac_identity = 0.99;
+  // Parse kmer length.
+  if (o.kc || o.kmer || o.paper) {
+    if (!vm.count("kmerlen"))
+      throw po::error("--kmerlen is required for kc and kmer scores.");
+    o.kmerlen = vm["kmerlen"].as<size_t>();
+  } else {
+    if (vm.count("kmerlen"))
+      throw po::error("--kmerlen is not needed except for kc and kmer scores.");
+  }
 
-  // Parse contig-max-frac-indel.
-  if (vm.count("contig-max-frac-indel"))
-    o.contig_max_frac_indel = vm["contig-max-frac-indel"].as<double>();
+  // Parse min-frac-identity.
+  if (vm.count("min-frac-identity"))
+    o.min_frac_identity = vm["min-frac-identity"].as<double>();
   else
-    o.contig_max_frac_indel = 0.01;
+    o.min_frac_identity = 0.99;
+
+  // Parse max-frac-indel.
+  if (vm.count("max-frac-indel"))
+    o.max_frac_indel = vm["max-frac-indel"].as<double>();
+  else
+    o.max_frac_indel = 0.01;
+
+  // Parse min segment length.
+  if (vm.count("min-segment-len"))
+    o.min_segment_len = vm["min-segment-len"].as<size_t>();
+  else
+    o.min_segment_len = 100;
 
   // Parse hash-table-type.
   if (o.kc || o.kmer || o.paper) {

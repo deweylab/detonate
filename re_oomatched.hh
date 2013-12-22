@@ -85,10 +85,10 @@ result compute_recall(
   Al al;
   while (input_stream >> al) {
     if (al.is_on_valid_strand(o.strand_specific) &&
-        al.frac_identity_wrt_a() >= o.contig_min_frac_identity && 
-        al.frac_identity_wrt_b() >= o.contig_min_frac_identity &&
-        al.frac_indel_wrt_a() <= o.contig_max_frac_indel &&
-        al.frac_indel_wrt_b() <= o.contig_max_frac_indel) {
+        al.frac_identity_wrt_a() >= o.min_frac_identity && 
+        al.frac_identity_wrt_b() >= o.min_frac_identity &&
+        al.frac_indel_wrt_a() <= o.max_frac_indel &&
+        al.frac_indel_wrt_b() <= o.max_frac_indel) {
       size_t a_idx = A.names_to_idxs.find(al.a_name())->second;
       size_t b_idx = B.names_to_idxs.find(al.b_name())->second;
       lemon::SmartGraph::Edge edge = graph.addEdge(A_nodes[a_idx], B_nodes[b_idx]);
