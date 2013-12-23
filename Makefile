@@ -103,25 +103,32 @@ sparsehash/finished:
 	@echo 
 	cd sparsehash && $(MAKE)
 
-ref-eval: ref-eval.cpp README.ref-eval boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
+ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
 	@echo 
 	@echo -----------------------------
 	@echo - Building REF-EVAL itself. -
 	@echo -----------------------------
 	@echo 
-	rm -f re_help.hh
-	cat README.ref-eval | sed 's/\\/\\\\/g' | awk 'BEGIN { print "#define REF_EVAL_HELP \\" } { printf("\"%s\\n\"\\\n", $$0); } END { print "\"\"" }' > re_help.hh
 	$(CXX) $(OMP) $(CXXFLAGS) $(INC) ref-eval.cpp $(LIB) -o ref-eval
 
-ref-eval-build-true-assembly: ref-eval-build-true-assembly.cpp README.ref-eval-build-true-assembly boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
+ref-eval-build-true-assembly: ref-eval-build-true-assembly.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
 	@echo 
 	@echo ------------------------------------------------
 	@echo - Building program to build the true assembly. -
 	@echo ------------------------------------------------
 	@echo 
-	rm -f re_bta_help.hh
-	cat README.ref-eval-build-true-assembly | sed 's/\\/\\\\/g' | awk 'BEGIN { print "#define REF_EVAL_BTA_HELP \\" } { printf("\"%s\\n\"\\\n", $$0); } END { print "\"\"" }' > re_bta_help.hh
 	$(CXX) $(CXXFLAGS) $(INC) ref-eval-build-true-assembly.cpp $(LIB) -lz -o ref-eval-build-true-assembly
+
+.PHONY: doc
+doc:
+	python3 make_doc.py --template ref-eval.template.html \
+                        --html     ref-eval.html \
+                        --text     README \
+                        --cxx      re_help.hh
+	python3 make_doc.py --template ref-eval-build-true-assembly.template.html \
+                        --html     ref-eval-build-true-assembly.html \
+                        --text     README.REF-EVAL-BUILD-TRUE-ASSEMBLY \
+                        --cxx      re_bta_help.hh
 
 all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_alignment_segment test_re_matched
 

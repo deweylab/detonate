@@ -256,7 +256,7 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
 
 void print_help()
 {
-  std::cout << REF_EVAL_HELP << std::endl;
+  std::cout << get_help_string() << std::endl;
 }
 
 int main(int argc, const char **argv)

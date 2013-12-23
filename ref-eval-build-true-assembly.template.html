@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<html>
+<head></head>
+<body>
+
+<h1>REF-EVAL-BUILD-TRUE-ASSEMBLY: A program to estimate the ``true'' assembly
+of a set of reads, relative to a set of reference sequences</h1>
+
+<h2>Overview</h2>
+
+<p>This program constructs an estimate of the ``true'' assembly of a set of
+reads, relative to a set of reference sequences, based on alignment information
+produced by RSEM.</p>
+
+<p>As defined by DETONATE [1], the ``true'' assembly of a set of reads,
+relative to the true transcript sequences that the reads were generated from,
+is the set of contiguous subsequences of the transcript sequences that are
+covered by reads, with the reads overlapping by at least --min-overlap bases,
+when each read is aligned to its true location of origin.</p>
+
+<p>In practice, we do not know the reads' true locations of origin; in fact, we
+do not even know (precisely) the true transcript sequences that the reads were
+generated from. Instead, we start with a set of reference sequences (e.g., an
+Ensembl reference), and we align each read to these reference sequences using
+RSEM/Bowtie. The current program chooses a subset of these alignments,
+according to a policy specified by --alignment-policy and --min-alignment-prob,
+and then builds our best guess as to the ``true'' assembly based on these
+alignments.</p>
+
+<p>[1] Bo Li*, Nathanael Fillmore*, Yongsheng Bai, Mike Collins, James A.
+Thompson, Ron Stewart, Colin N. Dewey. Evaluation of de novo transcriptome
+assemblies from RNA-Seq data.</p>
+
+
+<h2>Example usage</h2>
+
+<p>First, use a recent version of RSEM to quantify the expression of the
+full-length transcripts relative to the reads. For example:</p>
+
+<pre>
+$ rsem-prepare-reference --gtf mm9.ensembl63.filtered.gtf mm9.fa ref
+$ rsem-calculate-expression --num-threads 24 reads.fq ref expr
+</pre>
+
+<p>Second, use this program to build the ``true'' assembly:</p>
+
+<pre>
+$ ./ref-eval-build-true-assembly --reference ref --expression expr --assembly cc
+</pre>
+
+<p>This will output a file, cc_0.fa, that contains the ``true'' assembly.</p>
+
+
+<h2>General options</h2>
+<dl>
+
+  <dt>-? [ --help ]</dt>
+
+        <dd>
+        <p>Display this information.</p>
+        </dd>
+
+</dl>
+
+
+<h2>Options that specify input and output</h2>
+<dl>
+
+  <dt>--reference arg</dt>
+
+        <dd>
+        <p>The prefix of the reference built by rsem-prepare-reference.
+        Required.</p>
+        </dd>
+
+  <dt>--expression arg</dt>
+
+        <dd>
+        <p>The prefix of the expression built by rsem-calculate-expression.
+        Required.</p>
+        </dd>
+
+  <dt>--assembly arg</dt>
+
+        <dd>
+        <p>A prefix to write the ``true'' assembly or sequence of assemblies
+        to. The suffix ``_x.fa'' will be appended to this prefix, where x is
+        the minimum overlap size. Required.</p>
+        </dd>
+
+</dl>
+
+
+<h2>Options that change the output</h2>
+<dl>
+
+  <dt>--min-overlap arg</dt>
+
+        <dd>
+        <p>Either:</p>
+
+        <ul>
+        <li>An integer that specifies how much overlap between two reads is 
+            required to merge two reads. For example, if --min-overlap=3, then 
+            only reads whose chosen alignments overlap by at least 3 bases will
+            be joined into contigs. If --min-overlap=0, then only reads whose 
+            chosen alignments are contiguous (or overlap by a positive amount) 
+            will be joined into contigs.</li>
+        </ul>
+
+        <p>Or:</p>
+
+        <ul>
+        <li>A pair of integers, separated by commas, specifying a range of 
+            overlap sizes, as described above. For example, if 
+            --min-overlap=2,4 is given, then three assemblies will be produced,
+            corresponding to --min-overlap=2, --min-overlap=3, and 
+            --min-overlap=4. You might use this option to compute ideal 
+            assemblies at all overlap sizes, e.g., --min-overlap=0,76 for 
+            76-length reads.</li>
+        </ul>
+
+        <p>Default: 0.</p>
+        </dd>
+
+  <dt>--min-alignment-prob arg</dt>
+
+        <dd>
+        <p>A number between 0 and 1 (inclusive). Any alignment (of a read to a
+        reference transcript) with posterior probability, as calculated by
+        RSEM, strictly less than this value will be discarded. Noise reads,
+        with posterior probability exactly 0, are always discarded. Default:
+        0.</p>
+        </dd>
+
+  <dt>--alignment-policy arg</dt>
+
+        <dd>
+        <p>The policy used to choose which alignment(s) of each read to use in 
+        constructing the ``true'' assembly. Options:</p>
+
+        <ul>
+        <li>sample: For each read, sample a single alignment (to some reference 
+                    transcript) according to the posterior probability that the 
+                    read follows each alignment, as calculated by RSEM.</li>
+        <li>best:   For each read, choose the alignment that maximizes the 
+                    posterior probability mentioned above. Ties are broken 
+                    arbitrarily but deterministically (the first alignment in the
+                    BAM file is used).</li>
+        <li>all:    For each read, use all its alignments. Some reads might end 
+                    up with more than one alignment. In that case, contigs will 
+                    be made assuming that the read aligns to each place. (In 
+                    other words, the read is effectively duplicated, with one 
+                    copy per alignment.)</li>
+        </ul>
+
+        <p>This policy is applied after the thresholding implied by
+        --min-alignment-prob. For example, if ``--min-alignment-prob=0.10
+        --alignment-policy=sample'' is given, then (first) all alignments with
+        posterior probability less than 0.10 will be discarded, and (second),
+        for each read, an alignment will be sampled from among the remaining
+        alignments, with the posterior distribution renormalized as
+        appropriate. As another example, if ``--min-alignment-prob=0.90
+        --alignment-policy=all'' is given, then all alignments with posterior
+        probability at least 0.90 will be used.</p>
+
+        <p>Default: sample.</p>
+        </dd>
+
+</dl>
+
+</body>
+</html>

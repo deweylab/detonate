@@ -1,0 +1,631 @@
+<?xml version="1.0"?>
+<html>
+<head></head>
+<body>
+
+<h1>REF-EVAL: A toolkit of reference-based scores for <i>de novo</i>
+transcriptome sequence assembly evaluation</h1>
+
+<h2>Overview</h2>
+
+<p>REF-EVAL computes a number of reference-based scores. These scores measure
+the quality of a transcriptome assembly relative to a collection of reference
+sequences. For information about how to run REF-EVAL, see ``Usage'' and the
+sections following it below. For information about the score definitions, see
+``Score definitions'' and the sections below.</p>
+
+
+<h2>Usage</h2>
+
+<p>As an optional first step, estimate the ``true'' assembly. See
+<tt>./ref-eval-build-true-assembly --help</tt> for more information.
+Alternatively, you can use the full-length reference transcript sequences
+directly as a reference.</p>
+
+<p>From now on, we will call the estimated ``true'' assembly or the collection
+of full-length reference sequences (whichever you choose to use) the reference.
+Let's assume that the assembly of interest is in <tt>A.fa</tt>, and the
+reference is in <tt>B.fa</tt>.</p>
+
+<p>If you want to compute alignment-based scores (see <tt>--scores</tt> below
+for more info), align the assembly to the reference and vice versa using Blat
+[1]. We recommend fairly unrestrictive settings, in order to generate many
+candidate alignments.</p>
+
+<pre>
+$ blat -minIdentity=80 B.fa A.fa A_to_B.psl
+$ blat -minIdentity=80 A.fa B.fa B_to_A.psl
+</pre>
+
+<p>If you want to compute weighted variants of scores, use RSEM [2] (or
+RSEM-EVAL) to compute the expression of the assembly and reference relative to
+the given reads. Let's assume that the reads are in reads.fq.</p>
+
+<pre>
+$ rsem-prepare-reference --no-polyA A.fa A_ref
+$ rsem-prepare-reference --no-polyA B.fa B_ref
+$ rsem-calculate-expression -p 24 --no-bam-output reads.fq A_ref A_expr
+$ rsem-calculate-expression -p 24 --no-bam-output reads.fq B_ref B_expr
+</pre>
+
+<p>Finally, run REF-EVAL:</p>
+
+<pre>
+$ ./ref-eval --scores=nucl,pair,contig,kmer,kc \
+             --weighted=both \
+             --A-seqs A.fa \
+             --B-seqs B.fa \
+             --A-expr A_expr.isoforms.results \
+             --B-expr B_expr.isoforms.results \
+             --A-to-B A_to_B.psl \
+             --B-to-A B_to_A.psl \
+             --num-reads 5000000 \
+             --readlen 76 \
+             --kmerlen 76 \
+             | tee scores.txt
+</pre>
+
+<p>The scores will be written to scores.txt. Further details about the
+arguments to REF-EVAL are described below. Further details about the scores
+themselves are given under ``Score definitions'' below.</p>
+
+<p>
+[1] http://genome.ucsc.edu/FAQ/FAQblat.html<br />
+[2] http://deweylab.biostat.wisc.edu/rsem/
+</p>
+
+
+<h2>Usage: Score specification</h2>
+<dl>
+
+  <dt>
+  --scores arg
+  </dt>
+
+        <dd>
+        <p>The groups of scores to compute, separated by commas (e.g.,
+        <tt>--scores=nucl,contig,kc</tt>). It is more efficient to compute all
+        the scores you are interested in using one invocation of REF-EVAL
+        instead of using multiple invocations that each compute one score. The
+        available score groups are as follows:</p>
+
+          <p>Alignment-based score groups:</p>
+          <ul>
+            <li><tt>nucl</tt>:   nucleotide precision, recall, and F1.</li>
+            <li><tt>contig</tt>: contig precision, recall, and F1.</li>
+            <li><tt>pair</tt>:   pair precision, recall, and F1.</li>
+          </ul>
+
+          <p>Alignment-free score groups:</p>
+          <ul>
+            <li><tt>kmer</tt>:   kmer Kullback-Leibler divergence, Jensen-Shannon
+                                 divergence, and Hellinger distance.</li>
+            <li><tt>kc</tt>:     kmer recall, number of nucleotides, and kmer
+                                 compression score.</li>
+          </ul>
+
+        <p>Required unless <tt>--paper</tt> is given.</p>
+        </dd>
+
+  <dt>
+  --weighted arg
+  </dt>
+
+        <dd>
+        <p>A string indicating whether to compute weighted or unweighted
+        variants of scores, or both (e.g., <tt>--weighted=yes</tt>):</p>
+
+          <ul>
+            <li><tt>yes</tt>:  compute weighted variants of scores.</li>
+            <li><tt>no</tt>:   compute unweighted variants of scores.</li>
+            <li><tt>both</tt>: compute both weighted and unweighted variants of scores.</li>
+          </ul>
+
+        <p>In weighted variants, the expression levels (TPM) of the assembly
+        and reference sequences are taken into account, and hence need to be
+        specified using <tt>--A-expr</tt> and <tt>--B-expr</tt>. Unweighted
+        variants are equivalent to weighted variants with uniform
+        expression.</p>
+
+        <p>The distinction between weighted and unweighted variants doesn't
+        make sense for the KC score, so this option is ignored by the KC score.
+        </p>
+
+        <p>Required unless <tt>--paper</tt> or only <tt>--score=kc</tt> is
+        given. </p>
+        </dd>
+
+  <dt>
+  --paper
+  </dt>
+
+        <dd>
+        <p>As an alternative to the above, if you are only interested in
+        computing the scores described in the main text of our paper [1], you
+        can pass the <tt>--paper</tt> flag instead of the <tt>--scores</tt> and
+        <tt>--weighted</tt> options. In that case, the following scores will be
+        computed:</p>
+
+          <p>Alignment-based scores:</p>
+          <ul>
+            <li>unweighted nucleotide F1</li>
+            <li>unweighted contig F1</li>
+          </ul>
+
+          <p>Alignment-free score groups:</p>
+          <ul>
+            <li>weighted kmer compression score</li>
+          </ul>
+
+        <p>For obvious reasons, the <tt>--scores</tt> and <tt>--weighted</tt>
+        options are incompatible with this flag.</p>
+
+        <p>
+        [1] Bo Li*, Nathanael Fillmore*, Yongsheng Bai, Mike Collins, James
+            A. Thompson, Ron Stewart, Colin N. Dewey. Evaluation of de novo
+            transcriptome assemblies from RNA-Seq data.
+        </p>
+        </dd>
+</dl>
+
+
+<h2>Usage: Input and output specification</h2>
+<dl>
+
+  <dt>
+  --A-seqs arg
+  </dt>
+
+        <dd>
+        <p>The assembly sequences, in FASTA format. Required.</p>
+        </dd>
+
+  <dt>
+  --B-seqs arg
+  </dt>
+
+        <dd>
+        <p>The reference sequences, in FASTA format. Required.</p>
+        </dd>
+
+  <dt>
+  --A-expr arg
+  </dt>
+
+        <dd>
+        <p>The assembly expression, for use in weighted scores, as produced by
+        RSEM in a file called <tt>*.isoforms.results</tt>. Required for
+        weighted variants of scores.</p>
+        </dd>
+
+  <dt>
+  --B-expr arg
+  </dt>
+
+        <dd>
+        <p>The reference expression, for use in weighted scores, as produced by
+        RSEM in a file called <tt>*.isoforms.results</tt>. Required for
+        weighted variants of scores.</p>
+        </dd>
+
+  <dt>
+  --A-to-B arg
+  </dt>
+
+        <dd>
+        <p>The alignments of the assembly to the reference. The file format is
+        specified by <tt>--alignment-type</tt>. Required for alignment-based
+        scores.</p>
+        </dd>
+
+  <dt>
+  --B-to-A arg
+  </dt>
+
+        <dd>
+        <p>The alignments of the reference to the assembly. The file format is
+        specified by <tt>--alignment-type</tt>. Required for alignment-based
+        scores.</p>
+        </dd>
+
+  <dt>
+  --alignment-type arg
+  </dt>
+
+        <dd>
+        <p>The type of alignments used, either <tt>blast</tt> or <tt>psl</tt>.
+        Default: <tt>psl</tt>. Currently BLAST support is experimental, not
+        well tested, and not recommended.</p>
+        </dd>
+
+</dl>
+
+
+<h2>Usage: Options that modify the score definitions (and hence output)</h2>
+<dl>
+
+  <dt>
+  --strand-specific
+  </dt>
+
+        <dd>
+        <p>If this flag is present, it is assumed that all the assembly and
+        reference sequences have the same orientation. Thus, alignments or kmer
+        matches that are to the reverse strand are ignored.</p>
+        </dd>
+
+  <dt>
+  --readlen arg
+  </dt>
+
+        <dd>
+        <p>This option only applies to the KC scores. The read length of the
+        reads used to build the assembly, used in the denominator of the ICR.
+        Required for KC scores.</p>
+        </dd>
+
+  <dt>
+  --num-reads arg
+  </dt>
+
+        <dd>
+        <p>This option only applies to the KC scores. The number of reads used
+        to build the assembly, used in the denominator of the ICR. Required for
+        KC scores.</p>
+        </dd>
+
+  <dt>
+  --kmerlen arg
+  </dt>
+
+        <dd>
+        <p>This option only applies to the kmer and KC scores. This is the
+        length (``k'') of the kmers used in the definition of the KC and kmer
+        scores. Required for KC and kmer scores.</p>
+        </dd>
+
+  <dt>
+  --min-frac-identity arg
+  </dt>
+
+        <dd>
+        <p>This option only applies to contig scores. Alignments with fraction
+        identity less than this threshold are ignored. The fraction identity
+        of an alignment is min(x/y, x/z), where</p>
+
+          <ul>
+            <li>$x$ is the number of bases in the assembly sequence that are 
+                    aligned to an identical base in the reference sequence,
+                    according to the alignment,</li>
+            <li>$y$ is the number of bases in the assembly sequence, and</li>
+            <li>$z$ is the number of bases in the reference sequence.</li>
+          </ul>
+
+        <p>Default: 0.99.</p>
+        </dd>
+
+  <dt>
+  --max-frac-indel arg
+  </dt>
+
+        <dd>
+        <p>This option only applies to contig scores. Alignments with fraction
+        indel greater than this threshold are ignored. For psl alignments, the
+        fraction indel of an alignment is $\max(w/y, x/z)$, where</p>
+
+          <ul>
+            <li>$w$ is the number of bases that are inserted in the assembly
+                    sequence, according to the alignment (``Q gap bases''),</li>
+            <li>$x$ is the number of bases that are inserted in the reference
+                    sequence, according to the alignment (``T gap bases''),</li>
+            <li>$y$ is the number of bases in the assembly sequence, and</li>
+            <li>$z$ is the number of bases in the reference sequence.</li>
+          </ul>
+
+        <p>For blast alignments, the fraction indel of an alignment is
+        $\max(x/y, x/z)$, where</p>
+        
+          <ul>
+            <li>$x$ is the number of gaps bases that are inserted in the
+                    reference sequence, according to the alignment (``gaps''),</li>
+            <li>$y$ is the number of bases in the assembly sequence, and</li>
+            <li>$z$ is the number of bases in the reference sequence.</li>
+          </ul>
+
+        <p>Default: 0.01.</p>
+        </dd>
+
+  <dt>
+  --min-segment-len arg
+  </dt>
+
+        <dd>
+        <p>This option only applies to nucleotide and pair scores. Alignment
+        segments that contain fewer than this number of bases will be
+        discarded. Default: 100. In the DETONATE paper, this was set to the
+        read length.</p>
+        </dd>
+
+</dl>
+
+
+<h2>Usage: Options that modify the algorithm, but not the score definitions</h2>
+<dl>
+
+  <dt>
+  --hash-table-type arg
+  </dt>
+
+        <dd>
+        <p>The type of hash table to use, either ``sparse'' or ``dense''. This
+        is only relevant for KC and kmer scores. The sparse table is slower but
+        uses less memory. The dense table is faster but uses more memory.
+        Default: ``sparse''.</p>
+        </dd>
+
+  <dt>
+  --hash-table-fudge-factor arg
+  </dt>
+
+        <dd>
+        <p>This is only relevant for KC and kmer scores. When the hash table is
+        created, its initial capacity is set as the total worst-case number of
+        possible kmers in the assembly and reference, based on each sequence's
+        length, divided by the fudge factor. The default, 2.0, is often
+        reasonable because (1) most kmers should be shared by the assembly and
+        the reference, and (2) many kmers will be repeated several times.
+        However, if you have a lot of memory or a really bad assembly, you
+        could try a smaller number. Default: 2.0.</p>
+        </dd>
+
+</dl>
+
+
+<h2>Usage: General options</h2>
+<dl>
+
+  <dt>
+  -? [ --help ]
+  </dt>
+
+        <dd>
+        <p>Display this information.</p>
+        </dd>
+
+</dl>
+
+
+<h2>Score definitions</h2>
+
+<p>In the next few sections, we define the scores computed by REF-EVAL.
+Throughout, $A$ denotes the assembly, and $B$ denotes the reference. (As
+discussed under ``Usage'' above, the reference can be either an estimate of the
+``true'' assembly or a collection of full-length reference transcripts.) Both
+$A$ and $B$ are thought of as sets of sequences. $A$ is a set of contigs, and
+$B$ is a set of reference sequences.</p>
+
+
+<h2>Score definitions: contig precision, recall, and F1</h2>
+
+<p>The contig recall is defined as follows:</p>
+
+<ul>
+  <li>Align the assembly $A$ to the reference $B$. Notation: each alignment $l$
+      is between a contig $a$ in $A$ and an reference sequence $b$ in $B$.</li>
+
+  <li>Throw out alignments that are to the reverse strand, if
+      <tt>--strand-specific</tt> is present.</li>
+
+  <li>Throw out alignments whose fraction identity is less than
+      <tt>--min-frac-identity</tt> (q.v.\ for the definition of ``fraction
+      identity'').</li>
+
+  <li>Throw out alignments whose fraction indel is greater than
+      <tt>--max-frac-indel</tt> (q.v.\ for the definition of ``fraction indel'').</li>
+
+  <li>Construct a bipartite graph from the remaining alignments, in which there
+      is an edge between $a$ and $b$ iff there is a remaining alignment $l$ of
+      $a$ to $b$.</li>
+
+  <li>If <tt>--weighted=yes</tt>, specify a weight for each edge between $a$ and
+      $b$, namely $\tau(b)$, the relative abundance of $b$ within the
+      reference, as specified in <tt>--B-expr</tt>.</li>
+
+  <li>The unweighted contig recall is the number of edges in the maximum
+      cardinality matching of this graph, divided by the number of sequences in
+      the reference $B$.</li>
+
+  <li>The weighted contig recall is the weight of the maximum weight matching
+      of this graph.</li>
+</ul>
+
+<p>The contig precision is defined as follows: Interchange the assembly and the
+reference, and compute the contig recall.</p>
+
+<p>The contig F1 is the harmonic mean of the precision and recall.</p>
+
+
+<h2>Score definitions: nucleotide precision, recall, and F1</h2>
+
+<p>The nucleotide recall is defined as follows:</p>
+
+<ul>
+  <li>Align the assembly $A$ to the reference $B$. Notation: each alignment $l$
+      is between a contig $a \in A$ and an reference element $b \in B$.</li>
+
+  <li>Throw out alignments that are to the reverse strand, if
+      <tt>--strand-specific</tt> is present.</li>
+
+  <li>Throw out alignments that are shorter than <tt>--min-fragment-length</tt>.</li>
+
+  <li>Add each remaining alignment to a priority queue, with priority equal to
+      the number of identical bases in the alignment.</li>
+
+  <li>Let numer = 0.</li>
+
+  <li>While the priority queue is not empty:
+  <ul>
+    <li>Pop the alignment $l$ with highest priority.</li>
+    <li>Add the number of identical bases in the alignment to numer.</li>
+    <li>Subtract $l$ from all the other alignments in the queue and update their
+        priorities (see below).</li>
+  </ul>
+  </li>
+
+  <li>Let denom be the total number of bases in the reference $B$.</li>
+
+  <li>The unweighted nucleotide recall is numer/denom.</li>
+</ul>
+
+<p>The actual implementation uses a more complicated and efficient algorithm
+than the one above.</p>
+
+<p>If <tt>--weighted=yes</tt>, then (i) ``the number of identical bases'' above
+is replaced by ``the number of identical bases, times $\tau(b)$'', in the
+definition of the priority and the numer, and (ii) ``total number of bases in
+the reference $B$'' is replaced by ``$\sum_{b \in B} \tau(b) length(b)$''. In
+other words, each base (of a reference sequence), throughout the computation,
+is weighted by the expression level of its parent sequence.</p>
+
+<p>The nucleotide precision is defined as follows: Interchange the assembly and
+the reference, and compute the nucleotide recall.</p>
+
+<p>The nucleotide F1 is the harmonic mean of the precision and recall.</p>
+
+<p>Alignment subtraction is defined as follows.</p>
+
+<ul>
+  <li>An alignment $l$ from $a$ to $b$ can be thought of as a set of pairs of
+      disjoint intervals
+      <div>
+      $$
+        \{ ([s_1(a), e_1(a)], [s_1(b), e_1(b)]), \dots, ([s_n(a), e_n(a)], [s_n(b), e_n(b)]) \},
+      $$
+      </div>
+      where each pair $([s_i(a), e_i(a)], [s_i(b), e_i(b)])$ corresponds to an
+      ungapped segment of the alignment: $s_i(a)$ and $e_i(a)$ are the
+      segment's start and end positions within a, and $s_i(b)$ and $e_i(b)$ are
+      the segment's start and end positions within b. In the case of
+      non-strand-specific alignments, $s_i(b)$ might be greater than $e_i(b)$.</li>
+
+  <li>If $l$ is an alignment from $a$ to $b$, $l'$ is an alignment from $a'$ to
+      $b'$, $a \neq a'$, and $b \neq b'$, then the difference $l - l' = l$.</li>
+
+  <li>If $l$ is an alignment from $a$ to $b$, $l'$ is an alignment from $a'$ to
+      $b'$, $a = a'$, and $b \neq b'$, then the difference $l - l' = l''$,
+      defined as follows. Each alignment segment of $l$ is compared to the
+      alignment segments of $l'$. If a segment of $l$ overlaps one of the
+      segments of $l'$ wrt $a$, it is truncated so as to avoid the overlap.
+      This truncation may result in zero, one, or two replacement alignment
+      segments. (If the overlapping alignment segment of $l'$ is contained
+      strictly within the segment of $l$, wrt $a$, two segments will result.)</li>
+
+  <li>If $l$ is an alignment from $a$ to $b$, $l'$ is an alignment from $a'$ to
+      $b'$, $a \neq a'$, and $b = b'$, then the difference $l - l' = l''$,
+      defined similarly as in the previous item, except overlaps are examined
+      and resolved wrt $b$.</li>
+</ul>
+
+
+<h2>Score definitions: pair precision, recall, and F1</h2>
+
+<p>The definitions for pair precision, recall, and F1 are exactly the same as
+for nucleotide precision, recall, and F1, except that instead of bases, we
+operate on pairs of bases.</p>
+
+
+<h2>Score definitions: KC and related scores</h2>
+
+<p>The kmer compression score (KC score) is a combination of two measures,
+weighted kmer recall (WKR) and inverse compression rate (ICR), and is
+simply</p>
+$$
+  KC = WKR - ICR.
+$$
+<p>The WKR measures the <emph>fidelity</emph> with which a particular assembly
+represents the kmer content of the reference sequences. Balancing the WKR, the
+ICR measures the degree to which the assembly <emph>compresses</emph> the
+RNA-Seq data. The details of the WKR and ICR measures are provided below.</p>
+
+<p>To compute the WKR, the relative abundances of the reference elements are
+required, as specified by <tt>--B-expr</tt>. Given the reference sequences and
+their abundances, a kmer occurrence frequency profile, $p$, is computed, with
+individual kmer occurrences weighted by their parent sequences' abundances: for
+each kmer $r$, we define</p>
+$$
+p(r) = \frac{ \sum_{b \in B} n(r,b)*\tau(b) }
+            { \sum_{b \in B} n(b)  *\tau(b) }
+$$
+<p>where $B$ is the set of reference sequences, and for each reference sequence
+$b \in B$:</p>
+<ul>
+  <li>$n(r,b)$ is the number of times the kmer $r$ occurs in $b$,</li>
+  <li>$n(b)  $ is the total number of kmers in $b$, and</li>
+  <li>$tau(b)$ is the relative abundance of $b$.</li>
+</ul>
+
+<p>Letting $R(A)$ be the set of all kmers in the assembly $A$, the weighted
+kmer recall (WKR) is defined as</p>
+$$
+WKR = \sum_{r \in R(A)} p(r).
+$$
+
+<p>REF-EVAL currently uses <tt>--readlen</tt> as the kmer length.</p>
+
+<p>Since recall measures only tell half of the story regarding accuracy, the KC
+score includes a second term, the ICR, which serves to penalize large
+assemblies. We define the inverse compression rate (ICR) of an assembly as</p>
+$$
+ICR = n_A/(N L),
+$$
+<p>where</p>
+<ul>
+  <li>$n_A$ is the total number of bases in the assembly $A$,</li>
+  <li>$N$ is the total number of reads, as specified by <tt>--num-reads</tt>, and</li>
+  <li>$L$ is the read length, as specified by <tt>--readlen</tt>.</li>
+</ul>
+
+<h2>Score definitions: kmer scores</h2>
+
+<p>If <tt>--weighted=yes</tt>, we construct a kmer occurrence frequency profile
+$p_B$ for $B$ exactly as described in the previous section (about the KC
+score). We construct a kmer occurrence frequency profile $p_A$ for $A$
+similarly. The relative abundances are specified by <tt>--A-expr</tt> and
+<tt>--B-expr</tt>.</p>
+
+<p>If <tt>--weighted=no</tt>, we construct the kmer occurrence frequency
+profiles $p_A$ and $p_B$ in the same way, except that uniform relative
+abundances are used, i.e., $\tau(a) = 1/|A|$ for all $a$ in $A$, and $tau(b) =
+1/|B|$ for all $b$ in $B$, where $|A|$ is the number of contigs in $A$, and
+$|B|$ is the number of reference sequences in $B$.</p>
+
+<p>Let $m$ be the ``mean'' profile of $p_A$ and $p_B$:</p>
+$$
+   m(r) = (1/2) (p_A(r) + p_B(r))  \qquad\hbox{for every kmer $r$}.
+$$
+<p>The Jensen-Shannon divergence between $p_A$ and $p_B$ is defined in terms of
+the KL divergence between $p_A$ and the mean, and $p_B$ and the mean, as
+follows:</p>
+<ul>
+  <li>Let $KL(p_A || m) = \sum_r p_A(r) (\log_2(p_A(r)) - \log_2(m(r)))$.</li>
+  <li>Let $KL(p_B || m) = \sum_r p_B(r) (\log_2(p_B(r)) - \log_2(m(r)))$.</li>
+  <li>Let $JS(p_A || p_B) = (1/2) (KL(p_A || m) + KL(p_B || m))$.</li>
+</ul>
+<p>In the output file, these three scores are denoted
+<tt>(un)weighted_kmer_KL_A_to_M</tt>, <tt>(un)weighted_kmer_KL_B_to_M</tt>, and
+<tt>(un)weighted_kmer_jensen_shannon</tt>, respectively.</p>
+
+<p>The Hellinger distance between $p_A$ and $p_B$ is defined as</p>
+$$
+  \sqrt{ (1/2) \sum_r (\sqrt{p_A(r)} - \sqrt{p_B(r)})^2 }
+$$
+
+<p>The total variation distance between $p_A$ and $p_B$ is defined as</p>
+$$
+  (1/2) \sum_r |p_A(r) - p_B(r)|,
+$$
+<p>where $|\cdot|$ denotes absolute value. Above, $\sum_r$ denotes a sum over
+all possible kmers $r$ (most of which will have $p_A(r) = p_B(r) = 0$).</p>
+
+</body>
+</html>

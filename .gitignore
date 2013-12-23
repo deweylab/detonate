@@ -10,5 +10,3 @@ test_compute_alignment_stats
 test_alignment_segment
 test_re_matched
 *.dSYM
-re_help.hh
-re_bta_help.hh

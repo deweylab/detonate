@@ -390,7 +390,7 @@ void output(
 
 void print_help()
 {
-  std::cout << REF_EVAL_BTA_HELP << std::endl;
+  std::cout << get_help_string() << std::endl;
 }
 
 boost::program_options::options_description describe_options()
