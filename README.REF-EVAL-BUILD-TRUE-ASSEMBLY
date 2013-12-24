@@ -63,7 +63,7 @@ Options that specify input and output
    --assembly arg
 
            A prefix to write the "true" assembly or sequence of
-           assemblies to. The suffix "_x.fa" will be appended to this
+           assemblies to. The suffix _x.fa will be appended to this
            prefix, where x is the minimum overlap size. Required.
 
 Options that change the output
@@ -86,7 +86,7 @@ Options that change the output
                 range of overlap sizes, as described above. For example,
                 if --min-overlap=2,4 is given, then three assemblies
                 will be produced, corresponding to --min-overlap=2,
-                --min-overlap=3, and --min-overlap=4. You might use this
+                --min-overlap=3, and --min-overlap=4 You might use this
                 option to compute ideal assemblies at all overlap sizes,
                 e.g., --min-overlap=0,76 for 76-length reads.
 
