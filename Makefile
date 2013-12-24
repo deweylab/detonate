@@ -90,7 +90,7 @@ city/finished:
 sam/libbam.a:
 	@echo 
 	@echo ----------------------------------
-	@echo - Building the CityHash library. -
+	@echo - Building the SAMtools library. -
 	@echo ----------------------------------
 	@echo 
 	cd sam && $(MAKE)
