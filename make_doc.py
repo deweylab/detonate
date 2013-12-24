@@ -41,8 +41,7 @@ e.set("type", "text/css")
 e.text = """
 body { max-width: 50em; }
 body, td { font-family: sans-serif; }
-.arg { margin: 1.2em 0em 1.2em 1.2ex; font: fixed; }
-.adef { margin: 0.6em 0em 0.6em 4.8ex; }
+dt { font-family: monospace; }
 h1, h2 { color: #990000; }
 """
 e.tail = "\n"
