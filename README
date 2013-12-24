@@ -8,7 +8,7 @@ Overview
    collection of reference sequences. For information about how to run
    REF-EVAL, see "Usage" and the sections following it below. For
    information about the score definitions, see "Score definitions" and
-   the sections below.
+   the sections following it below.
 
 Usage
 
@@ -24,14 +24,14 @@ Usage
 
    If you want to compute alignment-based scores (see --scores below for
    more info), align the assembly to the reference and vice versa using
-   Blat [1]. We recommend fairly unrestrictive settings, in order to
+   [1]Blat. We recommend fairly unrestrictive settings, in order to
    generate many candidate alignments.
 
  $ blat -minIdentity=80 B.fa A.fa A_to_B.psl
  $ blat -minIdentity=80 A.fa B.fa B_to_A.psl
 
-   If you want to compute weighted variants of scores, use RSEM [2] (or
-   RSEM-EVAL) to compute the expression of the assembly and reference
+   If you want to compute weighted variants of scores, use [2]RSEM (or
+   [3]RSEM-EVAL) to compute the expression of the assembly and reference
    relative to the given reads. Let's assume that the reads are in
    reads.fq.
 
@@ -58,9 +58,6 @@ Usage
    The scores will be written to scores.txt. Further details about the
    arguments to REF-EVAL are described below. Further details about the
    scores themselves are given under "Score definitions" below.
-
-   [1] http://genome.ucsc.edu/FAQ/FAQblat.html
-   [2] http://deweylab.biostat.wisc.edu/rsem/
 
 Usage: Score specification
 
@@ -417,7 +414,7 @@ Score definitions: KC and related scores
 
      * $n(r,b)$ is the number of times the kmer $r$ occurs in $b$,
      * $n(b) $ is the total number of kmers in $b$, and
-     * $tau(b)$ is the relative abundance of $b$.
+     * $\tau(b)$ is the relative abundance of $b$.
 
    Letting $R(A)$ be the set of all kmers in the assembly $A$, the
    weighted kmer recall (WKR) is defined as
@@ -451,7 +448,7 @@ Score definitions: kmer scores
    If --weighted=no, we construct the kmer occurrence frequency profiles
    $p_A$ and $p_B$ in the same way, except that uniform relative
    abundances are used, i.e., $\tau(a) = 1/|A|$ for all $a$ in $A$, and
-   $tau(b) = 1/|B|$ for all $b$ in $B$, where $|A|$ is the number of
+   $\tau(b) = 1/|B|$ for all $b$ in $B$, where $|A|$ is the number of
    contigs in $A$, and $|B|$ is the number of reference sequences in
    $B$.
 
@@ -484,3 +481,10 @@ Score definitions: kmer scores
    where $|\cdot|$ denotes absolute value. Above, $\sum_r$ denotes a sum
    over all possible kmers $r$ (most of which will have $p_A(r) = p_B(r)
    = 0$).
+
+References
+
+   Visible links
+   1. http://genome.ucsc.edu/FAQ/FAQblat.html
+   2. http://deweylab.biostat.wisc.edu/rsem/
+   3. http://deweylab.biostat.wisc.edu/detonate/rsem-eval.html

@@ -12,7 +12,7 @@ transcriptome sequence assembly evaluation</h1>
 the quality of a transcriptome assembly relative to a collection of reference
 sequences. For information about how to run REF-EVAL, see ``Usage'' and the
 sections following it below. For information about the score definitions, see
-``Score definitions'' and the sections below.</p>
+``Score definitions'' and the sections following it below.</p>
 
 
 <h2>Usage</h2>
@@ -28,18 +28,20 @@ Let's assume that the assembly of interest is in <tt>A.fa</tt>, and the
 reference is in <tt>B.fa</tt>.</p>
 
 <p>If you want to compute alignment-based scores (see <tt>--scores</tt> below
-for more info), align the assembly to the reference and vice versa using Blat
-[1]. We recommend fairly unrestrictive settings, in order to generate many
-candidate alignments.</p>
+for more info), align the assembly to the reference and vice versa using <a
+href="http://genome.ucsc.edu/FAQ/FAQblat.html">Blat</a>. We recommend fairly
+unrestrictive settings, in order to generate many candidate alignments.</p>
 
 <pre>
 $ blat -minIdentity=80 B.fa A.fa A_to_B.psl
 $ blat -minIdentity=80 A.fa B.fa B_to_A.psl
 </pre>
 
-<p>If you want to compute weighted variants of scores, use RSEM [2] (or
-RSEM-EVAL) to compute the expression of the assembly and reference relative to
-the given reads. Let's assume that the reads are in reads.fq.</p>
+<p>If you want to compute weighted variants of scores, use <a
+href="http://deweylab.biostat.wisc.edu/rsem/">RSEM</a> (or <a
+href="http://deweylab.biostat.wisc.edu/detonate/rsem-eval.html">RSEM-EVAL</a>)
+to compute the expression of the assembly and reference relative to the given
+reads. Let's assume that the reads are in <tt>reads.fq</tt>.</p>
 
 <pre>
 $ rsem-prepare-reference --no-polyA A.fa A_ref
@@ -68,11 +70,6 @@ $ ./ref-eval --scores=nucl,pair,contig,kmer,kc \
 <p>The scores will be written to scores.txt. Further details about the
 arguments to REF-EVAL are described below. Further details about the scores
 themselves are given under ``Score definitions'' below.</p>
-
-<p>
-[1] http://genome.ucsc.edu/FAQ/FAQblat.html<br />
-[2] http://deweylab.biostat.wisc.edu/rsem/
-</p>
 
 
 <h2>Usage: Score specification</h2>
@@ -161,8 +158,8 @@ themselves are given under ``Score definitions'' below.</p>
         options are incompatible with this flag.</p>
 
         <p>
-        [1] Bo Li*, Nathanael Fillmore*, Yongsheng Bai, Mike Collins, James
-            A. Thompson, Ron Stewart, Colin N. Dewey. Evaluation of de novo
+        [1] Bo Li*, Nathanael Fillmore*, Yongsheng Bai, Mike Collins, James A.
+            Thompson, Ron Stewart, Colin N. Dewey. Evaluation of <i>de novo</i>
             transcriptome assemblies from RNA-Seq data.
         </p>
         </dd>
@@ -561,7 +558,7 @@ $b \in B$:</p>
 <ul>
   <li>$n(r,b)$ is the number of times the kmer $r$ occurs in $b$,</li>
   <li>$n(b)  $ is the total number of kmers in $b$, and</li>
-  <li>$tau(b)$ is the relative abundance of $b$.</li>
+  <li>$\tau(b)$ is the relative abundance of $b$.</li>
 </ul>
 
 <p>Letting $R(A)$ be the set of all kmers in the assembly $A$, the weighted
@@ -595,7 +592,7 @@ similarly. The relative abundances are specified by <tt>--A-expr</tt> and
 
 <p>If <tt>--weighted=no</tt>, we construct the kmer occurrence frequency
 profiles $p_A$ and $p_B$ in the same way, except that uniform relative
-abundances are used, i.e., $\tau(a) = 1/|A|$ for all $a$ in $A$, and $tau(b) =
+abundances are used, i.e., $\tau(a) = 1/|A|$ for all $a$ in $A$, and $\tau(b) =
 1/|B|$ for all $b$ in $B$, where $|A|$ is the number of contigs in $A$, and
 $|B|$ is the number of reference sequences in $B$.</p>
 
