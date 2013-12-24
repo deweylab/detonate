@@ -55,7 +55,9 @@ html = bio.getvalue().decode("utf-8")
 
 # Replace quotation marks.
 html = html.replace("``", "&ldquo;")
+html = html.replace("''$", "NF_PRIME_PRIME_DOLLAR_PLACEHOLDER")
 html = html.replace("''", "&rdquo;")
+html = html.replace("NF_PRIME_PRIME_DOLLAR_PLACEHOLDER", "''$")
 
 # Write the HTML string to the output file.
 with open(args.html, "w") as fo:

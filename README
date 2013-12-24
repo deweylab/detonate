@@ -368,7 +368,7 @@ Score definitions: nucleotide precision, recall, and F1
        $l - l' = l$.
      * If $l$ is an alignment from $a$ to $b$, $l'$ is an alignment from
        $a'$ to $b'$, $a = a'$, and $b \neq b'$, then the difference $l -
-       l' = l"$, defined as follows. Each alignment segment of $l$ is
+       l' = l''$, defined as follows. Each alignment segment of $l$ is
        compared to the alignment segments of $l'$. If a segment of $l$
        overlaps one of the segments of $l'$ wrt $a$, it is truncated so
        as to avoid the overlap. This truncation may result in zero, one,
@@ -377,7 +377,7 @@ Score definitions: nucleotide precision, recall, and F1
        segment of $l$, wrt $a$, two segments will result.)
      * If $l$ is an alignment from $a$ to $b$, $l'$ is an alignment from
        $a'$ to $b'$, $a \neq a'$, and $b = b'$, then the difference $l -
-       l' = l"$, defined similarly as in the previous item, except
+       l' = l''$, defined similarly as in the previous item, except
        overlaps are examined and resolved wrt $b$.
 
 Score definitions: pair precision, recall, and F1
