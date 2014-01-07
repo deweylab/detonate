@@ -274,7 +274,7 @@ void read_alignments(std::vector<tagged_alignment>& alignments,
         l.a_idx = it->second;
         // Extract b_name and look up its idx.
         it = B_names_to_idxs.find(al.b_name());
-        if (it == A_names_to_idxs.end())
+        if (it == B_names_to_idxs.end())
           throw std::runtime_error("Sequence name " + al.b_name() + " is not found in the corresponding fasta file.");
         l.b_idx = it->second;
         // Extract the alignment segments.
