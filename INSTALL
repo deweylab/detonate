@@ -15,3 +15,8 @@ REF-EVAL comes with a number of unit tests. To build and run these tests, run
 to build some of the tests. To be clear, the tests are mainly useful for
 developers, not normal users of the software. It isn't necessary for users to
 build or run the tests.
+
+REF-EVAL also comes with regression tests. These tests compare the output of
+the current version of REF-EVAL to the output we used in our paper (and checked
+carefully at that time). To run these tests, follow the instructions in
+./test_against_paper/README.

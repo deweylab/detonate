@@ -1,0 +1,61 @@
+The scripts in this directory compare the scores produced by the current
+version of REF-EVAL to those produced for the DETONATE paper. Thus, this
+directory's code functions as a regression test suite for the REF-EVAL code.
+
+The steps below look numerous and complicated, but most of them either just
+replicate the setup I already use day-to-day in the UW-Madison biostats pool,
+or explain how to use the nfwq tool. In other words, using all the
+infrastructure below might look like overkill, and indeed in some sense it is,
+but it is actually pretty quick and dirty for me, given our existing
+computational infrastructure setup.
+
+To run these tests, do the following:
+
+- Download http://deweylab.biostat.wisc.edu/detonate/detonate_assemblies.tar.gz
+  to ${workdir} and unpack it in ${workdir}. There will now exist a directory
+  ${workdir}/detonate_assemblies.
+
+- Download and install cctools (Cooperative Computing Tools) from
+  http://www3.nd.edu/~ccl/software/. If you install cctools in a nonstandard
+  directory, make sure that:
+
+  - your PYTHONPATH environment variable contains something like
+    ${ccdir}/lib/python3.3/site-packages/, and
+
+  - your PATH environment variable contains ${ccdir}/bin,
+
+  where ${ccdir} is the directory you installed cctools. While installing
+  cctools, be sure to enable Python 3 support. For example:
+
+  $ ./configure --with-python3-path $(dirname $(dirname $(which python3))) \
+                --prefix $(pwd)/../cctools-install
+
+- Download the nfwq package:
+
+  $ git clone https://github.com/nfillmore/nfwq.git
+
+  and add the nfwq directory to your PYTHONPATH and PATH environment variables.
+
+- Create a DAG to run the tests:
+
+  $ python3 make_dag.py --workdir ${workdir}
+
+- Start a work queue master:
+
+  $ nfwq start_master --db ${workdir}/dag.db --port 9140
+  
+  (It's best to do this in a GNU Screen session or similar.)
+
+- In a different shell, instruct the master to look for available jobs:
+
+  $ nfwq refresh_master --db ${workdir}/dag.db
+
+- Start workers. In the UW-Madison biostats pool, the following will work well.
+  Otherwise, look at this script and adapt it as appropriate.
+
+  $ bash start_workers.sh $(uname -n) 9140
+
+- After all jobs have completed, compare the results to those used in the
+  DETONATE paper:
+
+  $ python3 compare_results.py --workdir ${workdir}
