@@ -12,10 +12,9 @@ Overview
 
 Usage
 
-   As an optional first step, estimate the "true" assembly. See
-   ./ref-eval-build-true-assembly --help for more information.
-   Alternatively, you can use the full-length reference transcript
-   sequences directly as a reference.
+   As an optional first step, estimate the "true" assembly, using
+   [1]REF-EVAL-BUILD-TRUE-ASSEMBLY. Alternatively, you can use the
+   full-length reference transcript sequences directly as a reference.
 
    From now on, we will call the estimated "true" assembly or the
    collection of full-length reference sequences (whichever you choose
@@ -24,14 +23,14 @@ Usage
 
    If you want to compute alignment-based scores (see --scores below for
    more info), align the assembly to the reference and vice versa using
-   [1]Blat. We recommend fairly unrestrictive settings, in order to
+   [2]Blat. We recommend fairly unrestrictive settings, in order to
    generate many candidate alignments.
 
  $ blat -minIdentity=80 B.fa A.fa A_to_B.psl
  $ blat -minIdentity=80 A.fa B.fa B_to_A.psl
 
-   If you want to compute weighted variants of scores, use [2]RSEM (or
-   [3]RSEM-EVAL) to compute the expression of the assembly and reference
+   If you want to compute weighted variants of scores, use [3]RSEM (or
+   [4]RSEM-EVAL) to compute the expression of the assembly and reference
    relative to the given reads. Let's assume that the reads are in
    reads.fq.
 
@@ -40,7 +39,7 @@ Usage
  $ rsem-calculate-expression -p 24 --no-bam-output reads.fq A_ref A_expr
  $ rsem-calculate-expression -p 24 --no-bam-output reads.fq B_ref B_expr
 
-   Finally, run REF-EVAL:
+   Finally, run REF-EVAL. To compute everything, run:
 
  $ ./ref-eval --scores=nucl,pair,contig,kmer,kc \
               --weighted=both \
@@ -55,9 +54,46 @@ Usage
               --kmerlen 76 \
               | tee scores.txt
 
-   The scores will be written to scores.txt. Further details about the
-   arguments to REF-EVAL are described below. Further details about the
-   scores themselves are given under "Score definitions" below.
+   To only compute the kmer compression score (and its dependencies),
+   run:
+
+ $ ./ref-eval --scores=kc \
+              --A-seqs A.fa \
+              --B-seqs B.fa \
+              --B-expr B_expr.isoforms.results \
+              --num-reads 5000000 \
+              --readlen 76 \
+              --kmerlen 76 \
+              | tee scores.txt
+
+   To only compute the unweighted reference-based scores, run:
+
+ $ ./ref-eval --scores=nucl,pair,contig \
+              --weighted=no \
+              --A-seqs A.fa \
+              --B-seqs B.fa \
+              --A-to-B A_to_B.psl \
+              --B-to-A B_to_A.psl \
+              | tee scores.txt
+
+   To only compute the scores discussed in the DETONATE paper, run:
+
+ $ ./ref-eval --paper \
+              --A-seqs A.fa \
+              --B-seqs B.fa \
+              --B-expr B_expr.isoforms.results \
+              --A-to-B A_to_B.psl \
+              --B-to-A B_to_A.psl \
+              --num-reads 5000000 \
+              --readlen 76 \
+              --kmerlen 76 \
+              | tee scores.txt
+
+   The scores will be written to standard output (hence, above, to
+   scores.txt). Progress information is written to standard error.
+   Further details about the arguments to REF-EVAL are described below.
+   Further details about the scores themselves are given under "Score
+   definitions" below.
 
 Usage: Score specification
 
@@ -380,11 +416,156 @@ Score definitions: nucleotide precision, recall, and F1
        l' = l''$, defined similarly as in the previous item, except
        overlaps are examined and resolved wrt $b$.
 
+   A couple of examples of the above are as follows. The comments in
+   [5]test_re_matched.cpp contain even more examples.
+
+   As a first example, consider alignments of an assembly $A = \{a_0,
+   a_1, a_2\}$ to a reference $B = \{b_0, b_1\}$. In the pictures below,
+   each alignment segment is indicated by a pair diagonal or vertical
+   lines, with its name (initially $x$, $y$, $z$, $w$) in between the
+   two lines.
+
+       b0                    b1
+    B  -----------------     -------------
+            /    \   /  \   /  | / |
+           /      \ /    \ /   |/  |
+          /  x     /  y   \  z / w |
+         /        / \    / \  /|   |
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   Assume:
+
+     * $x > y > z > w$, where $>$ compares alignment size measured by
+       the number of identical bases.
+     * $y - x < z$.
+     * $y - x$ is contained in $z$, wrt $A$.
+
+   Step 1: Process alignment $x$, resulting in
+
+       b0                    b1
+    B  ------------------   --------------
+            /        /\ \   /  | / |
+           /        /  \ \ /   |/  |
+          /  x     /    \*\  z / w |        * = y - x
+         /        /      / \  /|   |
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   Step 2: Process alignment $z$, resulting in
+
+       b0                    b1
+    B  -----------------    --------------
+            /        /      /    /||
+           /        /      /    / ||
+          /  x     /      /  z /  *|        * = w - z
+         /        /      /    /   ||
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   Now we have a 1-1 mathing. The intervals of $B$ used to compute
+   recall are as follows:
+
+       b0                    b1
+    B  -----[--------]--    [----][]------
+            /        /      /    /||
+           ...
+
+   As a second example, we start with the same initial set of
+   alignments:
+
+       b0                    b1
+    B  -----------------     -------------
+            /    \   /  \   /  | / |
+           /      \ /    \ /   |/  |
+          /  x     /  y   \  z / w |
+         /        / \    / \  /|   |
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   But we make a slightly different set of assumptions:
+
+     * $x > y > w > z$ ($w$ and $z$ are interchanged, compared to the
+       first example).
+     * $y - x < w$.
+     * $y - x > z - w$.
+     * $y - x$ is contained in $z$, wrt $A$.
+
+   Step 1: Process alignment $x$, resulting in
+
+       b0                    b1
+    B  ------------------   --------------
+            /        /\ \   /  | / |
+           /        /  \ \ /   |/  |
+          /  x     /    \*\  z / w |        * = y - x
+         /        /      / \  /|   |
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   Step 2: Process alignment w, resulting in
+
+       b0                    b1
+    B  ------------------   --------------
+            /        /\ \   /  |   |
+           /        /  \ \ /  /|   |
+          /  x     /    \*\ +/ | w |        * = y - x
+         /        /      / \/  |   |        + = z - w
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   Step 3: Process alignment $y - x$, resulting in
+
+       b0                    b1
+    B  ------------------   --------------
+            /        /\ \  +/  |   |
+           /        /  \*\//   |   |
+          /  x     /    \ \    | w |        * = y - x
+         /        /     // \   |   |        + = (z - w) - (y - x)
+    A    ---------   --------- ---------
+         a0          a1        a2
+
+   Now we have a 1-1 mathing. The intervals of $B$ used to compute
+   recall are:
+
+       b0                    b1
+    B  -----[--------][-]   []-[---]------
+            /        /\ \  //  |   |        * = y - x
+             x         *   +     w          + = (z - w) - (y - x)
+           ...
+
 Score definitions: pair precision, recall, and F1
 
    The definitions for pair precision, recall, and F1 are exactly the
    same as for nucleotide precision, recall, and F1, except that instead
    of bases, we operate on pairs of bases.
+
+   For example, consider the reference $B$ (with one transcript) and
+   assembly $A$ (with two contigs), where horizontal position indicates
+   alignment.
+
+       B: b   = AGCTCGACGT
+       A: a_1 = AGCT
+          a_2 =     CGACGT
+
+   Here, the transcript recall is 0 (because neither $a_1$ nor $a_2$
+   covers $b$ to $\geq$ 99 percent), but the nucleotide recall is 1
+   (because $a_1$ and $a_2$ jointly cover $b$ completely). The pair
+   recall is somewhere in between, because the following pairs of $b$
+   are correctly predicted (represented by an upper triangular indicator
+   matrix):
+
+           First base
+       S   AGCTCGACGT
+       e A 1111
+       c G  111
+       o C   11
+       n T    1
+       d C     111111
+         G      11111
+       b A       1111
+       a C        111
+       s G         11
+       e T          1
 
 Score definitions: KC and related scores
 
@@ -406,8 +587,8 @@ Score definitions: KC and related scores
    computed, with individual kmer occurrences weighted by their parent
    sequences' abundances: for each kmer $r$, we define
 
-   $$ p(r) = \frac{ \sum_{b \in B} n(r,b)*\tau(b) } { \sum_{b \in B}
-   n(b) *\tau(b) } $$
+   $$ p(r) = \frac{ \sum_{b \in B} n(r,b) \tau(b) } { \sum_{b \in B}
+   n(b) \tau(b) } $$
 
    where $B$ is the set of reference sequences, and for each reference
    sequence $b \in B$:
@@ -485,6 +666,8 @@ Score definitions: kmer scores
 References
 
    Visible links
-   1. http://genome.ucsc.edu/FAQ/FAQblat.html
-   2. http://deweylab.biostat.wisc.edu/rsem/
-   3. http://deweylab.biostat.wisc.edu/detonate/rsem-eval.html
+   1. http://deweylab.biostat.wisc.edu/detonate/ref-eval-build-true-assembly.html
+   2. http://genome.ucsc.edu/FAQ/FAQblat.html
+   3. http://deweylab.biostat.wisc.edu/rsem/
+   4. http://deweylab.biostat.wisc.edu/detonate/rsem-eval.html
+   5. https://github.com/nfillmore/ref-eval/blob/master/test_re_matched.cpp
