@@ -184,20 +184,19 @@ void main_2(
     const std::string& prefix)
 {
   size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.kmerlen, o.hash_table_fudge_factor);
-  std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::flush;
+  std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::endl;
   Ht ht(max_entries, kmer_key_hash(o.kmerlen), kmer_key_equal_to(o.kmerlen));
   empty_key_initializer<Ht> eki(ht, o.kmerlen);
-  std::cerr << "done." << std::endl;
 
   std::cerr << "Populating the hash table..." << std::flush;
   count_kmers<Ht, 0>(ht, A.seqs, A_rc, tau_A, o.kmerlen, o.strand_specific);
   count_kmers<Ht, 1>(ht, B.seqs, B_rc, tau_B, o.kmerlen, o.strand_specific);
   std::cerr << "done; hash table contains " << ht.size() << " entries." << std::endl;
 
-  std::cerr << "Normalizing the induced distributions..." << std::flush;
+  std::cerr << "Normalizing the induced distributions..." << std::endl;
   normalize_kmer_distributions(ht);
-  std::cerr << "done." << std::endl;
 
+  std::cerr << "Computing kmer Jensen-Shannon, Hellinger, and total variation scores..." << std::endl;
   compute_stats(ht, prefix);
 }
 

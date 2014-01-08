@@ -166,23 +166,22 @@ void main_1(
     const fasta& B,
     const expr& tau_B)
 {
-  std::cerr << "Reverse complementing the sequences..." << std::flush;
+  std::cerr << "Reverse complementing the sequences..." << std::endl;
   std::vector<std::string> A_rc, B_rc;
   transform(A.seqs.begin(), A.seqs.end(), back_inserter(A_rc), reverse_complement);
   transform(B.seqs.begin(), B.seqs.end(), back_inserter(B_rc), reverse_complement);
-  std::cerr << "done." << std::endl;
 
   size_t max_entries = estimate_hashtable_size(A.seqs, B.seqs, o.kmerlen, o.hash_table_fudge_factor);
-  std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::flush;
+  std::cerr << "Initializing the hash table with space for " << max_entries << " entries..." << std::endl;
   Ht ht(max_entries, kmer_key_hash(o.kmerlen), kmer_key_equal_to(o.kmerlen));
   empty_key_initializer<Ht> eki(ht, o.kmerlen);
-  std::cerr << "done." << std::endl;
 
   std::cerr << "Populating the hash table..." << std::flush;
   count_kmers_in_A(ht, A.seqs, A_rc,        o.readlen, o.strand_specific);
   count_kmers_in_B(ht, B.seqs, B_rc, tau_B, o.readlen, o.strand_specific);
   std::cerr << "done; hash table contains " << ht.size() << " entries." << std::endl;
 
+  std::cerr << "Computing kmer recall, inverse compression rate, and kmer compression scores..." << std::endl;
   double wkr = compute_kmer_recall(ht);
   double icr = compute_inverse_compression_rate(o, A);
 

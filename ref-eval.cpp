@@ -279,25 +279,22 @@ int main(int argc, const char **argv)
     parse_options(o, vm);
     notify(vm);
 
-    std::cerr << "Reading the sequences..." << std::flush;
+    std::cerr << "Reading the sequences..." << std::endl;
     fasta A, B;
     read_fasta(A, o.A_seqs);
     read_fasta(B, o.B_seqs);
-    std::cerr << "done." << std::endl;
 
     expr tau_A, tau_B;
     if (o.weighted) {
-      std::cerr << "Reading the expression..." << std::flush;
+      std::cerr << "Reading the expression..." << std::endl;
       tau_A.resize(A.card);
       tau_B.resize(B.card);
       read_rsem_expr(tau_A, o.A_expr, A);
       read_rsem_expr(tau_B, o.B_expr, B);
-      std::cerr << "done." << std::endl;
     } else if (o.kc || o.paper) {
-      std::cerr << "Reading the expression..." << std::flush;
+      std::cerr << "Reading the expression..." << std::endl;
       tau_B.resize(B.card);
       read_rsem_expr(tau_B, o.B_expr, B);
-      std::cerr << "done." << std::endl;
     }
 
     expr unif_A, unif_B;
@@ -311,7 +308,7 @@ int main(int argc, const char **argv)
     re::kc       ::main(o, A, B,        tau_B);
     re::kmer     ::main(o, A, B, tau_A, tau_B, unif_A, unif_B);
 
-    std::cerr << "Done!" << std::endl;
+    std::cerr << "Done computing all scores." << std::endl;
 
   } catch (const boost::program_options::error& x) {
 

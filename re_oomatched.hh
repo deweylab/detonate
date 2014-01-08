@@ -157,13 +157,14 @@ void main_1(const opts& o,
   typename Al::input_stream_type A_to_B_is(open_or_throw(o.A_to_B));
   typename Al::input_stream_type B_to_A_is(open_or_throw(o.B_to_A));
 
+  std::cerr << "Computing contig precision, recall, and F1 scores..." << std::endl;
   result recall = compute_recall<Al>(o, A_to_B_is, A, B, tau_B);
   result precis = compute_recall<Al>(o, B_to_A_is, B, A, tau_A);
 
   if (o.weighted) {
-    std::cout << "weighted_contig_recall\t"   << recall.weighted   << std::endl;
-    std::cout << "weighted_contig_precision\t"   << precis.weighted   << std::endl;
-    std::cout << "weighted_contig_F1\t"   << compute_F1(precis.weighted,   recall.weighted)   << std::endl;
+    std::cout << "weighted_contig_recall\t" << recall.weighted << std::endl;
+    std::cout << "weighted_contig_precision\t" << precis.weighted << std::endl;
+    std::cout << "weighted_contig_F1\t" << compute_F1(precis.weighted, recall.weighted) << std::endl;
   }
 
   if (o.unweighted || o.paper) {

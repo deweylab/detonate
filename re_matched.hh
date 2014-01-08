@@ -442,19 +442,29 @@ void main_1(const opts& o,
             const expr& unif_A,
             const expr& unif_B)
 {
-  std::cerr << "Reading the alignments and extracting intervals..." << std::flush;
+  std::cerr << "Reading the alignments and extracting intervals..." << std::endl;
   std::vector<tagged_alignment> A_to_B, B_to_A;
   read_alignments<Al>(A_to_B, o.A_to_B, A.seqs, B.seqs, A.names_to_idxs, B.names_to_idxs, o.strand_specific, o.min_segment_len);
   read_alignments<Al>(B_to_A, o.B_to_A, B.seqs, A.seqs, B.names_to_idxs, A.names_to_idxs, o.strand_specific, o.min_segment_len);
-  std::cerr << "done." << std::endl;
 
-  if (o.nucl) main_2<nucl_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "nucl_");
-  if (o.pair) main_2<pair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "pair_");
+  if (o.nucl) {
+    std::cerr << "Computing nucleotide precision, recall, and F1 scores..." << std::endl;
+    main_2<nucl_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "nucl_");
+  }
+
+  if (o.pair) {
+    std::cerr << "Computing pair precision, recall, and F1 scores..." << std::endl;
+    main_2<pair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "pair_");
+  }
+
   //if (o.kpair) main_2<kpair_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "kpair_");
   //if (o.kmer) main_2<kmer_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "kmer_");
   //if (o.tran) main_2<tran_helper>(o, A, B, tau_A, tau_B, unif_A, unif_B, A_to_B, B_to_A, "tran_");
 
-  if (o.paper) compute<nucl_helper>(o, A, B, unif_A, unif_B, A_to_B, B_to_A, "unweighted_nucl_");
+  if (o.paper) {
+    std::cerr << "Computing nucleotide precision, recall, and F1 scores..." << std::endl;
+    compute<nucl_helper>(o, A, B, unif_A, unif_B, A_to_B, B_to_A, "unweighted_nucl_");
+  }
 }
 
 void main(const opts& o,
