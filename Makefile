@@ -23,13 +23,11 @@
 #   CXX below to use MacPorts' g++ instead of clang++.
 
 ifeq ($(shell uname), Linux)
-  CXX   = g++
   CXX11 = $(CXX) -std=c++11 
   OMP   = -fopenmp
 endif
 
 ifeq ($(shell uname), Darwin)
-  CXX   = clang++
   CXX11 = $(CXX) -std=c++11 
   OMP   =
 endif
@@ -71,7 +69,15 @@ boost/finished:
 	@echo 
 	cd boost && $(MAKE)
 
-lemon/finished:
+cmake/bin/cmake:
+	@echo 
+	@echo -------------------
+	@echo - Building CMake. -
+	@echo -------------------
+	@echo 
+	cd cmake && $(MAKE)
+
+lemon/finished: cmake/bin/cmake
 	@echo 
 	@echo -------------------------------------
 	@echo - Building the Lemon graph library. -
