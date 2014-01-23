@@ -230,6 +230,10 @@ void choose_alignments(
         is_lidx_chosen[it->second.lidxs[i]] = true;
     }
   }
+
+  else {
+    throw std::runtime_error("Unknown alignment policy: " + alignment_policy);
+  }
 }
 
 void extract_reads(
@@ -454,12 +458,12 @@ void parse_options(opts& o, const boost::program_options::variables_map& vm)
 
   if (vm.count("alignment-policy")) {
     o.alignment_policy = vm["alignment-policy"].as<std::string>();
-    if (o.alignment_policy != "random" &&
+    if (o.alignment_policy != "sample" &&
         o.alignment_policy != "best" &&
         o.alignment_policy != "all")
       throw po::error("Invalid value for --alignment-policy: " + o.alignment_policy);
   } else {
-    o.alignment_policy = "random";
+    o.alignment_policy = "sample";
   }
 
   if (vm.count("min-alignment-prob")) {
