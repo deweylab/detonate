@@ -48,42 +48,56 @@ std::string join(V vec, S sep)
 {
   std::ostringstream oss;
   typename V::iterator b = vec.begin(), e = vec.end();
-  if (b != e)
+  if (b != e) {
     oss << *b;
-  ++b;
-  for (; b != e; ++b)
-    oss << sep << *b;
+    ++b;
+    for (; b != e; ++b)
+      oss << sep << *b;
+  }
   return oss.str();
 }
 
-template<typename Al, typename MM>
+template<typename MM>
 void output_matching(const std::string& fname,
                      const std::string& pr_string,
                      const fasta& A,
                      const fasta& B,
                      const std::vector<lemon::SmartGraph::Node>& B_nodes,
                      std::map<lemon::SmartGraph::Node, size_t>& A_nodes_to_idxs,
+                     const lemon::SmartGraph& graph,
                      const MM& mm,
-                     const lemon::SmartGraph::EdgeMap<double> *wei_map,
-                     const lemon::SmartGraph::EdgeMap<boost::shared_ptr<Al> >& al_map)
+                     const lemon::SmartGraph::EdgeMap<double> *wei_map)
 {
   std::ofstream fo(fname.c_str());
   if (pr_string == "recall")
-    fo << "b_name\ta_name\tedge_weight" << std::endl;
+    fo << "b_name\ta_name\tedge_weight\tcandidate_a_names" << std::endl;
   else // for precision, A and B have been interchanged
-    fo << "a_name\tb_name\tedge_weight" << std::endl;
+    fo << "a_name\tb_name\tedge_weight\tcandidate_b_names" << std::endl;
   for (size_t b_idx = 0; b_idx < B.card; ++b_idx) {
-    lemon::SmartGraph::Node a_node = mm.mate(B_nodes[b_idx]);
-    lemon::SmartGraph::Edge edge = mm.matching(B_nodes[b_idx]);
+    lemon::SmartGraph::Node b_node = B_nodes[b_idx];
+    lemon::SmartGraph::Node a_node = mm.mate(b_node);
+    lemon::SmartGraph::Edge edge = mm.matching(b_node);
+    // Output the first three columns.
     if (a_node == lemon::INVALID) {
-      fo << B.names[b_idx] << "\tNA\tNA" << std::endl;
+      fo << B.names[b_idx] << "\tNA\tNA\t";
     } else {
       size_t a_idx = A_nodes_to_idxs[a_node];
       fo << B.names[b_idx] << "\t"
          << A.names[a_idx] << "\t"
-         << (wei_map ? (*wei_map)[edge] : 1.0/B.card)
-         << std::endl;
+         << (wei_map ? (*wei_map)[edge] : 1.0/B.card) << "\t";
     }
+    // Output the last two columns.
+    std::vector<std::string> alt_names;
+    for (lemon::SmartGraph::OutArcIt it(graph, b_node); it != lemon::INVALID; ++it) {
+      assert(graph.source(it) == b_node);
+      lemon::SmartGraph::Node alternate = graph.target(it);
+      alt_names.push_back(A.names[A_nodes_to_idxs[alternate]]);
+    }
+    if (alt_names.size() == 0)
+      fo << "NA";
+    else
+      fo << join(alt_names, ",");
+    fo << std::endl;
   }
 }
 
@@ -145,14 +159,14 @@ result compute_recall(const opts& o,
   if (o.trace != "" && o.weighted) {
     std::ostringstream fname;
     fname << o.trace << ".weighted_contig_" << pr_string << "_matching";
-    output_matching(fname.str(), pr_string, A, B, B_nodes, A_nodes_to_idxs, wei_mm, &wei_map, al_map);
+    output_matching(fname.str(), pr_string, A, B, B_nodes, A_nodes_to_idxs, graph, wei_mm, &wei_map);
   }
 
   // Output the unweighted matching.
   if (o.trace != "" && (o.unweighted || o.paper)) {
     std::ostringstream fname;
     fname << o.trace << ".unweighted_contig_" << pr_string << "_matching";
-    output_matching(fname.str(), pr_string, A, B, B_nodes, A_nodes_to_idxs, unw_mm, NULL, al_map);
+    output_matching(fname.str(), pr_string, A, B, B_nodes, A_nodes_to_idxs, graph, unw_mm, NULL);
   }
   return recall;
 }

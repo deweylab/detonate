@@ -456,10 +456,17 @@ themselves are given under &ldquo;Score definitions&rdquo; below.</p>
                     $a$. (This is set to the uniform weights $1/|B|$ in the
                     unweighted case, although the maximum cardinality matching
                     algorithm does not actually use these weights.)</li>
+                <li>Column 4 contains the names of all the contigs $a'$ that
+                    are adjacent to $b$ in the bipartite graph that the
+                    matching is based on, separated by commas. Thus, this
+                    column lists all the contigs $a'$ that have a "good enough"
+                    match with the reference sequence $b$, according to the
+                    criteria used to build the bipartite graph. (See the
+                    section below on score definitions for details.)</li>
               </ul>
 
-            Otherwise, columns 2 and 3 contain "NA". For precision, the file
-            has the same format, but with the reference and the assembly
+            Otherwise, columns 2--4 contain "NA". For precision, the file has
+            the same format, but with the reference and the assembly
             interchanged. In other words, each row corresponds to a contig $a$
             and contains information about its matching to a reference sequence
             $b$, or all "NA" values if $a$ was not matched.</li>
