@@ -56,6 +56,7 @@ boost::program_options::options_description describe_options()
     ("min-segment-len", po::value<size_t>())
     ("hash-table-type", po::value<std::string>())
     ("hash-table-fudge-factor", po::value<double>())
+    ("trace", po::value<std::string>())
   ;
   return desc;
 }
@@ -252,6 +253,10 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
       throw po::error("--hash-table-fudge-factor is not needed except for kmer and kc scores.");
   }
 
+  // Parse trace.
+  if (vm.count("trace")) {
+    o.trace = vm["trace"].as<std::string>();
+  }
 }
 
 void print_help()

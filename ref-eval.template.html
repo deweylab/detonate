@@ -421,6 +421,45 @@ themselves are given under ``Score definitions'' below.</p>
 
 </dl>
 
+<h2>Usage: Options to include additional output</h2>
+<dl>
+
+  <dt>
+  --trace arg
+  </dt>
+
+        <dd>
+        <p>If given, the prefix for additional output that provides details
+        about the REF-EVAL scores; if not given, no such output is produced.
+        Currently, the only such output is as follows.</p>
+
+          <ul>
+            <li>(--trace).{weighted,unweighted}_contig_{precision,recall}_matching
+            is a TSV file that describes the matching used to compute the
+            weighted or unweighted contig precision or recall. (Details about
+            the matching are given in the section on score definitions below.)
+            For recall, each row corresponds to a reference sequence $b$.
+            Column 1 contains $b$'s name. If $b$ is matched to a contig $a$,
+            then the remaining columns are as follows:
+
+              <ul>
+                <li>Column 2 contains $a$'s name.</li>
+                <li>Column 3 contains the weight of the edge between $b$ and
+                    $a$. (This is set to the uniform weights $1/|B|$ in the
+                    unweighted case, although the maximum cardinality matching
+                    algorithm does not actually use these weights.)</li>
+              </ul>
+
+            Otherwise, columns 2 and 3 contain "NA". For precision, the file
+            has the same format, but with the reference and the assembly
+            interchanged. In other words, each row corresponds to a contig $a$
+            and contains information about its matching to a reference sequence
+            $b$, or all "NA" values if $a$ was not matched.</li>
+          </ul>
+        </dd>
+
+</dl>
+
 
 <h2>Usage: General options</h2>
 <dl>

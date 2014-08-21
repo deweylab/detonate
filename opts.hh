@@ -74,6 +74,9 @@ struct opts
   std::string hash_table_type;
   double hash_table_fudge_factor;
 
+  // Trace output
+  std::string trace;
+
   opts()
   :
     // Scores
@@ -127,7 +130,10 @@ struct opts
 
     // Hash table
     hash_table_type(""),
-    hash_table_fudge_factor(-1.0)
+    hash_table_fudge_factor(-1.0),
+
+    // Trace output
+    trace("")
   {}
 };
 
