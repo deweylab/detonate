@@ -27,7 +27,7 @@
 #include "sam/bam.h"
 #include "fasta.hh"
 #include "util.hh"
-#include "re_bta_help.hh"
+#include "re_eta_help.hh"
 
 struct probs_and_lidxs
 {

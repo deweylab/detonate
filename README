@@ -13,7 +13,7 @@ Overview
 Usage
 
    As an optional first step, estimate the "true" assembly, using
-   [1]REF-EVAL-BUILD-TRUE-ASSEMBLY. Alternatively, you can use the
+   [1]REF-EVAL-ESTIMATE-TRUE-ASSEMBLY. Alternatively, you can use the
    full-length reference transcript sequences directly as a reference.
 
    From now on, we will call the estimated "true" assembly or the
@@ -706,7 +706,7 @@ Score definitions: kmer scores
 References
 
    Visible links
-   1. http://deweylab.biostat.wisc.edu/detonate/ref-eval-build-true-assembly.html
+   1. http://deweylab.biostat.wisc.edu/detonate/ref-eval-estimate-true-assembly.html
    2. http://genome.ucsc.edu/FAQ/FAQblat.html
    3. http://deweylab.biostat.wisc.edu/rsem/
    4. http://deweylab.biostat.wisc.edu/detonate/rsem-eval.html

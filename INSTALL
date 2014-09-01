@@ -1,10 +1,10 @@
 To build REF-EVAL, simply run "make" from the current directory. This will
 build two executables (plus a few dependent libraries), ./ref-eval and
-./ref-eval-build-true-assembly, which you can run from the current directory or
+./ref-eval-estimate-true-assembly, which you can run from the current directory or
 move elsewhere. (The executables are statically linked with their local
 dependencies, so you don't need to worry about the library path.) For
 information about how to run REF-EVAL once it is built, see ./ref-eval --help
-and ./ref-eval-build-true-assembly --help.
+and ./ref-eval-estimate-true-assembly --help.
 
 If the "make" command fails, you might need to tweak the build process a bit.
 To do so, edit ./Makefile and make changes as appropriate to the section marked

@@ -1,5 +1,5 @@
-REF-EVAL-BUILD-TRUE-ASSEMBLY: A program to estimate the "true" assembly of
-         a set of reads, relative to a set of reference sequences
+REF-EVAL-ESTIMATE-TRUE-ASSEMBLY: A program to estimate the "true" assembly
+        of a set of reads, relative to a set of reference sequences
 
 Overview
 
@@ -36,9 +36,9 @@ Example usage
  $ rsem-prepare-reference --gtf mm9.ensembl63.filtered.gtf mm9.fa ref
  $ rsem-calculate-expression --num-threads 24 reads.fq ref expr
 
-   Second, use this program to build the "true" assembly:
+   Second, use this program to estimate the "true" assembly:
 
- $ ./ref-eval-build-true-assembly --reference ref --expression expr --assembly cc
+ $ ./ref-eval-estimate-true-assembly --reference ref --expression expr --assembly cc
 
    This will output a file, cc_0.fa, that contains the "true" assembly.
 

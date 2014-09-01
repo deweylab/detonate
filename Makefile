@@ -55,11 +55,11 @@ LIB = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB) $(SAM_LIB)
 TEST_LIB = boost/stage/lib/libboost_unit_test_framework.a
 
 .PHONY: all
-all: ref-eval ref-eval-build-true-assembly
+all: ref-eval ref-eval-estimate-true-assembly
 
 .PHONY: debug
 debug: CXXFLAGS += $(CXXFLAGS_DEBUG)
-debug: ref-eval ref-eval-build-true-assembly
+debug: ref-eval ref-eval-estimate-true-assembly
 
 boost/finished:
 	@echo 
@@ -117,13 +117,13 @@ ref-eval: ref-eval.cpp boost/finished lemon/finished city/finished sam/libbam.a 
 	@echo 
 	$(CXX) $(OMP) $(CXXFLAGS) $(INC) ref-eval.cpp $(LIB) -o ref-eval
 
-ref-eval-build-true-assembly: ref-eval-build-true-assembly.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
+ref-eval-estimate-true-assembly: ref-eval-estimate-true-assembly.cpp boost/finished lemon/finished city/finished sam/libbam.a sparsehash/finished
 	@echo 
-	@echo ------------------------------------------------
-	@echo - Building program to build the true assembly. -
-	@echo ------------------------------------------------
+	@echo ---------------------------------------------------
+	@echo - Building program to estimate the true assembly. -
+	@echo ---------------------------------------------------
 	@echo 
-	$(CXX) $(CXXFLAGS) $(INC) ref-eval-build-true-assembly.cpp $(LIB) -lz -o ref-eval-build-true-assembly
+	$(CXX) $(CXXFLAGS) $(INC) ref-eval-estimate-true-assembly.cpp $(LIB) -lz -o ref-eval-estimate-true-assembly
 
 .PHONY: doc
 doc:
@@ -131,10 +131,10 @@ doc:
                         --html     ref-eval.html \
                         --text     README \
                         --cxx      re_help.hh
-	python3 make_doc.py --template ref-eval-build-true-assembly.template.html \
-                        --html     ref-eval-build-true-assembly.html \
-                        --text     README.REF-EVAL-BUILD-TRUE-ASSEMBLY \
-                        --cxx      re_bta_help.hh
+	python3 make_doc.py --template ref-eval-estimate-true-assembly.template.html \
+                        --html     ref-eval-estimate-true-assembly.html \
+                        --text     README.REF-EVAL-ESTIMATE-TRUE-ASSEMBLY \
+                        --cxx      re_eta_help.hh
 
 all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_alignment_segment test_re_matched
 
@@ -183,7 +183,7 @@ test_re_matched: test_re_matched.cpp re_matched.hh
 
 .PHONY: clean
 top-clean:
-	-rm -f ref-eval ref-eval-build-true-assembly ${all_tests}
+	-rm -f ref-eval ref-eval-estimate-true-assembly ${all_tests}
 	-rm -rf *.dSYM
 
 .PHONY: clean

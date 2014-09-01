@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <html>
 <head>
-<title>REF-EVAL-BUILD-TRUE-ASSEMBLY: A program to estimate the ``true'' assembly
-of a set of reads, relative to a set of reference sequences</title>
+<title>REF-EVAL-ESTIMATE-TRUE-ASSEMBLY: A program to estimate the ``true''
+assembly of a set of reads, relative to a set of reference sequences</title>
 </head>
 <body>
 
-<h1>REF-EVAL-BUILD-TRUE-ASSEMBLY: A program to estimate the ``true'' assembly
-of a set of reads, relative to a set of reference sequences</h1>
+<h1>REF-EVAL-ESTIMATE-TRUE-ASSEMBLY: A program to estimate the ``true''
+assembly of a set of reads, relative to a set of reference sequences</h1>
 
 <h2>Overview</h2>
 
@@ -45,10 +45,10 @@ $ rsem-prepare-reference --gtf mm9.ensembl63.filtered.gtf mm9.fa ref
 $ rsem-calculate-expression --num-threads 24 reads.fq ref expr
 </pre>
 
-<p>Second, use this program to build the ``true'' assembly:</p>
+<p>Second, use this program to estimate the ``true'' assembly:</p>
 
 <pre>
-$ ./ref-eval-build-true-assembly --reference ref --expression expr --assembly cc
+$ ./ref-eval-estimate-true-assembly --reference ref --expression expr --assembly cc
 </pre>
 
 <p>This will output a file, cc_0.fa, that contains the ``true'' assembly.</p>
