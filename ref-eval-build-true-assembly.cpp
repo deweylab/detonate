@@ -29,7 +29,8 @@
 #include "util.hh"
 #include "re_bta_help.hh"
 
-struct probs_and_lidxs {
+struct probs_and_lidxs
+{
   std::vector<size_t> lidxs;
   std::vector<double> probs;
 };
@@ -39,7 +40,8 @@ struct ReadStruct
   int rid, tid, pos, readlen;
   int cid, rpos; // id in contigs and right most end's contig position
 
-  ReadStruct(int rid, int tid, int pos, int readlen) {
+  ReadStruct(int rid, int tid, int pos, int readlen)
+  {
     this->rid = rid;
     this->tid = tid;
     this->pos = pos;
@@ -47,7 +49,8 @@ struct ReadStruct
     cid = rpos = -1;
   }
 
-  bool operator< (const ReadStruct& o) const {
+  bool operator< (const ReadStruct& o) const
+  {
     if (tid != o.tid) return tid < o.tid;
     return pos < o.pos;
   }
@@ -57,7 +60,8 @@ struct ContigStruct
 {
   int tid, pos, len;
 
-  ContigStruct(int tid, int pos, int len) {
+  ContigStruct(int tid, int pos, int len)
+  {
     this->tid = tid;
     this->pos = pos;
     this->len = len;
@@ -68,7 +72,8 @@ struct BreakPointStruct
 {
   int cid, pos, overlap;
 
-  BreakPointStruct(int cid, int pos, int overlap) {
+  BreakPointStruct(int cid, int pos, int overlap)
+  {
     this->cid = cid;
     this->pos = pos;
     this->overlap = overlap;
@@ -138,10 +143,9 @@ double compute_prob(const bam1_t *rec)
   return prob;
 }
 
-size_t extract_alignment_probs(
-    std::map<std::string, probs_and_lidxs>& read_to_probs_and_lidxs,
-    const std::string& bam_fname,
-    double min_alignment_prob)
+size_t extract_alignment_probs(std::map<std::string, probs_and_lidxs>& read_to_probs_and_lidxs,
+                               const std::string& bam_fname,
+                               double min_alignment_prob)
 {
   // Open BAM file and read header.
   bamFile fi = bam_open(bam_fname.c_str(), "r");
@@ -186,11 +190,10 @@ size_t extract_alignment_probs(
   return lidx;
 }
 
-void choose_alignments(
-    std::vector<bool>& is_lidx_chosen,
-    boost::random::mt19937& rng,
-    const std::map<std::string, probs_and_lidxs>& read_to_probs_and_lidxs,
-    const std::string& alignment_policy)
+void choose_alignments(std::vector<bool>& is_lidx_chosen,
+                       boost::random::mt19937& rng,
+                       const std::map<std::string, probs_and_lidxs>& read_to_probs_and_lidxs,
+                       const std::string& alignment_policy)
 {
   std::map<std::string, probs_and_lidxs>::const_iterator it;
 
@@ -236,10 +239,9 @@ void choose_alignments(
   }
 }
 
-void extract_reads(
-    std::vector<ReadStruct>& reads,
-    const std::vector<bool>& is_lidx_chosen,
-    const std::string& bam_fname)
+void extract_reads(std::vector<ReadStruct>& reads,
+                   const std::vector<bool>& is_lidx_chosen,
+                   const std::string& bam_fname)
 {
   // Open BAM file and read header.
   bamFile fi = bam_open(bam_fname.c_str(), "r");
@@ -276,10 +278,9 @@ void extract_reads(
   bam_header_destroy(header);
 }
 
-void assemble(
-  std::vector<ContigStruct>& contigs,
-  std::vector<ReadStruct>& reads,
-  int min_overlap)
+void assemble(std::vector<ContigStruct>& contigs,
+              std::vector<ReadStruct>& reads,
+              int min_overlap)
 {
   int s = -1;
   size_t num_reads = reads.size();
@@ -319,11 +320,10 @@ void assemble(
   // }
 }
 
-void output(
-  const std::string& output_fname,
-  const std::vector<ContigStruct>& contigs,
-  const fasta& ref_fa,
-  const std::string& bam_fname)
+void output(const std::string& output_fname,
+            const std::vector<ContigStruct>& contigs,
+            const fasta& ref_fa,
+            const std::string& bam_fname)
 {
   // Open BAM file and read header.
   bamFile fi = bam_open(bam_fname.c_str(), "r");
