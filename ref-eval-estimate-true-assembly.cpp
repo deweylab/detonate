@@ -38,7 +38,6 @@ struct probs_and_lidxs
 struct ReadStruct
 {
   int rid, tid, pos, readlen;
-  int cid, rpos; // id in contigs and right most end's contig position
 
   ReadStruct(int rid, int tid, int pos, int readlen)
   {
@@ -46,7 +45,6 @@ struct ReadStruct
     this->tid = tid;
     this->pos = pos;
     this->readlen = readlen;
-    cid = rpos = -1;
   }
 
   bool operator< (const ReadStruct& o) const
@@ -65,18 +63,6 @@ struct ContigStruct
     this->tid = tid;
     this->pos = pos;
     this->len = len;
-  }
-};
-
-struct BreakPointStruct
-{
-  int cid, pos, overlap;
-
-  BreakPointStruct(int cid, int pos, int overlap)
-  {
-    this->cid = cid;
-    this->pos = pos;
-    this->overlap = overlap;
   }
 };
 
@@ -299,25 +285,9 @@ void assemble(std::vector<ContigStruct>& contigs,
     else {
       contigs[s].len = reads[i].pos + reads[i].readlen - contigs[s].pos;
     }
-
-    reads[i].cid = s;
-    reads[i].rpos = contigs[s].len - 1;
   }
 
   ++s; // there are s contigs
-
-  // if (breakpoints != NULL) {
-  //   for (int i = 0; i < num_reads - 1; i++) {
-  //     // read is the end of a contig
-  //     if (reads[i].rpos + 1 == contigs[reads[i].cid].len)
-  //       continue;
-  //     // there is another read coincide with this read
-  //     if (reads[i].rpos == reads[i + 1].rpos)
-  //       continue;
-  //     assert(reads[i].cid == reads[i + 1].cid);
-  //     breakpoints->push_back(BreakPointStruct(reads[i].cid, reads[i].rpos, readLen - (reads[i + 1].rpos - reads[i].rpos)));
-  //   }
-  // }
 }
 
 void output(const std::string& output_fname,
@@ -377,19 +347,6 @@ void output(const std::string& output_fname,
 
   // Clean up.
   bam_header_destroy(header);
-
-  // if (outputBreakPoints) {
-  //   sprintf(breakPointsF, "%s_%d.bp", breakPointsFN, windowSize);
-  //   fo = fopen(breakPointsF, "w");
-  //   if (!fo)
-  //     throw std::runtime_error(std::string("Cannot open file to write breakpoints: ") + breakPointsF);
-  //   int nbp = (int)breakPoints.size();
-  //   fprintf(fo, "%d\n", nbp);
-  //   for (int i = 0; i < nbp; i++) 
-  //     fprintf(fo, "%d %d %d\n", breakPoints[i].cid, breakPoints[i].pos, breakPoints[i].overlap);
-  //   fclose(fo);
-  //   printf("All break points are written to %s!\n", breakPointsF);
-  // }
 }
 
 void print_help()
