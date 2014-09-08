@@ -136,7 +136,7 @@ doc:
                         --text     README.REF-EVAL-ESTIMATE-TRUE-ASSEMBLY \
                         --cxx      re_eta_help.hh
 
-all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_alignment_segment test_re_matched
+all_tests := test_lazycsv test_line_stream test_blast test_psl test_pairset test_mask test_alignment_segment test_re_matched test_re_kc
 
 .PHONY: test
 test: test_msg ${all_tests} boost/finished lemon/finished city/finished sparsehash/finished
@@ -148,6 +148,7 @@ test: test_msg ${all_tests} boost/finished lemon/finished city/finished sparseha
 	./test_mask
 	./test_alignment_segment
 	./test_re_matched
+	./test_re_kc
 
 .PHONY: test_msg
 test_msg:
@@ -180,6 +181,9 @@ test_alignment_segment: test_alignment_segment.cpp alignment_segment.hh
 
 test_re_matched: test_re_matched.cpp re_matched.hh
 	$(CXX11) $(CXXFLAGS) $(INC) test_re_matched.cpp $(LIB) $(TEST_LIB) -o test_re_matched
+
+test_re_kc: test_re_kc.cpp re_matched.hh
+	$(CXX11) $(CXXFLAGS) $(INC) test_re_kc.cpp $(LIB) $(TEST_LIB) -o test_re_kc
 
 .PHONY: clean
 top-clean:
