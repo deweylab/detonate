@@ -52,8 +52,12 @@ public:
   std::string b_name()              const { return t_name(); }
   double      frac_identity_wrt_a() const { return 1.0 * num_identity() / q_size(); }
   double      frac_identity_wrt_b() const { return 1.0 * num_identity() / t_size(); }
+  double      num_identity_wrt_a()  const { return       num_identity()           ; }
+  double      num_identity_wrt_b()  const { return       num_identity()           ; }
   double      frac_indel_wrt_a()    const { return 1.0 * q_base_insert() / q_size(); }
   double      frac_indel_wrt_b()    const { return 1.0 * t_base_insert() / t_size(); }
+  int         num_indel_wrt_a()     const { return       q_base_insert()           ; }
+  int         num_indel_wrt_b()     const { return       t_base_insert()           ; }
   typedef detail::psl_alignment_input_stream input_stream_type;
   typedef detail::psl_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below
@@ -69,6 +73,10 @@ public:
   //
   // Not part of the Alignment concept, but rather for use by psl-specific algorithms.
   //
+
+  // Notes:
+  // - q_size and t_size are the lengths of the query and target, including N's.
+  // - match excludes N's, even if the N's line up.
 
   int                      matches      () const { return lazy_csv.at <int>        ( 0); } // Number of bases that match that aren't repeats
   int                      mis_matches  () const { return lazy_csv.at <int>        ( 1); } // Number of bases that don't match
@@ -229,7 +237,9 @@ namespace detail
       for (int j = 0; j < block_sizes[i]; ++j) {
         char a_char = a_is_rc ? complement((*a)[a_pos]) : (*a)[a_pos];
         char b_char = (*b)[b_pos];
-        if (a_char != b_char) {
+        if (a_char != b_char ||
+            a_char == 'N' || a_char == 'n' ||
+            b_char == 'N' || b_char == 'n') {
           seg.a_mismatches.push_back(a_pos);
           seg.b_mismatches.push_back(b_pos);
         }

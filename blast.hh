@@ -45,8 +45,12 @@ public:
   std::string b_name()        const { return lazy_csv.at<std::string>(2); }
   double      frac_identity_wrt_a() const { return 1.0 * nident() * (qframe() == 0 ? 1 : 3) / qlen(); }
   double      frac_identity_wrt_b() const { return 1.0 * nident() * (sframe() == 0 ? 1 : 3) / slen(); }
+  int         num_identity_wrt_a()  const { return       nident() * (qframe() == 0 ? 1 : 3)         ; }
+  int         num_identity_wrt_b()  const { return       nident() * (sframe() == 0 ? 1 : 3)         ; }
   double      frac_indel_wrt_a()    const { return 1.0 * gaps()   * (qframe() == 0 ? 1 : 3) / qlen(); }
   double      frac_indel_wrt_b()    const { return 1.0 * gaps()   * (sframe() == 0 ? 1 : 3) / slen(); }
+  int         num_indel_wrt_a()     const { return       gaps()   * (qframe() == 0 ? 1 : 3)         ; }
+  int         num_indel_wrt_b()     const { return       gaps()   * (sframe() == 0 ? 1 : 3)         ; }
   typedef detail::blast_alignment_input_stream input_stream_type;
   typedef detail::blast_alignment_segments     segments_type;
   segments_type segments(const std::string& a, const std::string& b) const; // defined below

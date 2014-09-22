@@ -107,6 +107,8 @@ result compute_recall(const opts& o,
                       const fasta& A,
                       const fasta& B,
                       const std::vector<double>& tau_B,
+                      const std::vector<size_t>& num_non_N_in_A,
+                      const std::vector<size_t>& num_non_N_in_B,
                       const std::string pr_string)
 {
   // Create the graph, and add a node for each contig and oracleset element.
@@ -129,18 +131,23 @@ result compute_recall(const opts& o,
   lemon::SmartGraph::EdgeMap<boost::shared_ptr<Al> > al_map(graph);
   Al al;
   while (input_stream >> al) {
-    if (al.is_on_valid_strand(o.strand_specific) &&
-        al.frac_identity_wrt_a() >= o.min_frac_identity && 
-        al.frac_identity_wrt_b() >= o.min_frac_identity &&
-        al.frac_indel_wrt_a() <= o.max_frac_indel &&
-        al.frac_indel_wrt_b() <= o.max_frac_indel) {
+    if (al.is_on_valid_strand(o.strand_specific)) {
+        // al.frac_identity_wrt_a() >= o.min_frac_identity && 
+        // al.frac_identity_wrt_b() >= o.min_frac_identity &&
+        // al.frac_indel_wrt_a() <= o.max_frac_indel &&
+        // al.frac_indel_wrt_b() <= o.max_frac_indel)
       size_t a_idx = A.names_to_idxs.find(al.a_name())->second;
       size_t b_idx = B.names_to_idxs.find(al.b_name())->second;
-      lemon::SmartGraph::Edge edge = graph.addEdge(A_nodes[a_idx], B_nodes[b_idx]);
-      if (o.weighted)
-        wei_map[edge] = tau_B[b_idx];
-      if (al_map[edge] == NULL || al.num_identity() >= al_map[edge]->num_identity())
-        al_map[edge] = boost::make_shared<Al>(al);
+      if (1.0*al.num_identity_wrt_a()/num_non_N_in_A[a_idx] >= o.min_frac_identity && 
+          1.0*al.num_identity_wrt_b()/num_non_N_in_B[b_idx] >= o.min_frac_identity &&
+          1.0*al.frac_indel_wrt_a()/num_non_N_in_A[a_idx] <= o.max_frac_indel &&
+          1.0*al.frac_indel_wrt_b()/num_non_N_in_B[b_idx] <= o.max_frac_indel) {
+        lemon::SmartGraph::Edge edge = graph.addEdge(A_nodes[a_idx], B_nodes[b_idx]);
+        if (o.weighted)
+          wei_map[edge] = tau_B[b_idx];
+        if (al_map[edge] == NULL || al.num_identity() >= al_map[edge]->num_identity())
+          al_map[edge] = boost::make_shared<Al>(al);
+      }
     }
   }
 
@@ -171,6 +178,18 @@ result compute_recall(const opts& o,
   return recall;
 }
 
+void compute_num_non_N(std::vector<size_t>& num_non_N, const fasta& A)
+{
+  for (size_t i = 0; i < A.card; ++i) {
+    size_t n = 0;
+    const std::string& a = A.seqs[i];
+    for (std::string::const_iterator it = a.begin(); it != a.end(); ++it)
+      if (*it != 'N' && *it != 'n')
+        ++n;
+    num_non_N[i] = n;
+  }
+}
+
 template<typename Al>
 void main_1(const opts& o,
             const fasta& A,
@@ -181,9 +200,15 @@ void main_1(const opts& o,
   typename Al::input_stream_type A_to_B_is(open_or_throw(o.A_to_B));
   typename Al::input_stream_type B_to_A_is(open_or_throw(o.B_to_A));
 
+  std::cerr << "Computing number of non-N bases..." << std::endl;
+  std::vector<size_t> num_non_N_in_A(A.card);
+  std::vector<size_t> num_non_N_in_B(B.card);
+  compute_num_non_N(num_non_N_in_A, A);
+  compute_num_non_N(num_non_N_in_B, B);
+
   std::cerr << "Computing contig precision, recall, and F1 scores..." << std::endl;
-  result recall = compute_recall<Al>(o, A_to_B_is, A, B, tau_B, "recall");
-  result precis = compute_recall<Al>(o, B_to_A_is, B, A, tau_A, "precision");
+  result recall = compute_recall<Al>(o, A_to_B_is, A, B, tau_B, num_non_N_in_A, num_non_N_in_B, "recall");
+  result precis = compute_recall<Al>(o, B_to_A_is, B, A, tau_A, num_non_N_in_B, num_non_N_in_A, "precision");
 
   if (o.weighted) {
     std::cout << "weighted_contig_recall\t" << recall.weighted << std::endl;
