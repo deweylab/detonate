@@ -334,12 +334,13 @@ Usage: Options to include additional output
                      build the bipartite graph. (See the section below
                      on score definitions for details.)
 
-                Otherwise, columns 2--4 contain "NA". For precision, the
-                file has the same format, but with the reference and the
-                assembly interchanged. In other words, each row
-                corresponds to a contig $a$ and contains information
-                about its matching to a reference sequence $b$, or all
-                "NA" values if $a$ was not matched.
+                Otherwise, if $b$ is not matched to any contig, columns
+                2 and 3 contain "NA". For precision, the file has the
+                same format, but with the reference and the assembly
+                interchanged. In other words, each row corresponds to a
+                contig $a$ and contains information about its matching
+                to a reference sequence $b$, or all "NA" values if $a$
+                was not matched.
 
 Usage: General options
 
