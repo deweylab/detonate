@@ -60,6 +60,17 @@ Options that specify input and output
            The prefix of the expression built by
            rsem-calculate-expression. Required.
 
+   --paired-end
+
+           If you have paired-end data, and you want to estimate the
+           "true" scaffolded assembly, then include the --paired-end
+           flag. In this case, rsem-calculate-expression needs to have
+           been run with the --paired-end flag. (However, even if
+           rsem-calculate-expression was run with the --paired-end flag,
+           you can omit it here in order to generate an unscaffolded
+           assembly. In this case, each mate will be treated as an
+           independent read.)
+
    --assembly arg
 
            A prefix to write the "true" assembly or sequence of

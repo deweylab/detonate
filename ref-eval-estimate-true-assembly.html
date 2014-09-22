@@ -95,6 +95,18 @@ $ ./ref-eval-estimate-true-assembly --reference ref --expression expr --assembly
         <tt>rsem-calculate-expression</tt>. Required.</p>
         </dd>
 
+  <dt>--paired-end</dt>
+
+        <dd>
+        <p>If you have paired-end data, and you want to estimate the &ldquo;true&rdquo;
+        scaffolded assembly, then include the --paired-end flag. In this case,
+        rsem-calculate-expression needs to have been run with the --paired-end
+        flag. (However, even if rsem-calculate-expression was run with the
+        --paired-end flag, you can omit it here in order to generate an
+        unscaffolded assembly. In this case, each mate will be treated as an
+        independent read.)</p>
+        </dd>
+
   <dt>--assembly arg</dt>
 
         <dd>
