@@ -27,6 +27,7 @@
 #include <boost/foreach.hpp>
 #include <sparsehash/sparse_hash_map>
 #include <sparsehash/dense_hash_map>
+#include "skip_Ns.hh"
 #include "util.hh"
 #include "kmer_key.hh"
 
@@ -94,8 +95,13 @@ void count_kmers(
         double c = tau_A[i];
         const char *beg = a.c_str();
         const char *a_end = a.c_str() + a.size() + 1 - kmerlen;
-        for (; beg != a_end; ++beg)
+        beg = skip_Ns(beg, a_end, kmerlen, true);
+        for (; beg != a_end; ++beg) {
+          beg = skip_Ns(beg, a_end, kmerlen, false);
+          if (beg == a_end)
+            break;
           ht[beg].weights[A_or_B] += c; // relies on default init to 0
+        }
       }
     }
   }
