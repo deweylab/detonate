@@ -1,0 +1,5 @@
+species				mean			sd			file			
+
+Homo sapiens			1466.44794266103	1804.89907493894	human.txt		# hg20, Ensembl annotation
+Mus musculus			2096.81038298315	2090.673227048		mouse.txt		# mm9, Ensembl annotation
+Schizosaccharomyces pombe	2050.84456458776	1293.22178627889	fission_yeast.txt	# PomBase, S. pombe annotation (v09052011)

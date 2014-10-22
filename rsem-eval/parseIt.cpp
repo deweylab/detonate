@@ -88,6 +88,9 @@ void parseIt(SamParser *parser) {
 
 	record_val = -2; //indicate no recorded read now
 	while ((val = parser->parseNext(read, hit)) >= 0) {
+	  // Special assertion for RSEM-EVAL, available val value can only be 0, 1, or 5
+	  assert(val == 0 || val == 1 || val == 5);
+
 		if (val >= 0 && val <= 2) {
 			// flush out previous read's info if needed
 			if (record_val >= 0) {
@@ -229,7 +232,9 @@ int main(int argc, char* argv[]) {
 	for (iter = counter.begin(); iter != counter.end(); iter++) {
 		fout<<iter->first<<'\t'<<iter->second<<endl;
 	}
-	fout<<"Inf\t"<<N[2]<<endl;
+	// RSEM-EVAL specific
+	assert(N[2] == 0);
+	//	fout<<"Inf\t"<<N[2]<<endl;
 	fout.close();
 
 	release();

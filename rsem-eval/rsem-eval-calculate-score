@@ -1,0 +1,900 @@
+#!/usr/bin/env perl
+
+use Getopt::Long;
+use Pod::Usage;
+
+use FindBin;
+use lib $FindBin::RealBin;
+use rsem_perl_utils qw(runCommand collectResults showVersionInfo nbinom_load_params nbinom_convert_params);
+
+use Env qw(@PATH);
+@PATH = ($FindBin::RealBin, "$FindBin::RealBin/sam", @PATH);
+
+use strict;
+
+my $command = "";
+
+#RSEM-EVAL parameters
+my $w = 0; # default is 0
+my $params_file = ""; # default is empty
+my $trans_mean = 0; 
+my $trans_sd = 0;
+my (@eval_params) = (); # nb_r, nb_p, L, w
+
+#prepare reference parameters
+my $mappingF = "";
+my $minimum_length = 0;
+
+#calculate RSEM-EVAL score parameters
+my $read_type = 1; # default, single end with qual
+my $paired_end = 0;
+my $no_qual = 0;
+
+my $gap = 32;
+
+# bowtie paramethers
+my $bowtie_path = "";
+my $C = 2;
+my $E = 99999999;
+my $L = 25;
+my $maxHits = 200;
+my $chunkMbs = 0;	# 0 = use bowtie default
+
+# bowtie2 parameters
+my $bowtie2 = 0;
+my $bowtie2_path = "";
+my $bowtie2_mismatch_rate = 0.1;
+my $bowtie2_k = 200;
+my $bowtie2_sensitivity_level = "sensitive"; # must be one of "very_fast", "fast", "sensitive", "very_sensitive"
+
+# two aligners shared parameters
+my $phred33 = 0;
+my $phred64 = 0;
+my $solexa = 0;
+
+# SAM/BAM input parameters
+my $is_sam = 0;
+my $is_bam = 0;
+my $fn_list = "";
+my $tagName = "XM";
+
+# Model parameters
+my $probF = 0.5;
+my $strand_specific = 0;
+
+my $minL = 1;
+my $maxL = 1000;
+my $mean = -1;
+my $sd = 0;
+
+my $estRSPD = 0;
+my $B = 20;
+
+# Number of threads used
+my $nThreads = 1;
+
+# BAM output parameters
+my $genBamF = 0;  # default is not to generate transcript bam file
+my $sampling = 0;
+my $SortMem = "1G"; # default as 1G per thread
+
+# Gibbs and calculate credibility interval parameters
+my $calcPME = 0;
+my $calcCI = 0;
+my $BURNIN = 200;
+my $NCV = 1000;
+my $SAMPLEGAP = 1;
+my $CONFIDENCE = 0.95;
+my $NSPC = 50;
+my $NMB = 1024; # default
+
+# Auxiliary options
+my $seed = "NULL";
+my $keep_intermediate_files = 0;
+my $quiet = 0;
+my $help = 0;
+my $version = 0;
+
+# Time
+my $mTime = 0;
+my ($time_start, $time_end) = (0, 0);
+my ($time_prepare, $time_alignment, $time_rsem, $time_ci) = (0, 0, 0, 0);
+
+# Input list
+my $mate1_list = "";
+my $mate2_list = "";
+my $inpF = "";
+
+my ($assembly_fasta, $refName, $sampleName, $sampleToken, $temp_dir, $stat_dir, $imdName, $statName) = ();
+
+GetOptions("transcript-to-gene-map=s" => \$mappingF,
+           "minimum-length=i" => \$minimum_length,
+	   "overlap-size=i" => \$w,
+	   "transcript-length-parameters=s" => \$params_file,
+	   "transcript-length-mean=f" => \$trans_mean,
+	   "transcript-length-sd=f" => \$trans_sd,
+           "keep-intermediate-files" => \$keep_intermediate_files,
+	   "temporary-folder=s" => \$temp_dir,
+	   "no-qualities" => \$no_qual,
+	   "paired-end" => \$paired_end,
+	   "strand-specific" => \$strand_specific,
+	   "sam" => \$is_sam,
+	   "bam" => \$is_bam,
+	   "sam-header-info=s" => \$fn_list,
+	   "tag=s" => \$tagName,
+	   "seed-length=i" => \$L,
+	   "bowtie-path=s" => \$bowtie_path,
+	   "bowtie-n=i" => \$C,
+	   "bowtie-e=i" => \$E,
+	   "bowtie-m=i" => \$maxHits,
+	   "bowtie-chunkmbs=i" => \$chunkMbs,
+	   "phred33-quals" => \$phred33,
+	   "phred64-quals" => \$phred64, #solexa1.3-quals" => \$phred64,
+	   "solexa-quals" => \$solexa,
+	   "bowtie2" => \$bowtie2,
+	   "bowtie2-path=s" => \$bowtie2_path,
+	   "bowtie2-mismatch-rate=f" => \$bowtie2_mismatch_rate,
+	   "bowtie2-k=i" => \$bowtie2_k,
+	   "bowtie2-sensitivity-level=s" => \$bowtie2_sensitivity_level,
+	   "forward-prob=f" => \$probF,
+	   "fragment-length-min=i" => \$minL,
+	   "fragment-length-max=i" => \$maxL,
+	   "estimate-rspd" => \$estRSPD,
+	   "num-rspd-bins=i" => \$B,
+	   "p|num-threads=i" => \$nThreads,
+	   "output-bam" => \$genBamF,
+	   "sampling-for-bam" => \$sampling,
+	   "calc-pme" => \$calcPME,
+	   "gibbs-burnin=i" => \$BURNIN,
+	   "gibbs-number-of-samples=i" => \$NCV,
+	   "gibbs-sampling-gap=i", \$SAMPLEGAP,
+	   "calc-ci" => \$calcCI,
+	   "ci-credibility-level=f" => \$CONFIDENCE,
+	   "ci-memory=i" => \$NMB,
+	   "ci-number-of-samples-per-count-vector=i" => \$NSPC,
+	   "samtools-sort-mem=s" => \$SortMem,
+	   "seed=i" => \$seed,
+	   "time" => \$mTime,
+	   "version" => \$version,
+	   "q|quiet" => \$quiet,
+	   "h|help" => \$help) or pod2usage(-exitval => 2, -verbose => 2);
+
+pod2usage(-verbose => 2) if ($help == 1);
+&showVersionInfo($FindBin::RealBin) if ($version == 1);
+
+#check parameters and options
+if ($is_sam || $is_bam) {
+    pod2usage(-msg => "Invalid number of arguments!", -exitval => 2, -verbose => 2) if (scalar(@ARGV) != 4);
+    pod2usage(-msg => "--sam and --bam cannot be active at the same time!", -exitval => 2, -verbose => 2) if ($is_sam == 1&& $is_bam == 1);
+    pod2usage(-msg => "--bowtie-path, --bowtie-n, --bowtie-e, --bowtie-m, --phred33-quals, --phred64-quals, --solexa-quals, --bowtie2, --bowtie2-path, --bowtie2-mismatch-rate, --bowtie2-k and --bowtie2-sensitivity-level cannot be set if input is SAM/BAM format!", -exitval => 2, -verbose => 2) if ($bowtie_path ne "" || $C != 2 || $E != 99999999 || $maxHits != 200 || $phred33 || $phred64 || $solexa || $bowtie2 || $bowtie2_path ne "" || $bowtie2_mismatch_rate != 0.1 || $bowtie2_k != 200 || $bowtie2_sensitivity_level ne "sensitive");
+}
+else {
+    pod2usage(-msg => "Invalid number of arguments!", -exitval => 2, -verbose => 2) if (!$paired_end && scalar(@ARGV) != 4 || $paired_end && scalar(@ARGV) != 5);    
+    pod2usage(-msg => "If --no-qualities is set, neither --phred33-quals, --phred64-quals or --solexa-quals can be active!", -exitval => 2, -verbose => 2) if ($no_qual && ($phred33 + $phred64 + $solexa > 0));
+    pod2usage(-msg => "Only one of --phred33-quals, --phred64-quals, and --solexa-quals can be active!", -exitval => 2, -verbose => 2) if ($phred33 + $phred64 + $solexa > 1);    
+    pod2usage(-msg => "--sam , --bam or --sam-header-info cannot be set if use bowtie/bowtie2 aligner to produce alignments!", -exitval => 2, -verbose => 2) if ($is_sam || $is_bam || $fn_list ne "");
+    pod2usage(-msg => "--bowtie2-path, --bowtie2-mismatch-rate, --bowtie2-k and --bowtie2-sensitivity-level cannot be set if bowtie aligner is used!", -exitval => 2, -verbose => 2) if (!$bowtie2 && ($bowtie2_path ne "" || $bowtie2_mismatch_rate != 0.1 || $bowtie2_k != 200 || $bowtie2_sensitivity_level ne "sensitive"));
+    pod2usage(-msg => "--bowtie-path, --bowtie-n, --bowtie-e, --bowtie-m cannot be set if bowtie2 aligner is used!", -exitval => 2, -verbose => 2) if ($bowtie2 && ($bowtie_path ne "" || $C != 2 || $E != 99999999 || $maxHits != 200));
+    pod2usage(-msg => "Mismatch rate must be within [0, 1]!", -exitval => 2, -verbose => 2) if ($bowtie2 && ($bowtie2_mismatch_rate < 0.0 || $bowtie2_mismatch_rate > 1.0));
+    pod2usage(-msg => "Sensitivity level must be one of \"very_fast\", \"fast\", \"sensitive\", and \"very_sensitive\"!", -exitval => 2, -verbose => 2) if ($bowtie2 && (($bowtie2_sensitivity_level ne "very_fast") && ($bowtie2_sensitivity_level ne "fast") && ($bowtie2_sensitivity_level ne "sensitive") && ($bowtie2_sensitivity_level ne "very_sensitive"))); 
+}
+
+pod2usage(-msg => "Forward probability should be in [0, 1]!", -exitval => 2, -verbose => 2) if ($probF < 0 || $probF > 1);
+pod2usage(-msg => "Min fragment length should be at least 1!", -exitval => 2, -verbose => 2) if ($minL < 1);
+pod2usage(-msg => "Min fragment length should be smaller or equal to max fragment length!", -exitval => 2, -verbose => 2) if ($minL > $maxL);
+pod2usage(-msg => "The memory allocated for calculating credibility intervals should be at least 1 MB!\n", -exitval => 2, -verbose => 2) if ($NMB < 1);
+pod2usage(-msg => "Number of threads should be at least 1!\n", -exitval => 2, -verbose => 2) if ($nThreads < 1);
+pod2usage(-msg => "Seed length should be at least 5!\n", -exitval => 2, -verbose => 2) if ($L < 5);
+pod2usage(-msg => "--sampling-for-bam cannot be specified if --output-bam is not specified!\n", -exitval => 2, -verbose => 2) if ($sampling && !$genBamF);
+pod2usage(-msg => "The seed for random number generator must be a non-negative 32bit integer!\n", -exitval => 2, -verbose => 2) if (($seed ne "NULL") && ($seed < 0 || $seed > 0xffffffff));
+pod2usage(-msg => "The credibility level should be within (0, 1)!\n", -exitval => 2, -verbose => 2) if ($CONFIDENCE <= 0.0 || $CONFIDENCE >= 1.0);
+
+# Load eval_params
+pod2usage(-msg => "--transcript-length-parameters and --transcript-length-mean, --transcript-length-sd are mutually exclusive!", -exitval => 2, -verbose => 2) if (($params_file ne "") && ($trans_mean > 0 || $trans_sd > 0));
+if ($params_file ne "") { ($trans_mean, $trans_sd) = &nbinom_load_params($params_file); }
+if ($trans_mean == 0 && $trans_sd == 0) { $trans_mean = 1466.44794266103; $trans_sd = 1804.89907493894; } # default values
+pod2usage(-msg => "Transcript length mean must be positive!", -exitval => 2, -verbose => 2) if ($trans_mean <= 0);
+pod2usage(-msg => "Transcript length standard deviation must be positive!", -exitval => 2, -verbose => 2) if ($trans_sd <= 0);
+pod2usage(-msg => "Transcript length variance must be larger than transcript length mean!", -exitval => 2, -verbose => 2) if ($trans_mean >= $trans_sd ** 2);
+@eval_params = ();
+push(@eval_params, &nbinom_convert_params($trans_mean, $trans_sd));
+push(@eval_params, $ARGV[-1]);
+push(@eval_params, $w);
+
+
+# Set read type etc.
+if ($strand_specific) { $probF = 1.0; }
+
+if ($paired_end) {
+    if ($no_qual) { $read_type = 2; }
+    else { $read_type = 3; }
+}
+else {
+    if ($no_qual) { $read_type = 0; }
+    else { $read_type = 1; }
+}
+
+# Set input files
+if (scalar(@ARGV) == 4) {
+    if ($is_sam || $is_bam) { $inpF = $ARGV[0]; } 
+    else {$mate1_list = $ARGV[0]; }
+    $assembly_fasta = $ARGV[1];
+    $sampleName = $ARGV[2];
+}
+else {
+    $mate1_list = $ARGV[0];
+    $mate2_list = $ARGV[1];
+    $assembly_fasta = $ARGV[2];
+    $sampleName = $ARGV[3];
+}
+
+# Build sample_name.temp and sample_name.stat
+my $pos = rindex($sampleName, '/');
+if ($pos < 0) { $sampleToken = $sampleName; }
+else { $sampleToken = substr($sampleName, $pos + 1); }
+
+if ($temp_dir eq "") { $temp_dir = "$sampleName.temp"; }
+$stat_dir = "$sampleName.stat";
+
+if (!(-d $temp_dir) && !mkdir($temp_dir)) { print "Fail to create folder $temp_dir.\n"; exit(-1); }
+if (!(-d $stat_dir) && !mkdir($stat_dir)) { print "Fail to create folder $stat_dir.\n"; exit(-1); }
+
+$imdName = "$temp_dir/$sampleToken";
+$statName = "$stat_dir/$sampleToken";
+
+# Set bowtie/bowtie2 path
+if ($bowtie_path ne "") { $bowtie_path .= "/"; }
+if ($bowtie2_path ne "") { $bowtie2_path .= "/"; }
+
+
+
+
+# Prepare references
+if ($mTime) { $time_start = time(); }
+
+$refName = $imdName;
+
+$command = "rsem-synthesis-reference-transcripts $refName $minimum_length $quiet";
+if ($mappingF ne "") { $command .= " 1 $mappingF"; }
+else { $command .= " 0"; }
+$command .= " $assembly_fasta";
+&runCommand($command);
+
+$command = "rsem-preref $refName.transcripts.fa 1 $refName";  # No polyA tail is added                                                                                                                   
+if ($quiet) { $command .= " -q"; }
+&runCommand($command);
+
+# Build bowtie/bowtie2 indices if needed
+if (!$is_sam && !$is_bam) {
+    if (!$bowtie2) {
+	$command = $bowtie_path."bowtie-build -f";
+	if ($quiet) { $command .= " -q"; }
+	$command .= " $refName.n2g.idx.fa $refName";
+	&runCommand($command);
+    }
+    else {
+	$command = $bowtie2_path."bowtie2-build -f";
+	if ($quiet) { $command .= " -q"; }
+	$command .= " $refName.idx.fa $refName";
+	&runCommand($command);
+    }
+}
+
+if ($mTime) { $time_end = time(); $time_prepare = $time_end - $time_start; }
+
+
+
+# Calculate RSEM-EVAL score
+if (!$is_sam && !$is_bam && !$no_qual && ($phred33 + $phred64 + $solexa == 0)) { $phred33 = 1; }
+my ($mate_minL, $mate_maxL) = (1, $maxL);
+
+# Run bowtie/bowtie2 if needed
+if (!$is_sam && !$is_bam) {
+    if (!$bowtie2) {
+	$command = $bowtie_path."bowtie";
+	if ($no_qual) { $command .= " -f"; }
+	else { $command .= " -q"; }
+    
+	if ($phred33) { $command .= " --phred33-quals"; }
+	elsif ($phred64) { $command .= " --phred64-quals"; }
+	elsif ($solexa) { $command .= " --solexa-quals"; }
+    
+	$command .= " -n $C -e $E -l $L";
+	if ($read_type == 2 || $read_type == 3) { $command .= " -I $minL -X $maxL"; }
+	if ($chunkMbs > 0) { $command .= " --chunkmbs $chunkMbs"; }
+	
+	if ($strand_specific || $probF == 1.0) { $command .= " --norc"; }
+	elsif ($probF == 0.0) { $command .= " --nofw"; }
+	
+	$command .= " -p $nThreads -a -m $maxHits -S";
+	if ($quiet) { $command .= " --quiet"; }    
+
+	$command .= " $refName";
+	if ($read_type == 0 || $read_type == 1) {
+	    $command .= " $mate1_list"; 
+	}
+	else {
+	    $command .= " -1 $mate1_list -2 $mate2_list";
+	}
+
+	# pipe to samtools to generate a BAM file
+	$command .= " | samtools view -S -b -o $imdName.bam -";
+    }
+    else {
+	$command = $bowtie2_path."bowtie2";
+	if ($no_qual) { $command .= " -f"; }
+	else { $command .= " -q"; }
+
+	if ($phred33) { $command .= " --phred33"; }
+	elsif ($phred64) { $command .= " --phred64"; }
+	elsif ($solexa) { $command .= " --solexa-quals"; }
+
+	if ($bowtie2_sensitivity_level eq "very_fast") { $command .= " --very-fast"; }
+	elsif ($bowtie2_sensitivity_level eq "fast") { $command .= " --fast"; }
+	elsif ($bowtie2_sensitivity_level eq "sensitive") { $command .= " --sensitive"; }
+	else { $command .= " --very-sensitive"; }
+
+	$command .= " --dpad 0 --gbar 99999999 --mp 1,1 --np 1 --score-min L,0,-$bowtie2_mismatch_rate";  
+
+	if ($read_type == 2 || $read_type == 3) { $command .= " -I $minL -X $maxL --no-mixed --no-discordant"; }
+
+	if ($strand_specific || $probF == 1.0) { $command .= " --norc"; }
+	elsif ($probF == 0.0) { $command .= " --nofw"; }
+	
+	$command .= " -p $nThreads -k $bowtie2_k";
+	if ($quiet) { $command .= " --quiet"; }    
+
+	$command .= " -x $refName";
+	if ($read_type == 0 || $read_type == 1) {
+	    $command .= " -U $mate1_list"; 
+	}
+	else {
+	    $command .= " -1 $mate1_list -2 $mate2_list";
+	}
+
+	# pipe to samtools to generate a BAM file
+	$command .= " | samtools view -S -b -o $imdName.bam -";
+    }
+
+    if ($mTime) { $time_start = time(); }
+
+    &runCommand($command);
+
+    if ($mTime) { $time_end = time(); $time_alignment = $time_end - $time_start; }
+
+    $inpF = "$imdName.bam";
+    $is_bam = 1; # alignments are outputed as a BAM file
+}
+
+if ($mTime) { $time_start = time(); }
+
+# Parse alignments
+$command = "rsem-parse-alignments $refName $imdName $statName";
+
+my $samInpType;
+if ($is_sam) { $samInpType = "s"; } 
+elsif ($is_bam) { $samInpType = "b"; }
+
+$command .= " $samInpType $inpF -t $read_type";
+if ($fn_list ne "") { $command .= " -l $fn_list"; }
+if ($tagName ne "") { $command .= " -tag $tagName"; }
+if ($quiet) { $command .= " -q"; }
+
+&runCommand($command);
+
+# Build read indices
+$command = "rsem-build-read-index $gap"; 
+if ($read_type == 0) { $command .= " 0 $quiet $imdName\_alignable.fa"; }
+elsif ($read_type == 1) { $command .= " 1 $quiet $imdName\_alignable.fq"; }
+elsif ($read_type == 2) { $command .= " 0 $quiet $imdName\_alignable_1.fa $imdName\_alignable_2.fa"; }
+elsif ($read_type == 3) { $command .= " 1 $quiet $imdName\_alignable_1.fq $imdName\_alignable_2.fq"; }
+else { print "Impossible! read_type is not in [1,2,3,4]!\n"; exit(-1); }
+&runCommand($command);
+
+# Write out model parameters
+my $doesOpen = open(OUTPUT, ">$imdName.mparams");
+if ($doesOpen == 0) { print "Cannot generate $imdName.mparams!\n"; exit(-1); }
+print OUTPUT "$minL $maxL\n";
+print OUTPUT "$probF\n";
+print OUTPUT "$estRSPD\n";
+print OUTPUT "$B\n";
+print OUTPUT "$mate_minL $mate_maxL\n";
+print OUTPUT "$mean $sd\n";
+print OUTPUT "$L\n";
+close(OUTPUT);  
+
+# Generate seeds based on a given seed
+my @seeds = ();
+if ($seed ne "NULL") { 
+    srand($seed); 
+    for (my $i = 0; $i < 3; $i++) {
+	push(@seeds, int(rand(1 << 32))); 
+    }
+}
+
+# Run EM
+$command = "rsem-run-em $refName $read_type $sampleName $imdName $statName -p $nThreads";
+$" = " ";
+$command .= " --calc-evaluation-score @eval_params";
+if ($genBamF) { 
+    $command .= " -b $samInpType $inpF";
+    if ($fn_list ne "") { $command .= " 1 $fn_list"; }
+    else { $command .= " 0"; }
+    if ($sampling) { $command .= " --sampling"; }
+    if ($seed ne "NULL") { $command .= " --seed $seeds[0]"; }
+}
+if ($calcPME || $calcCI) { $command .= " --gibbs-out"; }
+if ($quiet) { $command .= " -q"; }
+
+&runCommand($command);
+&collectResults("isoform", "$imdName.iso_res", "$sampleName.isoforms.results"); # isoform level
+&collectResults("gene", "$imdName.gene_res", "$sampleName.genes.results"); # gene level
+
+if ($genBamF) {
+    $command = "samtools sort -@ $nThreads -m $SortMem $sampleName.transcript.bam $sampleName.transcript.sorted";
+    &runCommand($command);
+    $command = "samtools index $sampleName.transcript.sorted.bam";
+    &runCommand($command);
+}
+if ($mTime) { $time_end = time(); $time_rsem = $time_end - $time_start; }
+
+# Gibbs or CI
+if ($mTime) { $time_start = time(); }
+if ($calcPME || $calcCI ) {
+    $command = "rsem-run-gibbs $refName $imdName $statName $BURNIN $NCV $SAMPLEGAP";
+    $command .= " -p $nThreads";
+    if ($seed ne "NULL") { $command .= " --seed $seeds[1]"; }
+    if ($quiet) { $command .= " -q"; }
+    &runCommand($command);
+}
+
+if ($calcPME || $calcCI) {
+    system("mv $sampleName.isoforms.results $imdName.isoforms.results.bak1");
+    system("mv $sampleName.genes.results $imdName.genes.results.bak1");
+    &collectResults("isoform", "$imdName.iso_res", "$sampleName.isoforms.results"); # isoform level
+    &collectResults("gene", "$imdName.gene_res", "$sampleName.genes.results"); # gene level
+}
+
+if ($calcCI) {
+    $command = "rsem-calculate-credibility-intervals $refName $imdName $statName $CONFIDENCE $NCV $NSPC $NMB";
+    $command .= " -p $nThreads";
+    if ($seed ne "NULL") { $command .= " --seed $seeds[2]"; }
+    if ($quiet) { $command .= " -q"; }
+    &runCommand($command);
+
+    system("mv $sampleName.isoforms.results $imdName.isoforms.results.bak2");
+    system("mv $sampleName.genes.results $imdName.genes.results.bak2");
+    &collectResults("isoform", "$imdName.iso_res", "$sampleName.isoforms.results"); # isoform level
+    &collectResults("gene", "$imdName.gene_res", "$sampleName.genes.results"); # gene level
+}
+
+if ($mTime) { $time_end = time(); $time_ci = $time_end - $time_start; }
+
+if (!$keep_intermediate_files) {
+    &runCommand("rm -rf $temp_dir", "Fail to delete the temporary folder!");
+}
+
+if ($mTime) { 
+    open(OUTPUT, ">$sampleName.time");
+    print OUTPUT "Building indices: $time_prepare s.\n";
+    print OUTPUT "Aligning reads: $time_alignment s.\n";
+    print OUTPUT "Estimating expression levels: $time_rsem s.\n";
+    print OUTPUT "Calculating credibility intervals: $time_ci s.\n";
+    close(OUTPUT);
+}
+
+__END__
+
+=head1 NAME
+
+rsem-eval-calculate-score
+
+=head1 SYNOPSIS
+
+ rsem-eval-calculate-score [options] upstream_read_file(s) assembly_fasta_file sample_name L
+ rsem-eval-calculate-score [options] --paired-end upstream_read_file(s) downstream_read_file(s) assembly_fasta_file sample_name L
+ rsem-eval-calculate-score [options] --sam/--bam [--paired-end] input assembly_fasta_file sample_name L
+
+=head1 ARGUMENTS
+
+=over
+
+=item B<upstream_read_files(s)>
+
+Comma-separated list of files containing single-end reads or upstream reads for paired-end data. By default, these files are assumed to be in FASTQ format. If the --no-qualities option is specified, then FASTA format is expected.
+
+=item B<downstream_read_file(s)>
+
+Comma-separated list of files containing downstream reads which are paired with the upstream reads. By default, these files are assumed to be in FASTQ format. If the --no-qualities option is specified, then FASTA format is expected.
+
+=item B<input>
+
+SAM/BAM formatted input file.  If "-" is specified for the filename, SAM/BAM input is instead assumed to come from standard input. RSEM-EVAL requires all alignments of the same read group together. For paired-end reads, RSEM-EVAL also requires the two mates of any alignment be adjacent. See Description section for how to make input file obey RSEM-EVAL's requirements.
+
+=item B<assembly_fasta_file>                        
+
+A multi-FASTA file contains the assembly used for calculating RSEM-EVAL score.
+
+=item B<sample_name>
+
+The name of the sample analyzed. All output files are prefixed by this name (e.g., sample_name.isoforms.results).
+
+=item B<L>
+
+For single-end data, L represents the average read length. For paired-end data, L represents the average fragment length.
+
+=back
+
+=head1 BASIC OPTIONS
+
+=over
+
+=item B<--overlap-size> <int>
+
+The minimum overlap size required to join two reads together. (Default: 0)
+
+=item B<--transcript-length-parameters> <file>
+
+Read the true transcript length distribution's mean and standard deviation from <file>. This option is mutually exclusive with '--transcript-length-mean' and '--transcript-length-sd'. (Default: off)
+
+=item B<--transcript-length-mean> <double>
+
+The mean of true transcript length distribution. This option is used together with '--transcript-length-sd' and mutually exclusive with '--estimate-transcript-length-distribution'. (Default: learned from human Ensembl annotation and hg20 genome) 
+
+=item B<--transcript-length-sd> <double>
+
+The standard deviation of true transcript length distribution. This option is used together with '--transcript-length-mean' and mutually exclusive with '--estimate-transcript-length-distribution'. (Default: learned from human Ensembl annotation and hg20 genome) 
+
+=item B<--paired-end>
+
+Input reads are paired-end reads. (Default: off)
+
+=item B<--no-qualities>
+
+Input reads do not contain quality scores. (Default: off)
+
+=item B<--strand-specific>
+
+The RNA-Seq protocol used to generate the reads is strand specific, i.e., all (upstream) reads are derived from the forward strand.  This option is equivalent to --forward-prob=1.0.  With this option set, if RSEM-EVAL runs the Bowtie/Bowtie 2 aligner, the '--norc' Bowtie/Bowtie 2 option will be used, which disables alignment to the reverse strand of transcripts.  (Default: off)
+
+=item B<--bowtie2>
+
+Use Bowtie 2 instead of Bowtie to align reads. Since currently RSEM-EVAL does not handle indel, local and discordant alignments, the Bowtie2 parameters are set in a way to avoid those alignments. In particular, we use options '--sensitive --dpad 0 --gbar 99999999 --mp 1,1 --np 1 --score-min L,0,-0.1' by default. "-0.1", the last parameter of '--score-min' is the negative value of the maximum mismatch rate allowed. This rate can be set by option '--bowtie2-mismatch-rate'. If reads are paired-end, we additionally use options '--no-mixed' and '--no-discordant'. (Default: off)
+
+=item B<--sam>
+
+Input file is in SAM format. (Default: off)
+
+=item B<--bam>
+
+Input file is in BAM format. (Default: off)
+
+=item B<-p/--num-threads> <int>
+
+Number of threads to use. Both Bowtie/Bowtie2, expression estimation and 'samtools sort' will use this many threads. (Default: 1)
+
+=item B<--output-bam>
+
+Generate BAM outputs. (Default: off)
+
+=item B<--sampling-for-bam>
+
+When RSEM-EVAL generates a BAM file, instead of outputing all alignments a read has with their posterior probabilities, one alignment is sampled according to the posterior probabilities. The sampling procedure includes the alignment to the "noise" transcript, which does not appear in the BAM file. Only the sampled alignment has a weight of 1. All other alignments have weight 0. If the "noise" transcript is sampled, all alignments appeared in the BAM file should have weight 0. (Default: off)
+
+=item B<--seed> <uint32>
+
+Set the seed for the random number generators used in calculating posterior mean estimates and credibility intervals. The seed must be a non-negative 32 bit interger. (Default: off)
+
+=item B<--calc-pme>
+
+Run RSEM-EVAL's collapsed Gibbs sampler to calculate posterior mean estimates. (Default: off) 
+
+=item B<--calc-ci>
+
+Calculate 95% credibility intervals and posterior mean estimates. The credibility level can be changed by setting '--ci-credibility-level'. (Default: off)
+
+=item B<-q/--quiet>
+
+Suppress the output of logging information. (Default: off)
+
+=item B<-h/--help>
+
+Show help information.
+
+=item B<--version>
+
+Show version information.
+
+=back
+
+=head1 ADVANCED OPTIONS
+
+=over
+
+=item B<--sam-header-info> <file>
+
+RSEM-EVAL reads header information from input by default. If this option is on, header information is read from the specified file. For the format of the file, please see SAM official website. (Default: "")
+
+=item B<--seed-length> <int>
+
+Seed length used by the read aligner.  Providing the correct value is important for RSEM-EVAL. If RSEM-EVAL runs Bowtie, it uses this value for Bowtie's seed length parameter. Any read with its or at least one of its mates' (for paired-end reads) length less than this value will be ignored. If the references are not added poly(A) tails, the minimum allowed value is 5, otherwise, the minimum allowed value is 25. Note that this script will only check if the value >= 5 and give a warning message if the value < 25 but >= 5. (Default: 25)
+
+=item B<--tag> <string>
+
+The name of the optional field used in the SAM input for identifying a read with too many valid alignments. The field should have the format <tagName>:i:<value>, where a <value> bigger than 0 indicates a read with too many alignments. (Default: "")
+
+=item B<--bowtie-path> <path>
+
+The path to the Bowtie executables. (Default: the path to the Bowtie executables is assumed to be in the user's PATH environment variable)
+
+=item B<--bowtie-n> <int>
+
+(Bowtie parameter) max # of mismatches in the seed. (Range: 0-3, Default: 2)
+
+=item B<--bowtie-e> <int>
+
+(Bowtie parameter) max sum of mismatch quality scores across the alignment. (Default: 99999999)
+
+=item B<--bowtie-m> <int>
+
+(Bowtie parameter) suppress all alignments for a read if > <int> valid alignments exist. (Default: 200)
+
+=item B<--bowtie-chunkmbs> <int>
+
+(Bowtie parameter) memory allocated for best first alignment calculation (Default: 0 - use Bowtie's default)
+
+=item B<--phred33-quals>
+
+Input quality scores are encoded as Phred+33. (Default: on)
+
+=item B<--phred64-quals>
+
+Input quality scores are encoded as Phred+64 (default for GA Pipeline ver. >= 1.3). (Default: off)
+
+=item B<--solexa-quals>
+
+Input quality scores are solexa encoded (from GA Pipeline ver. < 1.3). (Default: off)
+
+=item B<--bowtie2-path> <path>
+
+(Bowtie 2 parameter) The path to the Bowtie 2 executables. (Default: the path to the Bowtie 2 executables is assumed to be in the user's PATH environment variable)
+
+=item B<--bowtie2-mismatch-rate> <double>
+
+(Bowtie 2 parameter) The maximum mismatch rate allowed. (Default: 0.1)
+
+=item B<--bowtie2-k> <int>
+
+(Bowtie 2 parameter) Find up to <int> alignments per read. (Default: 200)
+
+=item B<--bowtie2-sensitivity-level> <string>
+
+(Bowtie 2 parameter) Set Bowtie 2's preset options in --end-to-end mode. This option controls how hard Bowtie 2 tries to find alignments. <string> must be one of "very_fast", "fast", "sensitive" and "very_sensitive". The four candidates correspond to Bowtie 2's "--very-fast", "--fast", "--sensitive" and "--very-sensitive" options. (Default: "sensitive" - use Bowtie 2's default)
+
+=item B<--forward-prob> <double>
+
+Probability of generating a read from the forward strand of a transcript. Set to 1 for a strand-specific protocol where all (upstream) reads are derived from the forward strand, 0 for a strand-specific protocol where all (upstream) read are derived from the reverse strand, or 0.5 for a non-strand-specific protocol. (Default: 0.5)
+
+=item B<--fragment-length-min> <int>
+
+Minimum read/fragment length allowed. This is also the value for the Bowtie/Bowtie2 -I option. (Default: 1)
+
+=item B<--fragment-length-max> <int>
+
+Maximum read/fragment length allowed. This is also the value for the Bowtie/Bowtie 2 -X option. (Default: 1000)
+
+=item B<--estimate-rspd>
+
+Set this option if you want to estimate the read start position distribution (RSPD) from data. Otherwise, RSEM-EVAL will use a uniform RSPD. (Default: off)
+
+=item B<--num-rspd-bins> <int>
+
+Number of bins in the RSPD. Only relevant when '--estimate-rspd' is specified.  Use of the default setting is recommended. (Default: 20)
+
+=item B<--gibbs-burnin> <int>
+
+The number of burn-in rounds for RSEM-EVAL's Gibbs sampler. Each round passes over the entire data set once. If RSEM-EVAL can use multiple threads, multiple Gibbs samplers will start at the same time and all samplers share the same burn-in number. (Default: 200)
+
+=item B<--gibbs-number-of-samples> <int>
+
+The total number of count vectors RSEM-EVAL will collect from its Gibbs samplers. (Default: 1000)
+
+=item B<--gibbs-sampling-gap> <int>
+
+The number of rounds between two succinct count vectors RSEM-EVAL collects. If the count vector after round N is collected, the count vector after round N + <int> will also be collected. (Default: 1) 
+
+=item B<--ci-credibility-level> <double>
+
+The credibility level for credibility intervals. (Default: 0.95)
+
+=item B<--ci-memory> <int>
+
+Maximum size (in memory, MB) of the auxiliary buffer used for computing credibility intervals (CI). Set it larger for a faster CI calculation. However, leaving 2 GB memory free for other usage is recommended. (Default: 1024)
+
+=item B<--ci-number-of-samples-per-count-vector> <int>
+
+The number of read generating probability vectors sampled per sampled count vector. The crebility intervals are calculated by first sampling P(C | D) and then sampling P(Theta | C) for each sampled count vector. This option controls how many Theta vectors are sampled per sampled count vector. (Default: 50)
+
+=item B<--samtools-sort-mem> <string>
+
+Set the maximum memory per thread that can be used by 'samtools sort'. <string> represents the memory and accepts suffices 'K/M/G'. RSEM-EVAL will pass <string> to the '-m' option of 'samtools sort'.  Please note that the default used here is different from the default used by samtools. (Default: 1G)
+
+=item B<--keep-intermediate-files>
+
+Keep temporary files generated by RSEM-EVAL.  RSEM-EVAL creates a temporary directory, 'sample_name.temp', into which it puts all intermediate output files. If this directory already exists, RSEM-EVAL overwrites all files generated by previous RSEM-EVAL runs inside of it. By default, after RSEM-EVAL finishes, the temporary directory is deleted.  Set this option to prevent the deletion of this directory and the intermediate files inside of it. (Default: off)
+
+=item B<--temporary-folder> <string>
+
+Set where to put the temporary files generated by RSEM-EVAL. If the folder specified does not exist, RSEM-EVAL will try to create it. (Default: sample_name.temp)
+
+=item B<--time>
+
+Output time consumed by each step of RSEM-EVAL to 'sample_name.time'. (Default: off)
+
+=back
+
+=head1 DESCRIPTION
+
+In its default mode, this program builds indices, aligns input reads against a reference assembly with Bowtie and calculates RSEM-EVAL score and expression values using the alignments.  RSEM-EVAL assumes the data are single-end reads with quality scores, unless the '--paired-end' or '--no-qualities' options are specified.  Users may use an alternative aligner by specifying one of the --sam and --bam options, and providing an alignment file in the specified format. However, users should make sure that they align against 'assembly_fasta_file'  and the alignment file satisfies the requirements mentioned in ARGUMENTS section. 
+
+The SAM/BAM format RSEM-EVAL uses is v1.4. However, it is compatible with old SAM/BAM format. However, RSEM-EVAL cannot recognize 0x100 in the FLAG field. In addition, RSEM-EVAL requires SEQ and QUAL are not '*'. 
+
+Please note that some of the default values for the Bowtie parameters are not the same as those defined for Bowtie itself.
+
+The temporary directory and all intermediate files will be removed when RSEM-EVAL finishes unless '--keep-intermediate-files' is specified.
+
+With the '--calc-pme' option, posterior mean estimates will be calculated in addition to maximum likelihood estimates.
+
+With the '--calc-ci' option, 95% credibility intervals and posterior mean estimates will be calculated in addition to maximum likelihood estimates.
+
+=head1 OUTPUT
+
+=over
+
+=item B<sample_name.score, sample_name.score.isoforms.results and sample_name.score.genes.results>
+
+'sample_name.score' stores the evaluation score for the evaluated assembly. It contains 14 lines and each line contains a name and a value separated by a tab. 
+
+The first 6 lines provide: 'Score', the RSEM-EVAL score; 'BIC_penalty', the BIC penalty term; 'Prior_score_on_contig_lengths', the log score of priors of contig lengths; 'Prior_score_on_contig_sequences', the log score of priors of contig sequence bases; 'Data_likelihood_in_log_space_without_correction', the RSEM log data likelihood calculated with contig-level read generating probabilities mentioned in the supplement text of our DETONATE manuscript; 'Correction_term', the correction term. Score = BIC_penalty + Prior_score_on_contig_lengths + Prior_score_on_contig_sequences + Data_likelihood_in_log_space_without_correction - Correction_term. 
+
+The next 8 lines provide statistics that may help users to understand the RSEM-EVAL score better. They are: 'Number_of_contigs', the number of contigs contained in the assembly; 'Expected_number_of_aligned_reads_given_the_data', the expected number of reads assigned to each contig estimated using the contig-level read generating probabilities mentioned in the supplement text of our DETONATE manuscript; 'Number_of_contigs_smaller_than_expected_read/fragment_length', the number of contigs whose length is smaller than the expected read/fragment length; 'Number_of_contigs_with_no_read_aligned_to', the number of contigs whose expected number of aligned reads is smaller than 0.005; 'Maximum_data_likelihood_in_log_space', the maximum data likelihood in log space calculated from RSEM by treating the assembly as "true" transcripts; 'Number_of_alignable_reads', the number of reads that have at least one alignment found by the aligner (Because 'rsem-calculate-expression' tries to use a very loose criteria to find alignments, reads with only low quality alignments may also be counted as alignable reads here); 'Number_of_alignments_in_total', the number of total alignments found by the aligner; 'Transcript_length_distribution_related_factors', the term related to transcript length distribution in 'Prior_score_on_contig_lengths' (it is the summation of log c_{\lambda}(\ell) terms mentioned in 'Calculation of the contig length distribution' subsection of the supplementary text of our DETONATE manuscript. 
+
+'sample_name.score.isoforms.results' and 'sample_name.score.genes.results' output "corrected" expression levels based on contig-level read generating probabilities mentioned in the supplement of the DETONATE manuscript. Unlike 'sample_name.isoforms.results' and 'sample_name.genes.results', which are calculated by treating the contigs as true transcripts, calculating 'sample_name.score.isoforms.results' and 'sample_name.score.genes.results' involves first estimating expected read coverage for each contig and then convert the expected read coverage into contig-level read generating probabilities. This procedure is aware of that provided sequences are contigs and gives better expression estimates for very short contigs. In addtion, the 'TPM' field is changed to 'CPM' field, which stands for contig per million. For 'sample_name.score.isoforms.results', one additional column is added. The additional column is named as 'contig_impact_score' and gives the contig impact score for each contig as described in the DETONATE manuscript.
+
+=item B<sample_name.isoforms.results> 
+
+File containing isoform level expression estimates. The first line
+contains column names separated by the tab character. The format of
+each line in the rest of this file is:
+
+transcript_id gene_id length effective_length expected_count TPM FPKM IsoPct [posterior_mean_count posterior_standard_deviation_of_count pme_TPM pme_FPKM IsoPct_from_pme_TPM TPM_ci_lower_bound TPM_ci_upper_bound FPKM_ci_lower_bound FPKM_ci_upper_bound]
+
+Fields are separated by the tab character. Fields within "[]" are
+optional. They will not be presented if neither '--calc-pme' nor
+'--calc-ci' is set.
+
+'transcript_id' is the transcript name of this transcript. 'gene_id'
+is the gene name of the gene which this transcript belongs to (denote
+this gene as its parent gene). If no gene information is provided,
+'gene_id' and 'transcript_id' are the same.
+
+'length' is this transcript's sequence length (poly(A) tail is not
+counted). 'effective_length' counts only the positions that can
+generate a valid fragment. If no poly(A) tail is added,
+'effective_length' is equal to transcript length - mean fragment
+length + 1. If one transcript's effective length is less than 1, this
+transcript's both effective length and abundance estimates are set to
+0.
+
+'expected_count' is the sum of the posterior probability of each read
+comes from this transcript over all reads. Because 1) each read
+aligning to this transcript has a probability of being generated from
+background noise; 2) RSEM-EVAL may filter some alignable low quality reads,
+the sum of expected counts for all transcript are generally less than
+the total number of reads aligned.
+
+'TPM' stands for Transcripts Per Million. It is a relative measure of
+transcript abundance. The sum of all transcripts' TPM is 1
+million. 'FPKM' stands for Fragments Per Kilobase of transcript per
+Million mapped reads. It is another relative measure of transcript
+abundance. If we define l_bar be the mean transcript length in a
+sample, which can be calculated as
+
+l_bar = \sum_i TPM_i / 10^6 * effective_length_i (i goes through every transcript), 
+
+the following equation is hold:
+
+FPKM_i = 10^3 / l_bar * TPM_i.
+
+We can see that the sum of FPKM is not a constant across samples.
+
+'IsoPct' stands for isoform percentage. It is the percentage of this
+transcript's abandunce over its parent gene's abandunce. If its parent
+gene has only one isoform or the gene information is not provided,
+this field will be set to 100.
+
+'posterior_mean_count', 'pme_TPM', 'pme_FPKM' are posterior mean
+estimates calculated by RSEM-EVAL's Gibbs
+sampler. 'posterior_standard_deviation_of_count' is the posterior
+standard deviation of counts. 'IsoPct_from_pme_TPM' is the isoform
+percentage calculated from 'pme_TPM' values.
+
+'TPM_ci_lower_bound', 'TPM_ci_upper_bound', 'FPKM_ci_lower_bound' and
+'FPKM_ci_upper_bound' are lower(l) and upper(u) bounds of 95%
+credibility intervals for TPM and FPKM values. The bounds are
+inclusive (i.e. [l, u]).
+
+=item B<sample_name.genes.results>
+
+File containing gene level expression estimates. The first line
+contains column names separated by the tab character. The format of
+each line in the rest of this file is:
+
+gene_id transcript_id(s) length effective_length expected_count TPM FPKM [posterior_mean_count posterior_standard_deviation_of_count pme_TPM pme_FPKM TPM_ci_lower_bound TPM_ci_upper_bound FPKM_ci_lower_bound FPKM_ci_upper_bound]
+
+Fields are separated by the tab character. Fields within "[]" are
+optional. They will not be presented if neither '--calc-pme' nor
+'--calc-ci' is set.
+
+'transcript_id(s)' is a comma-separated list of transcript_ids
+belonging to this gene. If no gene information is provided, 'gene_id'
+and 'transcript_id(s)' are identical (the 'transcript_id').
+
+A gene's 'length' and 'effective_length' are
+defined as the weighted average of its transcripts' lengths and
+effective lengths (weighted by 'IsoPct'). A gene's abundance estimates
+are just the sum of its transcripts' abundance estimates.
+
+=item B<sample_name.transcript.bam, sample_name.transcript.sorted.bam and sample_name.transcript.sorted.bam.bai>
+
+Only generated when --output-bam is specified.
+
+'sample_name.transcript.bam' is a BAM-formatted file of read
+alignments in transcript coordinates. The MAPQ field of each alignment
+is set to min(100, floor(-10 * log10(1.0 - w) + 0.5)), where w is the
+posterior probability of that alignment being the true mapping of a
+read.  In addition, RSEM-EVAL pads a new tag ZW:f:value, where value is a
+single precision floating number representing the posterior
+probability. Because this file contains all alignment lines produced
+by bowtie or user-specified aligners, it can also be used as a
+replacement of the aligner generated BAM/SAM file. For paired-end
+reads, if one mate has alignments but the other does not, this file
+marks the alignable mate as "unmappable" (flag bit 0x4) and appends an
+optional field "Z0:A:!".
+
+'sample_name.transcript.sorted.bam' and
+'sample_name.transcript.sorted.bam.bai' are the sorted BAM file and
+indices generated by samtools (included in RSEM-EVAL package).
+
+=item B<sample_name.time>
+
+Only generated when --time is specified.
+
+It contains time (in seconds) consumed by building references, aligning reads, estimating expression levels and calculating credibility intervals.
+
+=item B<sample_name.stat>
+
+This is a folder instead of a file. All model related statistics are stored in this folder. Use 'rsem-plot-model' can generate plots using this folder.
+
+=back 
+
+=head1 EXAMPLES
+
+We want to compute the RSEM-EVAL score for a contig assembly, 'assembly1.fa'. Our data are 76bp single-end reads contained in '/data/reads.fq'. The related species is human and 'human_transcripts.fa' contains all human transcripts. We use 8 threads and do not generate any BAM files. In addition, we set the overlap size w as 0 and 'sample_name' as 'assembly1_rsem_eval'. 
+
+First, we need to estimate the true transcript length distribution using 'human_transcripts.fa':
+
+ rsem-eval-estimate-transcript-length-distribution human_transcripts.fa human.txt
+
+Now, we can calculate RSEM-EVAL score:
+
+ rsem-eval-calculate-score -p 8 \
+                           --transcript-length-parameters human.txt \
+                           /data/reads.fq \
+                           assembly1.fa \
+                           assembly1_rsem_eval \
+                           76
+
+The RSEM-EVAL score can be found in 'assembly1_rsem_eval.score' and the contig impact scores can be found in 'assembly1_rsem_eval.score.isoforms.results'.
+
+=cut

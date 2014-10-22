@@ -65,7 +65,7 @@ void SingleReadQ::calc_lq(bool hasPolyA, int seedLen) {
 	if (len < seedLen) { low_quality = true; return; }
 
 	// if no polyA, no need to do the following calculation
-	if (!hasPolyA) return;
+      	if (!hasPolyA) return;
 
 	assert(readseq != "");
 

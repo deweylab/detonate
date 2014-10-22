@@ -34,6 +34,8 @@ public:
 	std::string simulate(simul*, int, int, int, const RefSeq&);
 	void finishSimulation();
 
+	double getNumMatchingBases();
+
 private:
 	static const int NCODES = 5;
 
@@ -80,7 +82,6 @@ Profile& Profile::operator=(const Profile& rv) {
 		p = new double[rv.proLen][NCODES][NCODES];
 	}
 	memcpy(p, rv.p, sizeof(double) * rv.size);
-
 	return *this;
 }
 
@@ -215,6 +216,15 @@ std::string Profile::simulate(simul* sampler, int len, int pos, int dir, const R
 
 void Profile::finishSimulation() {
 	delete[] pc;
+}
+
+// only be called after collect, mutually exclusive with finish
+double Profile::getNumMatchingBases() {
+	double numMatchingBases = 0.0;
+	for (int i = 0; i < proLen; i++) {
+		for (int j = 0; j < NCODES - 1; j++) numMatchingBases += p[i][j][j];
+	}
+	return numMatchingBases;
 }
 
 #endif /* PROFILE_H_ */

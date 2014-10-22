@@ -50,6 +50,8 @@ public:
 		mw = NULL;
 
 		seedLen = 0;
+
+		loglik_mld_noise = 0.0;
 	}
 
 	//If it is not a master node, only init & update can be used!
@@ -64,6 +66,8 @@ public:
 
 		ori = NULL; gld = NULL; mld = NULL; rspd = NULL; qd = NULL; qpro = NULL; nqpro = NULL;
 		mw = NULL;
+
+		loglik_mld_noise = 0.0;
 
 		if (isMaster) {
 			gld = new LenDist(params.minL, params.maxL);			
@@ -90,16 +94,13 @@ public:
 		if (qpro != NULL) delete qpro;
 		if (nqpro != NULL) delete nqpro;
 		if (mw != NULL) delete[] mw;
-		/*delete[] p1, p2;*/
 	}
-
-	//SingleQModel& operator=(const SingleQModel&);
 
 	void estimateFromReads(const char*);
 
 	//if prob is too small, just make it 0
 	double getConPrb(const SingleReadQ& read, const SingleHit& hit) const {
-		if (read.isLowQuality()) return 0.0;
+	  //if (read.isLowQuality()) return 0.0; // No need for RSEM-EVAL
 
 		double prob;
 		int sid = hit.getSid();
@@ -151,7 +152,7 @@ public:
 	}
 
 	double getNoiseConPrb(const SingleReadQ& read) {
-		if (read.isLowQuality()) return 0.0;
+	  //if (read.isLowQuality()) return 0.0; // No need for RSEM-EVAL
 		double prob = mld != NULL ? mld->getProb(read.getReadLength()) : gld->getProb(read.getReadLength());
 		prob *= nqpro->getProb(read.getReadSeq(), read.getQScore());
 		if (prob < EPSILON) { prob = 0.0; }
@@ -161,12 +162,14 @@ public:
 		return prob;
 	}
 
-	double getLogP() { return nqpro->getLogP(); }
+	double getLogP() { return loglik_mld_noise + nqpro->getLogP(); }
+	double getNumMatchingBases() { return qpro->getNumMatchingBases(); }
 
 	void init();
 
 	void update(const SingleReadQ& read, const SingleHit& hit, double frac) {
-		if (read.isLowQuality() || frac < EPSILON) return;
+	  //if (read.isLowQuality() || frac < EPSILON) return; // No need to call read.isLowQuality() for RSEM-EVAL
+		if (frac < EPSILON) return;
 
 		const RefSeq& ref = refs->getRef(hit.getSid());
 
@@ -215,7 +218,8 @@ public:
 	}
 
 	void updateNoise(const SingleReadQ& read, double frac) {
-		if (read.isLowQuality() || frac < EPSILON) return;
+	  //if (read.isLowQuality() || frac < EPSILON) return; // No need to call read.isLowQuality() for RSEM-EVAL
+		if (frac < EPSILON) return;
 
 		nqpro->update(read.getReadSeq(), read.getQScore(), frac);
 	}
@@ -224,15 +228,8 @@ public:
 
 	void collect(const SingleQModel&);
 
-	//void copy(const SingleQModel&);
-
 	bool getNeedCalcConPrb() { return needCalcConPrb; }
 	void setNeedCalcConPrb(bool value) { needCalcConPrb = value; }
-
-	//void calcP1();
-	//void calcP2();
-	//double* getP1() { return p1; }
-	//double* getP2() { return p2; }
 
 	void read(const char*);
 	void write(const char*);
@@ -277,6 +274,8 @@ private:
 
 	double *mw; // for masking
 
+	double loglik_mld_noise;
+
 	void calcMW();
 };
 
@@ -285,7 +284,11 @@ void SingleQModel::estimateFromReads(const char* readFN) {
 	char readFs[2][STRLEN];
 	SingleReadQ read;
 
-	mld != NULL ? mld->init() : gld->init();
+	assert(mld == NULL);
+	gld->init();
+
+	std::vector<READ_INT_TYPE> noise_len_stat(gld->getMaxL() + 1, 0);
+	
 	for (int i = 0; i < 3; i++)
 		if (N[i] > 0) {
 			genReadFileNames(readFN, i, read_type, s, readFs);
@@ -293,29 +296,26 @@ void SingleQModel::estimateFromReads(const char* readFN) {
 
 			READ_INT_TYPE cnt = 0;
 			while (reader.next(read)) {
-				if (!read.isLowQuality()) {
-					mld != NULL ? mld->update(read.getReadLength(), 1.0) : gld->update(read.getReadLength(), 1.0);
-					qd->update(read.getQScore());
-					if (i == 0) { nqpro->updateC(read.getReadSeq(), read.getQScore()); }
+				gld->update(read.getReadLength(), 1.0);
+				qd->update(read.getQScore());
+				if (i == 0) { 
+				  nqpro->updateC(read.getReadSeq(), read.getQScore()); 
+				  ++noise_len_stat[read.getReadLength()];
 				}
-				else if (verbose && read.getReadLength() < seedLen) {
-					std::cout<< "Warning: Read "<< read.getName()<< " is ignored due to read length "<< read.getReadLength()<< " < seed length "<< seedLen<< "!"<< std::endl;
-				}
-
+				
 				++cnt;
 				if (verbose && cnt % 1000000 == 0) { std::cout<< cnt<< " READS PROCESSED"<< std::endl; }
 			}
 
 			if (verbose) { std::cout<< "estimateFromReads, N"<< i<< " finished."<< std::endl; }
 		}
+	
+        // Calculate mate length related log-likelihood                                                                                                                                                   
+        gld->finish();
+	loglik_mld_noise = 0.0;
+        for (int len = gld->getMinL(); len <= gld->getMaxL(); ++len)
+          if (noise_len_stat[len] > 0) loglik_mld_noise += noise_len_stat[len] * log(gld->getProb(len));
 
-	mld != NULL ? mld->finish() : gld->finish();
-
-	//mean should be > 0
-	if (mean >= EPSILON) { 
-	  assert(mld->getMaxL() <= gld->getMaxL());
-	  gld->setAsNormal(mean, sd, std::max(mld->getMinL(), gld->getMinL()), gld->getMaxL());
-	}
 	qd->finish();
 	nqpro->calcInitParams();
 

@@ -33,7 +33,7 @@ public:
 
 	bool next(ReadType& read, int flags = 7) {
 		bool success = read.read(s, (std::istream**)arr, flags);
-		if (success && seedLen > 0) { read.calc_lq(hasPolyA, seedLen); }
+		//if (success && seedLen > 0) { read.calc_lq(hasPolyA, seedLen); }  // No need to filter any read by either read length or sequence quality for RSEM-EVAL
 		return success;
 	}
 

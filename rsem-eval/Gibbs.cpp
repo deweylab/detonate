@@ -98,7 +98,7 @@ void load_data(char* refName, char* statName, char* imdName) {
 	M = refs.getM();
 
 	//load ofgF;
-	sprintf(ofgF, "%s.ofg", imdName);
+	sprintf(ofgF, "%s.ofg", statName); // for internal experiments
 	fin.open(ofgF);
 	general_assert(fin.is_open(), "Cannot open " + cstrtos(ofgF) + "!");
 	fin>>tmpVal>>N0;

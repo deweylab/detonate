@@ -46,6 +46,8 @@
 
 #include "WriteResults.h"
 
+#include "CalcEvalScore.h"
+
 using namespace std;
 
 const double STOP_CRITERIA = 0.001;
@@ -58,10 +60,9 @@ struct Params {
 };
 
 int read_type;
-int m, M; // m genes, M isoforms
+int M; // M contigs
 READ_INT_TYPE N0, N1, N2, N_tot;
 int nThreads;
-
 
 bool genBamF; // If user wants to generate bam file, true; otherwise, false.
 bool bamSampling; // true if sampling from read posterior distribution when bam file is generated
@@ -75,8 +76,8 @@ char mparamsF[STRLEN];
 char modelF[STRLEN], thetaF[STRLEN];
 
 char inpSamType;
-char *pt_fn_list, *pt_chr_list;
-char inpSamF[STRLEN], outBamF[STRLEN], fn_list[STRLEN], chr_list[STRLEN];
+char *pt_fn_list;
+char inpSamF[STRLEN], outBamF[STRLEN], fn_list[STRLEN];
 
 char out_for_gibbs_F[STRLEN];
 
@@ -88,6 +89,11 @@ Refs refs;
 Transcripts transcripts;
 
 ModelParams mparams;
+
+bool calcEvalScore; // calculate evaluation score
+int L, w;
+double nb_r, nb_p;
+char scoreF[STRLEN];
 
 bool hasSeed;
 seedType seed;
@@ -275,6 +281,61 @@ void* calcConProbs(void* arg) {
 	return NULL;
 }
 
+template<class ReadType, class HitType, class ModelType>
+void* GET_SS_STEP(void* arg) {
+	Params *params = (Params*)arg;
+	ModelType *model = (ModelType*)(params->model);
+	ReadReader<ReadType> *reader = (ReadReader<ReadType>*)(params->reader);
+	HitContainer<HitType> *hitv = (HitContainer<HitType>*)(params->hitv);
+	double *ncpv = (double*)(params->ncpv);
+	ModelType *mhp = (ModelType*)(params->mhp);
+
+	assert(!model->getNeedCalcConPrb());
+
+	ReadType read;
+	READ_INT_TYPE N = hitv->getN();
+	double sum;
+	vector<double> fracs; //to remove this, do calculation twice
+	HIT_INT_TYPE fr, to, id;
+
+	reader->reset();
+	mhp->init();
+
+	for (READ_INT_TYPE i = 0; i < N; i++) {
+		general_assert(reader->next(read), "Can not load a read!");
+
+		fr = hitv->getSAt(i);
+		to = hitv->getSAt(i + 1);
+		fracs.resize(to - fr + 1);
+
+		sum = 0.0;
+
+		fracs[0] = probv[0] * ncpv[i];
+		if (fracs[0] < EPSILON) fracs[0] = 0.0;
+		sum += fracs[0];
+		for (HIT_INT_TYPE j = fr; j < to; j++) {
+			HitType &hit = hitv->getHitAt(j);
+			id = j - fr + 1;
+			fracs[id] = probv[hit.getSid()] * hit.getConPrb();
+			if (fracs[id] < EPSILON) fracs[id] = 0.0;
+			sum += fracs[id];
+		}
+
+		if (sum >= EPSILON) {
+			fracs[0] /= sum;
+			//mhp->updateNoise(read, fracs[0]);
+			for (HIT_INT_TYPE j = fr; j < to; j++) {
+				HitType &hit = hitv->getHitAt(j);
+				id = j - fr + 1;
+				fracs[id] /= sum;
+				mhp->update(read, hit, fracs[id]);
+			}
+		}
+	}
+
+	return NULL;
+}
+
 template<class ModelType>
 void writeResults(ModelType& model, double* counts) {
   sprintf(modelF, "%s.model", statName);
@@ -416,23 +477,47 @@ void EM() {
 
 	if (totNum > 0) { cout<< "Warning: RSEM reaches "<< MAX_ROUND<< " iterations before meeting the convergence criteria."<< endl; }
 
-	//generate output file used by Gibbs sampler
-	if (genGibbsOut) {
+	// generate outputs for Gibbs or calculate approximated model evidence score
+	if (genGibbsOut || calcEvalScore) {
 		if (model.getNeedCalcConPrb()) {
 			for (int i = 0; i < nThreads; i++) {
 				rc = pthread_create(&threads[i], &attr, calcConProbs<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
-				pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) when generating files for Gibbs sampler!");
+				pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) for calcConProbs!");
 			}
 			for (int i = 0; i < nThreads; i++) {
 				rc = pthread_join(threads[i], NULL);
-				pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) when generating files for Gibbs sampler!");
+				pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) for calcConProbs!");
 			}
 		}
 		model.setNeedCalcConPrb(false);
 
-		sprintf(out_for_gibbs_F, "%s.ofg", imdName);
+		double numMatchingBases = 0.0;
+
+		if (calcEvalScore) {
+			ModelType ss_model(mparams); //master model for sufficient statistics calculation
+
+			for (int i = 0; i <= M; i++) probv[i] = theta[i];
+
+			for (int i = 0; i < nThreads; i++) {
+				rc = pthread_create(&threads[i], &attr, GET_SS_STEP<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
+				pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) for GET_SS_STEP!");
+			}
+			for (int i = 0; i < nThreads; i++) {
+				rc = pthread_join(threads[i], NULL);
+				pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) for GET_SS_STEP!");
+			}
+
+			ss_model.init();
+			for (int i = 0; i < nThreads; i++) { ss_model.collect(*mhps[i]); }
+			numMatchingBases = ss_model.getNumMatchingBases();
+		}
+
+		sprintf(out_for_gibbs_F, "%s.ofg", statName); // for internal experiments
 		ofstream fout(out_for_gibbs_F);
-		fout<< M<< " "<< N0<< endl;
+		// one difference between RSEM-EVAL and RSEM
+		fout<< M<< " "<< N0<< " "<< N1<< " "<< setprecision(15)<< model.getLogP();
+		if (calcEvalScore) { fout<< " "<< setprecision(15)<< numMatchingBases; }
+		fout<< endl;
 		for (int i = 0; i < nThreads; i++) {
 			READ_INT_TYPE numN = hitvs[i]->getN();
 			for (READ_INT_TYPE j = 0; j < numN; j++) {
@@ -541,7 +626,7 @@ int main(int argc, char* argv[]) {
 	bool quiet = false;
 
 	if (argc < 6) {
-		printf("Usage : rsem-run-em refName read_type sampleName imdName statName [-p #Threads] [-b samInpType samInpF has_fn_list_? [fn_list]] [-q] [--gibbs-out] [--sampling] [--seed seed]\n\n");
+		printf("Usage : rsem-run-em refName read_type sampleName imdName statName [-p #Threads] [-b samInpType samInpF has_fn_list_? [fn_list]] [-q] [--gibbs-out] [--sampling] [--seed seed] [--calc-evaluation-score nb_r nb_p L w]\n\n");
 		printf("  refName: reference name\n");
 		printf("  read_type: 0 single read without quality score; 1 single read with quality score; 2 paired-end read without quality score; 3 paired-end read with quality score.\n");
 		printf("  sampleName: sample's name, including the path\n");
@@ -549,9 +634,12 @@ int main(int argc, char* argv[]) {
 		printf("  -p: number of threads which user wants to use. (default: 1)\n");
 		printf("  -b: produce bam format output file. (default: off)\n");
 		printf("  -q: set it quiet\n");
-		printf("  --gibbs-out: generate output file used by Gibbs sampler. (default: off)\n");
+		printf("  --gibbs-out: generate output file use by Gibbs sampler. (default: off)\n");
 		printf("  --sampling: sample each read from its posterior distribution when bam file is generated. (default: off)\n");
 		printf("  --seed uint32: the seed used for the BAM sampling. (default: off)\n");
+		printf("  --calc-evaluation-score nb_r nb_p L w: "
+				"nb_r and nb_p are parameters for the true transcript length distribution, which is modeled by a negative binomial distribution; "
+				"L is the read length and w is the mininum overlap required for joining two contigs.\n");
 		printf("// model parameters should be in imdName.mparams.\n");
 		exit(-1);
 	}
@@ -569,7 +657,8 @@ int main(int argc, char* argv[]) {
 	genBamF = false;
 	bamSampling = false;
 	genGibbsOut = false;
-	pt_fn_list = pt_chr_list = NULL;
+	calcEvalScore = false;
+	pt_fn_list = NULL;
 	hasSeed = false;
 
 	for (int i = 6; i < argc; i++) {
@@ -591,6 +680,13 @@ int main(int argc, char* argv[]) {
 		  int len = strlen(argv[i + 1]);
 		  seed = 0;
 		  for (int k = 0; k < len; k++) seed = seed * 10 + (argv[i + 1][k] - '0');
+		}
+		if (!strcmp(argv[i], "--calc-evaluation-score")) {
+			calcEvalScore = true;
+			nb_r = atof(argv[i + 1]);
+			nb_p = atof(argv[i + 2]);
+			L = atoi(argv[i + 3]);
+			w = atoi(argv[i + 4]);
 		}
 	}
 
@@ -645,9 +741,23 @@ int main(int argc, char* argv[]) {
 	default : fprintf(stderr, "Unknown Read Type!\n"); exit(-1);
 	}
 
+	if (calcEvalScore) {
+		CalcEvalScore ces(refs, nb_r, nb_p, L, w, statName);
+		sprintf(scoreF, "%s.score", outName);
+		ces.writeScoresTo(scoreF);
+		
+		char groupF[STRLEN];
+		GroupInfo gi;
+		sprintf(groupF, "%s.grp", argv[1]);
+		gi.load(groupF);
+
+		ces.generateExpressionFiles(gi, transcripts, scoreF);
+	}
+
 	time_t b = time(NULL);
 
 	printTimeUsed(a, b, "EM.cpp");
 
 	return 0;
 }
+

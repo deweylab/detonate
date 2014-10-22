@@ -15,12 +15,13 @@
 using namespace std;
 
 int M;
+int minimum_length; // minimum length accepted for a transcript
 
 map<string, string> name2seq;
 map<string, string>::iterator iter;
 
 Transcripts transcripts(1); // no genome, just transcript set
-char groupF[STRLEN], tiF[STRLEN], refFastaF[STRLEN], chromListF[STRLEN];
+char groupF[STRLEN], tiF[STRLEN], refFastaF[STRLEN];
 char gtF[STRLEN], taF[STRLEN]; // group info between gene and transcript, transcript and allele
 
 int hasMappingFile;
@@ -76,7 +77,7 @@ char check(char c) {
 }
 
 void writeResults(int option, char* refName) {
-	ofstream fout, fout2;
+	ofstream fout;
 	string cur_gene_id, cur_transcript_id, name;
 	vector<int> gi, gt, ta;
 
@@ -120,8 +121,6 @@ void writeResults(int option, char* refName) {
 	}
 
 	sprintf(refFastaF, "%s.transcripts.fa", refName);
-	sprintf(chromListF, "%s.chrlist", refName);
-	fout2.open(chromListF);
 	fout.open(refFastaF);
 	for (int i = 1; i <= M; i++) {
 		name = transcripts.getTranscriptAt(i).getSeqName();
@@ -129,38 +128,37 @@ void writeResults(int option, char* refName) {
 		general_assert(iter != name2seq.end(), "Cannot recognize sequence ID" + name + "!");
 		fout<<">"<<name<<endl;
 		fout<<iter->second<<endl;
-
-		fout2<<name<<'\t'<<iter->second.length()<<endl;
 	}
 	fout.close();
-	fout2.close();
 	
 	if (verbose) { 
-	  printf("Chromosome List File is generated!\n"); 
 	  printf("Extracted Sequences File is generated!\n"); 
 	}
 }
 
 int main(int argc, char* argv[]) {
-  if (argc < 5 || ((hasMappingFile = atoi(argv[3])) && argc < 6)) {
-		printf("Usage: synthesisRef refName quiet hasMappingFile<0,no;1,yes;2,allele-specific> [mappingFile] reference_file_1 [reference_file_2 ...]\n");
+	if (argc < 6 || ((hasMappingFile = atoi(argv[4])) && argc < 7)) {
+		printf("Usage: synthesisRef refName minimum_length quiet hasMappingFile<0,no;1,yes;2,allele-specific> [mappingFile] reference_file_1 [reference_file_2 ...]\n");
 		exit(-1);
 	}
 
-	verbose = !atoi(argv[2]);
+	minimum_length = atoi(argv[2]);
+	verbose = !atoi(argv[3]);
 
-	if (hasMappingFile) { loadMappingInfo(hasMappingFile, argv[4]); }
+	if (hasMappingFile) { loadMappingInfo(hasMappingFile, argv[5]); }
 
 	// allele-specific
 	if (hasMappingFile == 2) { transcripts.setType(2); }
 
-	int start = hasMappingFile ? 5 : 4;
+	int start = hasMappingFile ? 6 : 5;
 
 	ifstream fin;
 	string line, gseq;
 	string seqname, gene_id, transcript_id;
 
 	vector<Interval> vec;
+
+	int num_filtered = 0;
 
 	M = 0;
 	name2seq.clear();
@@ -179,6 +177,9 @@ int main(int argc, char* argv[]) {
 
 			int len = gseq.length();
 			assert(len > 0);
+
+			if (len < minimum_length) { num_filtered++; continue; }
+
 			for (int j = 0; j < len; j++) gseq[j] = check(gseq[j]);
 
 			name2seq[seqname] = gseq;
@@ -206,6 +207,8 @@ int main(int argc, char* argv[]) {
 		}
 		fin.close();
 	}
+
+	if (verbose && num_filtered > 0) { printf("The number of contigs filtered is %d.\n", num_filtered); }
 
 	if (M < 1) {
 		fprintf(stderr, "Number of transcripts in the reference is less than 1!\n");

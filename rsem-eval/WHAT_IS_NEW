@@ -1,3 +1,10 @@
+RSEM-EVAL v1.8
+
+- Extended RSEM-EVAL to handle paired-end data
+- Merged the reference preparation step into RSEM-EVAL score calculation step
+
+--------------------------------------------------------------------------------------------
+
 RSEM v1.2.17
 
 - Added error detection for cases such as a read's two mates having different names or a read is both alignable and unalignable
@@ -64,12 +71,31 @@ RSEM v1.2.10
 
 --------------------------------------------------------------------------------------------
 
+RSEM-EVAL v1.7
+
+- Modified the documentation to make it more clear
+
+--------------------------------------------------------------------------------------------
+
+RSEM-EVAL v1.6
+
+- Merged RSEM v1.2.9
+
+--------------------------------------------------------------------------------------------
+
 RSEM v1.2.9
 
 - Fixed a compilation error problem in Mac OS
 - Fixed a problem in makefile that affects 'make ebseq'
 - Added 'model_file_description.txt', which describes the format and meanings of file 'sample_name.stat/sample_name.model'
 - Updated samtools to version 0.1.19
+
+--------------------------------------------------------------------------------------------
+
+RSEM-EVAL v1.5
+
+- Merged RSEM v1.2.8
+- Added documents describing how to use RSEM-EVAL
 
 --------------------------------------------------------------------------------------------
 

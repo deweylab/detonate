@@ -7,7 +7,7 @@ use strict;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(runCommand);
-our @EXPORT_OK = qw(runCommand collectResults showVersionInfo);
+our @EXPORT_OK = qw(runCommand collectResults showVersionInfo nbinom_calc_moments nbinom_load_params nbinom_convert_params);
 
 # command, {err_msg}
 sub runCommand {
@@ -94,6 +94,62 @@ sub showVersionInfo {
     close(INPUT);
     print "Current version is $line\n";
     exit(0);
+}
+
+# 0, input multi-FASTA file
+# RETURN, mean and sd
+sub nbinom_calc_moments {
+    my $doesOpen = open(INPUT, $_[0]);
+    if ($doesOpen == 0) { print "Cannot open $_[0]!\n"; exit(-1); }
+    my ($line, $seq) = ();
+    my @lens = ();
+    $line = <INPUT>;
+    chomp($line);
+    while (substr($line, 0, 1) eq '>') {
+	$seq = "";
+	my $len = 0;
+	while (($seq = <INPUT>) && (substr($seq, 0, 1) ne '>')) {
+	    chomp($seq);
+	    $len += length($seq);
+	}
+	push(@lens, $len);
+	$line = $seq;
+    }
+    close(INPUT);
+
+    my ($mu, $mu2, $sigma2) = (0, 0, 0);
+
+    my $n = @lens;
+    for (my $i = 0; $i < $n; $i++) {
+	$mu += $lens[$i];
+	$mu2 += $lens[$i] * $lens[$i];
+    }
+    $mu /= $n;
+    $mu2 /= $n;
+    $sigma2 = $mu2 - $mu * $mu;
+
+    return ($mu, $sigma2 ** 0.5);
+}
+
+# 0, input_file
+# RETURN: mean and sd
+sub nbinom_load_params {
+    my $doesOpen = open(INPUT, $_[0]);
+    if ($doesOpen == 0) { print "Cannot open $_[0]!\n"; exit(-1); }
+    my $line = <INPUT>;
+    chomp($line);
+    my @arr = split(/\t/, $line);
+    close(INPUT);
+
+    return @arr;
+}
+
+# 0, mean; 1, sd
+# RETURN: r and p
+sub nbinom_convert_params {
+    my ($mu, $var) = ($_[0], $_[1] ** 2);
+    my @res = ($mu ** 2 / ($var - $mu), $mu / $var);
+    return @res;
 }
 
 1;

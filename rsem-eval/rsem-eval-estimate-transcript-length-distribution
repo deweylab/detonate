@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+
+use FindBin;
+use lib $FindBin::RealBin;
+use rsem_perl_utils qw(nbinom_calc_moments);
+use strict;
+
+die "Usage: rsem-eval-estimate-transcript-length-distribution input.fasta parameter_file\n".
+    "    input.fasta: A multi-FASTA file contains all transcript sequences used to learn the true transcript length distribution's parameters.\n".
+    "    parameter_file: This file records the learned parameters--the estimated mean and standard deviation (separated by a tab character).\n"
+    unless (scalar(@ARGV) == 2);
+
+open(OUTPUT, ">$ARGV[1]");
+my ($mean, $sd) = &nbinom_calc_moments($ARGV[0]);
+print OUTPUT "$mean\t$sd\n";
+close(OUTPUT);

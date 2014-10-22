@@ -30,6 +30,8 @@ public:
 	std::string simulate(simul*, int, int, int, const std::string&, const RefSeq&);
 	void finishSimulation();
 
+	double getNumMatchingBases();
+
 private:
 	static const int NCODES = 5; // number of possible codes
 	static const int SIZE = 100;
@@ -203,6 +205,15 @@ std::string QProfile::simulate(simul* sampler, int len, int pos, int dir, const 
 
 void QProfile::finishSimulation() {
 	delete[] pc;
+}
+
+// only be called after collect, mutually exclusive with finish
+double QProfile::getNumMatchingBases() {
+	double numMatchingBases = 0.0;
+	for (int i = 0; i < SIZE; i++) {
+		for (int j = 0; j < NCODES - 1; j++) numMatchingBases += p[i][j][j];
+	}
+	return numMatchingBases;
 }
 
 #endif /* QPROFILE_H_ */

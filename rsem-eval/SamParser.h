@@ -190,7 +190,7 @@ int SamParser::parseNext(PairedEndRead& read, PairedEndHit& hit) {
 		mp1 = b2; mp2 = b;
 	}
 
-	general_assert(!strcmp(bam1_qname(mp1), bam1_qname(mp2)), "Detected a read pair whose two mates have different names: " + getName(mp1) + " , " + getName(mp2) + " !");
+	if (strcmp(bam1_qname(mp1), bam1_qname(mp2))) printf("Warning: Detected a read pair whose two mates have different names--%s and %s!\n", getName(mp1).c_str(), getName(mp2).c_str()); 
 
 	int readType = getReadType(mp1, mp2);
 	std::string name = getName(mp1);
@@ -244,7 +244,7 @@ int SamParser::parseNext(PairedEndReadQ& read, PairedEndHit& hit) {
 		mp1 = b2; mp2 = b;
 	}
 
-	general_assert(!strcmp(bam1_qname(mp1), bam1_qname(mp2)), "Detected a read pair whose two mates have different names: " + getName(mp1) + " , " + getName(mp2) + " !");
+	if (strcmp(bam1_qname(mp1), bam1_qname(mp2))) printf("Warning: Detected a read pair whose two mates have different names--%s and %s!\n", getName(mp1).c_str(), getName(mp2).c_str()); 
 
 	int readType = getReadType(mp1, mp2);
 	std::string name = getName(mp1);
@@ -334,30 +334,14 @@ inline std::string SamParser::getQScore(const bam1_t* b) {
 	return qscore;
 }
 
-//0 ~ N0 , 1 ~ N1, 2 ~ N2
-inline int SamParser::getReadType(const bam1_t* b) {
-	if (!(b->core.flag & 0x0004)) return 1;
-
-	if (!strcmp(rtTag, "")) return 0;
-
-	uint8_t *p = bam_aux_get(b, rtTag);
-	if (p == NULL) return 0;
-	return (bam_aux2i(p) > 0 ? 2 : 0);
+//0 ~ N0 , 1 ~ N1. No type 2 read for RSEM-EVAl
+inline int SamParser::getReadType(const bam1_t* b) {  
+	return (b->core.flag & 0x0004) ? 0 : 1;
 }
 
-//For paired-end reads, do not print out type 2 reads
+// No type 2 read for RSEM-EVAL
 inline int SamParser::getReadType(const bam1_t* b, const bam1_t* b2) {
-	if (!(b->core.flag & 0x0004) && !(b2->core.flag & 0x0004)) return 1;
-
-	if (!strcmp(rtTag, "")) return 0;
-
-	uint8_t *p = bam_aux_get(b, rtTag);
-	if (p != NULL && bam_aux2i(p) > 0) return 2;
-
-	p = bam_aux_get(b2, rtTag);
-	if (p != NULL && bam_aux2i(p) > 0) return 2;
-
-	return 0;
+	return ((b->core.flag & 0x0004) || (b2->core.flag & 0x0004)) ? 0 : 1;
 }
 
 #endif /* SAMPARSER_H_ */
