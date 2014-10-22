@@ -140,21 +140,20 @@ contig as described in the DETONATE manuscript.
  
 ## <a name="example"></a> Example
 
-We have a toy example in folder 'examples'. The true transcript is
-stored at file 'toy_ref.fa'. The single-end, 76bp reads generated from this
-transcript are stored in file 'toy_SE.fq'. In addition, we have three
-different assemblies based on the data: 'toy_assembly_1.fa',
-'toy_assembly_2.fa' and 'toy_assembly_3.fa'. We also know the true
-transcript is from mouse and thus use 'mouse.txt' under
-'true_transcript_length_distribution' as our transcript length
-parameter file.
+We have a toy example in the 'examples' folder of the detonate distribution. A
+single true transcript is stored at file 'toy_ref.fa'. The single-end, 76bp
+reads generated from this transcript are stored in file 'toy_SE.fq'. In
+addition, we have three different assemblies based on the data:
+'toy_assembly_1.fa', 'toy_assembly_2.fa' and 'toy_assembly_3.fa'. We also know
+the true transcript is from mouse and thus use 'mouse.txt' under
+'true_transcript_length_distribution' as our transcript length parameter file.
 
-We run
+We run (assuming that we are in the rsem-eval directory)
 
-    rsem-eval-calculate-score -p 8 \
-    			      --transcript-length-parameters true_transcript_length_distribution/mouse.txt \
-			      examples/toy_SE.fq \
-			      examples/toy_assembly_1.fa \
+    ./rsem-eval-calculate-score -p 8 \
+    			  --transcript-length-parameters true_transcript_length_distribution/mouse.txt \
+			      ../examples/toy_SE.fq \
+			      ../examples/toy_assembly_1.fa \
 			      toy_assembly_1
 			      76
 
