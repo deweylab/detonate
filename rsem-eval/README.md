@@ -44,8 +44,7 @@ program, you must have [Bowtie](http://bowtie-bio.sourceforge.net) installed.
 
 Please note that the RNA-Seq data set used to build the assembly
 should be exactly the same as the RNA-Seq data set for evaluating this
-assembly. In addition, currently RSEM-EVAL only supports single-end,
-fixed-length RNA-Seq reads.
+assembly. RSEM-EVAL supports both single-end and paired-end reads.
 
 ### II. Estimate Transcript Length Distribution Parameters
 
