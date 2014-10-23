@@ -1,0 +1,20 @@
+First, make sure that config.sh looks correct, and that
+
+  - $ref_eval_upstream_dir/$ref_eval_pkg.tar.gz and
+  - $rsem_eval_upstream_dir/$rsem_eval_pkg.tar.gz
+
+both exist and are up to date.
+
+Second, run:
+
+$ bash package.sh
+
+This will create a tarball for distribution. It will also create HTML files for
+the website.
+
+Third, copy the HTML files and the tarball to the website:
+
+$ bash update_website.sh
+
+(You might want to do this last step manually, following the script as an
+example, just to be safe.)

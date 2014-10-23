@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+<html>
+<head>
+<title>DETONATE: DE novo TranscriptOme rNa-seq Assembly with or without the Truth Evaluation</title>
+<base href="http://deweylab.biostat.wisc.edu/detonate/" />
+</head>
+<body>
+
+<h1>DETONATE: DE novo TranscriptOme rNa-seq Assembly with or without the Truth
+Evaluation</h1>
+
+<h2>Overview</h2>
+
+<p>DETONATE (DE novo TranscriptOme rNa-seq Assembly with or without the Truth
+Evaluation) consists of two component packages, RSEM-EVAL and REF-EVAL. Both
+packages are mainly intended to be used to evaluate <i>de novo</i>
+transcriptome assemblies, although REF-EVAL can be used to compare sets of any
+kinds of genomic sequences.</p>
+
+<p>RSEM-EVAL is a reference-free evaluation method based on a novel
+probabilistic model that depends only on an assembly and the RNA-Seq reads used
+for its construction. Unlike N50, RSEM-EVAL combines multiple factors,
+including the compactness of an assembly and the support of the assembly from
+the RNA-Seq data, into a single, statistically-principled evaluation score.
+This score can be used to select a best assembler, optimize an assembler's
+parameters, and guide new assembler design as an objective function. In
+addition, for each contig within an assembly, RSEM-EVAL provides a score that
+assesses how well that contig is supported by the RNA-Seq data and can be used
+to filter unnecessary contigs.</p>
+
+<p>REF-EVAL is a toolkit of reference-based measures, including contig,
+nucleotide, and pair precision, recall, and F1 scores, a novel kmer compression
+score, and several scores that compare induced kmer distributions between the
+assembly and the reference. REF-EVAL also includes a program to estimate the
+``true'' assembly of a set of RNA-Seq reads, relative to a collection of
+full-length reference transcripts. See <a href="ref-eval.html">here</a>, or
+ref-eval/README in the distribution, for detailed information.</p>
+
+<p>DETONATE is motivated and described in detail in the following paper:</p>
+
+<p>Bo Li*, Nathanael Fillmore*, Yongsheng Bai, Mike Collins, James A. Thompson,
+Ron Stewart, Colin N. Dewey. Evaluation of <i>de novo</i> transcriptome
+assemblies from RNA-Seq data.</p>
+
+<p>* = equal contributions</p>
+
+
+<h2>Downloading</h2>
+
+<p>The current version of DETONATE (1.8.1) is available here:</p>
+
+<ul>
+<li><a href="detonate-1.8.1.tar.gz">detonate-1.8.1.tar.gz</a></li>
+</ul>
+
+
+<h2>Building/installation</h2>
+
+<p>To build RSEM-EVAL and REF-EVAL, simply type ``make'' in the top-level
+<tt>detonate-1.8.1</tt> directory, after you've upacked the tarball (<tt>tar
+xvf detonate-1.8.1.tar.gz</tt>). If you have trouble with any of this, please
+<a href="https://groups.google.com/d/forum/detonate-users">contact us</a>.</p>
+
+
+<h2>Vignette</h2>
+
+<p>A vignette with an extended example of the basic usage of DETONATE is
+available <a href="vignette.html">here</a>, or in VIGNETTE in the
+distribution.</p>
+
+
+<h2>Usage</h2>
+
+<p>For information about using RSEM-EVAL, see <a
+href="rsem-eval.html">here</a>, or rsem-eval/README.md in the distribution.</p>
+
+<p>For information about using REF-EVAL, see <a href="ref-eval.html">here</a>,
+or ref-eval/README in the distribution.</p>
+
+<p>For information about using REF-EVAL-ESTIMATE-TRUE-ASSEMBLY, see <a
+href="ref-eval-estimate-true-assembly.html">here</a>, or
+ref-eval/README.REF-EVAL-ESTIMATE-TRUE-ASSEMBLY in the distribution.</p>
+
+
+<h2>Authors</h2>
+
+<p>RSEM-EVAL was coded by Bo Li, and REF-EVAL was coded by Nathanael Fillmore.
+Bo, Nate, and Colin Dewey jointly developed the RSEM-EVAL and REF-EVAL
+methodology, with feedback on the methodology from the other coauthors.</p>
+
+
+<h2>Mailing list</h2>
+
+<table border="0" cellspacing="0">
+<tr><td>
+<b>Subscribe to DETONATE Users</b>
+</td></tr>
+<tr><td>
+<form action="http://groups.google.com/group/detonate-users/boxsubscribe">
+Email: <input type="text" name="email" />
+<input type="submit" name="sub" value="Subscribe" />
+</form>
+</td></tr>
+<tr><td align="right">
+<a href="http://groups.google.com/group/detonate-users">Visit this group</a>
+</td></tr>
+</table>
+
+
+<h2>Development</h2>
+
+<p>A repository for the DETONATE source code is available at Github, <a
+href="https://github.com/deweylab/detonate">here</a>.</p>
+
+
+<h2>Axolotl assembly</h2>
+
+<p>The RSEM-EVAL-guided Axolotl assembly described in the DETONATE paper (see
+above) is available <a
+href="http://deweylab.biostat.wisc.edu/detonate/AxoJuveBlastema_RSEM-EVAL-1.4_Trinity.fasta.gz">here</a>.</p>
+
+
+<h2>Changelog</h2>
+
+<p>In <a href="detonate-1.8.1.tar.gz">DETONATE 1.8.1</a> (the current version),
+released on Oct 2, 2014, the following changes were made:</p>
+
+<ul>
+<li>Updated the toy example to match that in the paper.</li>
+</ul>
+
+<p>In <a href="detonate-1.8.tar.gz">DETONATE 1.8</a>, released on Sep 26, 2014,
+and comprised of RSEM-EVAL 1.8 and REF-EVAL 1.8, the following changes were
+made:</p>
+
+<ul>
+<li>Added support for paired-end data.</li>
+<li>Improved the interface.</li>
+</ul>
+
+<p>In <a href="detonate-20140123.tar.gz">DETONATE 20140123</a>, comprised of
+RSEM-EVAL 1.6 and REF-EVAL 20140123, the following changes were made:</p>
+
+<ul>
+<li>Fixed UI bug in REF-EVAL related to --alignment-policy.</li>
+<li>Incorporated changes from RSEM 1.2.9 into RSEM-EVAL.</li>
+</ul>
+
+<p><a href="detonate-20140108.tar.gz">DETONATE 20140108</a>, comprised of
+RSEM-EVAL 1.5 and REF-EVAL 20140108 was the initial release.</p>
+
+</body>
+</html>
