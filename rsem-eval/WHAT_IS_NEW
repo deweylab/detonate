@@ -1,3 +1,9 @@
+RSEM-EVAL v1.9
+
+- Canceled f function values from 'Prior_score_on_contig_lengths' and 'Correction_term' 
+
+--------------------------------------------------------------------------------------------
+
 RSEM-EVAL v1.8
 
 - Extended RSEM-EVAL to handle paired-end data

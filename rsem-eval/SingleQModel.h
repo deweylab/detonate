@@ -47,7 +47,6 @@ public:
 		nqpro = new NoiseQProfile();
 
 		mean = -1.0; sd = 0.0;
-		mw = NULL;
 
 		seedLen = 0;
 
@@ -65,7 +64,6 @@ public:
 		needCalcConPrb = true;
 
 		ori = NULL; gld = NULL; mld = NULL; rspd = NULL; qd = NULL; qpro = NULL; nqpro = NULL;
-		mw = NULL;
 
 		loglik_mld_noise = 0.0;
 
@@ -93,15 +91,12 @@ public:
 		if (qd != NULL) delete qd;
 		if (qpro != NULL) delete qpro;
 		if (nqpro != NULL) delete nqpro;
-		if (mw != NULL) delete[] mw;
 	}
 
 	void estimateFromReads(const char*);
 
 	//if prob is too small, just make it 0
 	double getConPrb(const SingleReadQ& read, const SingleHit& hit) const {
-	  //if (read.isLowQuality()) return 0.0; // No need for RSEM-EVAL
-
 		double prob;
 		int sid = hit.getSid();
 		RefSeq &ref = refs->getRef(sid);
@@ -119,9 +114,6 @@ public:
 				+ "It is possible that the aligner you use gave different read lengths for a same read in SAM file.");
 		general_assert(readLen <= totLen, "Read " + read.getName() + " has length " + itos(readLen) + ", but it is aligned to transcript " \
 				+ itos(sid) + ", whose length (" + itos(totLen) + ") is shorter than the read's length!");
-
-		int seedPos = (dir == 0 ? pos : totLen - pos - seedLen); // the aligned position of the seed in forward strand coordinates
-		if (seedPos >= fullLen || ref.getMask(seedPos)) return 0.0;
 
 		int effL;
 		double value;
@@ -144,20 +136,15 @@ public:
 
 		prob = ori->getProb(dir) * value * qpro->getProb(read.getReadSeq(), read.getQScore(), ref, pos, dir);
 
-		if (prob < EPSILON) { prob = 0.0; }
-
-		prob = (mw[sid] < EPSILON ? 0.0 : prob / mw[sid]);
+		if (prob <= EPSILON) { prob = 0.0; }
 
 		return prob;
 	}
 
 	double getNoiseConPrb(const SingleReadQ& read) {
-	  //if (read.isLowQuality()) return 0.0; // No need for RSEM-EVAL
 		double prob = mld != NULL ? mld->getProb(read.getReadLength()) : gld->getProb(read.getReadLength());
 		prob *= nqpro->getProb(read.getReadSeq(), read.getQScore());
-		if (prob < EPSILON) { prob = 0.0; }
-
-		prob = (mw[0] < EPSILON ? 0.0 : prob / mw[0]);
+		if (prob <= EPSILON) { prob = 0.0; }
 
 		return prob;
 	}
@@ -168,8 +155,7 @@ public:
 	void init();
 
 	void update(const SingleReadQ& read, const SingleHit& hit, double frac) {
-	  //if (read.isLowQuality() || frac < EPSILON) return; // No need to call read.isLowQuality() for RSEM-EVAL
-		if (frac < EPSILON) return;
+		if (frac <= EPSILON) return;
 
 		const RefSeq& ref = refs->getRef(hit.getSid());
 
@@ -218,8 +204,7 @@ public:
 	}
 
 	void updateNoise(const SingleReadQ& read, double frac) {
-	  //if (read.isLowQuality() || frac < EPSILON) return; // No need to call read.isLowQuality() for RSEM-EVAL
-		if (frac < EPSILON) return;
+		if (frac <= EPSILON) return;
 
 		nqpro->update(read.getReadSeq(), read.getQScore(), frac);
 	}
@@ -239,12 +224,6 @@ public:
 	void startSimulation(simul*, const std::vector<double>&);
 	bool simulate(READ_INT_TYPE, SingleReadQ&, int&);
 	void finishSimulation();
-
-	//Use it after function 'read' or 'estimateFromReads'
-	const double* getMW() { 
-	  assert(mw != NULL);
-	  return mw;
-	}
 
 	int getModelType() const { return model_type; }
 
@@ -275,8 +254,6 @@ private:
 	double *mw; // for masking
 
 	double loglik_mld_noise;
-
-	void calcMW();
 };
 
 void SingleQModel::estimateFromReads(const char* readFN) {
@@ -318,9 +295,6 @@ void SingleQModel::estimateFromReads(const char* readFN) {
 
 	qd->finish();
 	nqpro->calcInitParams();
-
-	mw = new double[M + 1];
-	calcMW();
 }
 
 void SingleQModel::init() {
@@ -334,7 +308,6 @@ void SingleQModel::finish() {
 	qpro->finish();
 	nqpro->finish();
 	needCalcConPrb = true;
-	if (estRSPD) calcMW();
 }
 
 void SingleQModel::collect(const SingleQModel& o) {
@@ -364,14 +337,6 @@ void SingleQModel::read(const char* inpF) {
 	qpro->read(fi);
 	nqpro->read(fi);
 
-	if (fscanf(fi, "%d", &val) == 1) {
-		if (M == 0) M = val;
-		if (M == val) {
-			mw = new double[M + 1];
-			for (int i = 0; i <= M; i++) assert(fscanf(fi, "%lf", &mw[i]) == 1);
-		}
-	}
-
 	fclose(fi);
 }
 
@@ -394,14 +359,6 @@ void SingleQModel::write(const char* outF) {
 	qd->write(fo);   fprintf(fo, "\n");
 	qpro->write(fo); fprintf(fo, "\n");
 	nqpro->write(fo);
-
-	if (mw != NULL) {
-	  fprintf(fo, "\n%d\n", M);
-	  for (int i = 0; i < M; i++) {
-	    fprintf(fo, "%.15g ", mw[i]);
-	  }
-	  fprintf(fo, "%.15g\n", mw[M]);
-	}
 
 	fclose(fo);
 }
@@ -473,70 +430,6 @@ void SingleQModel::finishSimulation() {
 	qd->finishSimulation();
 	qpro->finishSimulation();
 	nqpro->finishSimulation();
-}
-
-void SingleQModel::calcMW() {
-	double probF, probR;
-
-	assert((mld == NULL ? gld->getMinL() : mld->getMinL()) >= seedLen);
-
-	memset(mw, 0, sizeof(double) * (M + 1));
-	mw[0] = 1.0;
-
-	probF = ori->getProb(0);
-	probR = ori->getProb(1);
-
-	for (int i = 1; i <= M; i++) {
-		RefSeq& ref = refs->getRef(i);
-		int totLen = ref.getTotLen();
-		int fullLen = ref.getFullLen();
-		double value = 0.0;
-		int minL, maxL;
-		int effL, pfpos;
-		int end = std::min(fullLen, totLen - seedLen + 1);
-		double factor;
-
-		for (int seedPos = 0; seedPos < end; seedPos++)
-			if (ref.getMask(seedPos)) {
-				//forward
-				minL = gld->getMinL();
-				maxL = std::min(gld->getMaxL(), totLen - seedPos);
-				pfpos = seedPos;
-				for (int fragLen = minL; fragLen <= maxL; fragLen++) {
-					effL = std::min(fullLen, totLen - fragLen + 1);
-					factor = (mld == NULL ? 1.0 : mld->getAdjustedCumulativeProb(std::min(mld->getMaxL(), fragLen), fragLen));
-					value += probF * gld->getAdjustedProb(fragLen, totLen) * rspd->getAdjustedProb(pfpos, effL, fullLen) * factor;
-				}
-				//reverse
-				minL = gld->getMinL();
-				maxL = std::min(gld->getMaxL(), seedPos + seedLen);
-				for (int fragLen = minL; fragLen <= maxL; fragLen++) {
-					pfpos = seedPos - (fragLen - seedLen);
-					effL = std::min(fullLen, totLen - fragLen + 1);
-					factor = (mld == NULL ? 1.0 : mld->getAdjustedCumulativeProb(std::min(mld->getMaxL(), fragLen), fragLen));
-					value += probR * gld->getAdjustedProb(fragLen, totLen) * rspd->getAdjustedProb(pfpos, effL, fullLen) * factor;
-				}
-			}
-
-		//for reverse strand masking
-		for (int seedPos = end; seedPos <= totLen - seedLen; seedPos++) {
-			minL = std::max(gld->getMinL(), seedPos + seedLen - fullLen + 1);
-			maxL = std::min(gld->getMaxL(), seedPos + seedLen);
-			for (int fragLen = minL; fragLen <= maxL; fragLen++) {
-				pfpos = seedPos - (fragLen - seedLen);
-				effL = std::min(fullLen, totLen - fragLen + 1);
-				factor = (mld == NULL ? 1.0 : mld->getAdjustedCumulativeProb(std::min(mld->getMaxL(), fragLen), fragLen));
-				value += probR * gld->getAdjustedProb(fragLen, totLen) * rspd->getAdjustedProb(pfpos, effL, fullLen) * factor;
-			}
-		}
-
-		mw[i] = 1.0 - value;
-
-		if (mw[i] < 1e-8) {
-			//      fprintf(stderr, "Warning: %dth reference sequence is masked for almost all positions!\n", i);
-			mw[i] = 0.0;
-		}
-	}
 }
 
 #endif /* SINGLEQMODEL_H_ */

@@ -24,7 +24,6 @@
 #include "SingleHit.h"
 #include "PairedEndHit.h"
 
-#include "Model.h"
 #include "SingleModel.h"
 #include "SingleQModel.h"
 #include "PairedEndModel.h"
@@ -213,18 +212,18 @@ void* E_STEP(void* arg) {
 
 		if (needCalcConPrb) { ncpv[i] = model->getNoiseConPrb(read); }
 		fracs[0] = probv[0] * ncpv[i];
-		if (fracs[0] < EPSILON) fracs[0] = 0.0;
+		if (fracs[0] <= EPSILON) fracs[0] = 0.0;
 		sum += fracs[0];
 		for (HIT_INT_TYPE j = fr; j < to; j++) {
 			HitType &hit = hitv->getHitAt(j);
 			if (needCalcConPrb) { hit.setConPrb(model->getConPrb(read, hit)); }
 			id = j - fr + 1;
 			fracs[id] = probv[hit.getSid()] * hit.getConPrb();
-			if (fracs[id] < EPSILON) fracs[id] = 0.0;
+			if (fracs[id] <= EPSILON) fracs[id] = 0.0;
 			sum += fracs[id];
 		}
 
-		if (sum >= EPSILON) {
+		if (sum > EPSILON) {
 			fracs[0] /= sum;
 			countv[0] += fracs[0];
 			if (updateModel) { mhp->updateNoise(read, fracs[0]); }
@@ -311,17 +310,17 @@ void* GET_SS_STEP(void* arg) {
 		sum = 0.0;
 
 		fracs[0] = probv[0] * ncpv[i];
-		if (fracs[0] < EPSILON) fracs[0] = 0.0;
+		if (fracs[0] <= EPSILON) fracs[0] = 0.0;
 		sum += fracs[0];
 		for (HIT_INT_TYPE j = fr; j < to; j++) {
 			HitType &hit = hitv->getHitAt(j);
 			id = j - fr + 1;
 			fracs[id] = probv[hit.getSid()] * hit.getConPrb();
-			if (fracs[id] < EPSILON) fracs[id] = 0.0;
+			if (fracs[id] <= EPSILON) fracs[id] = 0.0;
 			sum += fracs[id];
 		}
 
-		if (sum >= EPSILON) {
+		if (sum > EPSILON) {
 			fracs[0] /= sum;
 			//mhp->updateNoise(read, fracs[0]);
 			for (HIT_INT_TYPE j = fr; j < to; j++) {
@@ -453,7 +452,7 @@ void EM() {
 		//M step;
 		sum = 0.0;
 		for (int i = 0; i <= M; i++) sum += countvs[0][i];
-		assert(sum >= EPSILON);
+		assert(sum > EPSILON);
 		for (int i = 0; i <= M; i++) theta[i] = countvs[0][i] / sum;
 
 		if (updateModel) {
@@ -497,7 +496,7 @@ void EM() {
 			ModelType ss_model(mparams); //master model for sufficient statistics calculation
 
 			for (int i = 0; i <= M; i++) probv[i] = theta[i];
-
+			
 			for (int i = 0; i < nThreads; i++) {
 				rc = pthread_create(&threads[i], &attr, GET_SS_STEP<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
 				pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) for GET_SS_STEP!");
@@ -523,18 +522,14 @@ void EM() {
 			for (READ_INT_TYPE j = 0; j < numN; j++) {
 				HIT_INT_TYPE fr = hitvs[i]->getSAt(j);
 				HIT_INT_TYPE to = hitvs[i]->getSAt(j + 1);
-				HIT_INT_TYPE totNum = 0;
 
-				if (ncpvs[i][j] >= EPSILON) { ++totNum; fout<< "0 "<< setprecision(15)<< ncpvs[i][j]<< " "; }
+				fout<< "0 "<< setprecision(15)<< ncpvs[i][j]<< " "; 
 				for (HIT_INT_TYPE k = fr; k < to; k++) {
 					HitType &hit = hitvs[i]->getHitAt(k);
-					if (hit.getConPrb() >= EPSILON) {
-						++totNum;
-						fout<< hit.getSid()<< " "<< setprecision(15)<< hit.getConPrb()<< " ";
-					}
+					fout<< hit.getSid()<< " "<< setprecision(15)<< hit.getConPrb();
+					if (k < to - 1) fout<< " ";
 				}
-
-				if (totNum > 0) { fout<< endl; }
+				fout<< endl;
 			}
 		}
 		fout.close();
@@ -574,7 +569,7 @@ void EM() {
 	
 	//calculate expected effective lengths for each isoform
 	calcExpectedEffectiveLengths<ModelType>(M, refs, model, eel);
-	polishTheta(M, theta, eel, model.getMW());
+	polishTheta(M, theta, eel);
 
 	// output theta
 	for (int i = 0; i < M; i++) fprintf(fo, "%.15g ", theta[i]);
@@ -605,7 +600,7 @@ void EM() {
 					arr.assign(len, 0);
 					arr[0] = ncpvs[i][j];
 					for (HIT_INT_TYPE k = fr; k < to; k++) arr[k - fr + 1] = arr[k - fr] + hitvs[i]->getHitAt(k).getConPrb();
-					id = (arr[len - 1] < EPSILON ? -1 : sample(rg, arr, len)); // if all entries in arr are 0, let id be -1
+					id = (arr[len - 1] <= EPSILON ? -1 : sample(rg, arr, len)); // if all entries in arr are 0, let id be -1
 					for (HIT_INT_TYPE k = fr; k < to; k++) hitvs[i]->getHitAt(k).setConPrb(k - fr + 1 == id ? 1.0 : 0.0);
 				}
 			}

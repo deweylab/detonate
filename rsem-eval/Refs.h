@@ -133,9 +133,11 @@ void Refs::loadRefs(char *inpF, int option) {
     if (success) {
     	seqs.push_back(seq);
         ++M;
+	assert(seq.getFullLen() == seq.getTotLen());
     	has_polyA = has_polyA || seq.getFullLen() < seq.getTotLen();
     }
   } while (success);
+  assert(!has_polyA);
 
   fin.close();
 

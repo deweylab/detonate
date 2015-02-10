@@ -81,7 +81,7 @@ BamWriter.h : sam/sam.h sam/bam.h sam_rsem_aux.h sam_rsem_cvt.h SingleHit.h Pair
 
 sampling.h : boost/random.hpp
 
-WriteResults.h : utils.h my_assert.h GroupInfo.h Transcript.h Transcripts.h RefSeq.h Refs.h Model.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h
+WriteResults.h : utils.h my_assert.h GroupInfo.h Transcript.h Transcripts.h RefSeq.h Refs.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h
 
 ContigLengthDist.h : boost/math/special_functions/log1p.hpp boost/math/special_functions/expm1.hpp boost/math/distributions/negative_binomial.hpp
 
@@ -90,7 +90,7 @@ CalcEvalScore.h : utils.h my_assert.h Refs.h GroupInfo.h Transcript.h Transcript
 rsem-run-em : EM.o sam/libbam.a
 	$(CC) -o rsem-run-em EM.o sam/libbam.a -lz -lpthread
 
-EM.o : utils.h my_assert.h Read.h SingleRead.h SingleReadQ.h PairedEndRead.h PairedEndReadQ.h SingleHit.h PairedEndHit.h Model.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h Refs.h GroupInfo.h HitContainer.h ReadIndex.h ReadReader.h Orientation.h LenDist.h RSPD.h QualDist.h QProfile.h NoiseQProfile.h ModelParams.h RefSeq.h RefSeqPolicy.h PolyARules.h Profile.h NoiseProfile.h Transcript.h Transcripts.h HitWrapper.h BamWriter.h sam/bam.h sam/sam.h simul.h sam_rsem_aux.h sampling.h boost/random.hpp WriteResults.h boost/math/distributions/negative_binomial.hpp ContigLengthDist.h CalcEvalScore.h EM.cpp 
+EM.o : utils.h my_assert.h Read.h SingleRead.h SingleReadQ.h PairedEndRead.h PairedEndReadQ.h SingleHit.h PairedEndHit.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h Refs.h GroupInfo.h HitContainer.h ReadIndex.h ReadReader.h Orientation.h LenDist.h RSPD.h QualDist.h QProfile.h NoiseQProfile.h ModelParams.h RefSeq.h RefSeqPolicy.h PolyARules.h Profile.h NoiseProfile.h Transcript.h Transcripts.h HitWrapper.h BamWriter.h sam/bam.h sam/sam.h simul.h sam_rsem_aux.h sampling.h boost/random.hpp WriteResults.h boost/math/distributions/negative_binomial.hpp ContigLengthDist.h CalcEvalScore.h EM.cpp 
 	$(CC) $(COFLAGS) EM.cpp
 
 bc_aux.h : sam/bam.h
@@ -112,13 +112,13 @@ wiggle.o: sam/bam.h sam/sam.h wiggle.cpp wiggle.h
 rsem-simulate-reads : simulation.o
 	$(CC) -o rsem-simulate-reads simulation.o
 
-simulation.o : utils.h Read.h SingleRead.h SingleReadQ.h PairedEndRead.h PairedEndReadQ.h Model.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h Refs.h RefSeq.h GroupInfo.h Transcript.h Transcripts.h Orientation.h LenDist.h RSPD.h QualDist.h QProfile.h NoiseQProfile.h Profile.h NoiseProfile.h simul.h boost/random.hpp WriteResults.h simulation.cpp
+simulation.o : utils.h Read.h SingleRead.h SingleReadQ.h PairedEndRead.h PairedEndReadQ.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h Refs.h RefSeq.h GroupInfo.h Transcript.h Transcripts.h Orientation.h LenDist.h RSPD.h QualDist.h QProfile.h NoiseQProfile.h Profile.h NoiseProfile.h simul.h boost/random.hpp WriteResults.h simulation.cpp
 	$(CC) $(COFLAGS) simulation.cpp
 
 rsem-run-gibbs : Gibbs.o
 	$(CC) -o rsem-run-gibbs Gibbs.o -lpthread
 
-Gibbs.o : utils.h my_assert.h boost/random.hpp sampling.h Model.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h RefSeq.h RefSeqPolicy.h PolyARules.h Refs.h GroupInfo.h WriteResults.h Gibbs.cpp 
+Gibbs.o : utils.h my_assert.h boost/random.hpp sampling.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h RefSeq.h RefSeqPolicy.h PolyARules.h Refs.h GroupInfo.h WriteResults.h Gibbs.cpp 
 	$(CC) $(COFLAGS) Gibbs.cpp
 
 Buffer.h : my_assert.h
@@ -126,7 +126,7 @@ Buffer.h : my_assert.h
 rsem-calculate-credibility-intervals : calcCI.o
 	$(CC) -o rsem-calculate-credibility-intervals calcCI.o -lpthread
 
-calcCI.o : utils.h my_assert.h boost/random.hpp sampling.h Model.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h RefSeq.h RefSeqPolicy.h PolyARules.h Refs.h GroupInfo.h WriteResults.h Buffer.h calcCI.cpp
+calcCI.o : utils.h my_assert.h boost/random.hpp sampling.h SingleModel.h SingleQModel.h PairedEndModel.h PairedEndQModel.h RefSeq.h RefSeqPolicy.h PolyARules.h Refs.h GroupInfo.h WriteResults.h Buffer.h calcCI.cpp
 	$(CC) $(COFLAGS) calcCI.cpp
 
 rsem-get-unique : sam/bam.h sam/sam.h getUnique.cpp sam/libbam.a

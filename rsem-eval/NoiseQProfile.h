@@ -86,11 +86,11 @@ void NoiseQProfile::finish() {
 	for (int i = 0; i < SIZE; i++) {
 		sum = 0.0;
 		for (int j = 0; j < NCODES; j++) sum += (p[i][j] + c[i][j]);
-		if (sum <= 0.0) continue;
+		if (sum <= EPSILON) continue;
 		//if (isZero(sum)) continue;
 		for (int j = 0; j < NCODES; j++) {
 			p[i][j] = (p[i][j] + c[i][j]) /sum;
-			if (c[i][j] > 0.0) { logp += c[i][j] * log(p[i][j]); }
+			if (c[i][j] > EPSILON) { logp += c[i][j] * log(p[i][j]); }
 		}
 	}
 }
@@ -105,7 +105,7 @@ void NoiseQProfile::calcInitParams() {
 		for (int j = 0; j < NCODES; j++) sum += (1.0 + c[i][j]); // 1.0 pseudo count
 		for (int j = 0; j < NCODES; j++) {
 			p[i][j] = (c[i][j] + 1.0) / sum;
-			if (c[i][j] > 0.0) { logp += c[i][j] * log(p[i][j]); }
+			if (c[i][j] > EPSILON) { logp += c[i][j] * log(p[i][j]); }
 		}
 	}
 }

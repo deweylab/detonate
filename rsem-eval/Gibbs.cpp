@@ -11,7 +11,6 @@
 #include "my_assert.h"
 #include "sampling.h"
 
-#include "Model.h"
 #include "SingleModel.h"
 #include "SingleQModel.h"
 #include "PairedEndModel.h"
@@ -62,7 +61,6 @@ vector<HIT_INT_TYPE> s;
 vector<Item> hits;
 
 vector<double> eel;
-double *mw;
 
 vector<int> pseudo_counts;
 vector<double> pme_c, pve_c; //global posterior mean and variance vectors on counts
@@ -156,7 +154,6 @@ void init_model_related(char* modelF) {
 	model.read(modelF);
 
 	calcExpectedEffectiveLengths<ModelType>(M, refs, model, eel);
-	memcpy(mw, model.getMW(), sizeof(double) * (M + 1)); // otherwise, after exiting this procedure, mw becomes undefined
 }
 
 // assign threads
@@ -281,7 +278,7 @@ void* Gibbs(void* arg) {
 			if ((ROUND - BURNIN - 1) % GAP == 0) {
 				writeCountVector(params->fo, counts);
 				for (int i = 0; i <= M; i++) theta[i] = counts[i] / totc;
-				polishTheta(M, theta, eel, mw);
+				polishTheta(M, theta, eel);
 				calcExpressionValues(M, theta, eel, tpm, fpkm);
 				for (int i = 0; i <= M; i++) {
 					params->pme_c[i] += counts[i] - pseudo_counts[i];
@@ -430,8 +427,6 @@ int main(int argc, char* argv[]) {
 	assert(fscanf(fi, "%d", &model_type) == 1);
 	fclose(fi);
 
-	mw = new double[M + 1]; // make an extra copy
-
 	switch(model_type) {
 	case 0 : init_model_related<SingleModel>(modelF); break;
 	case 1 : init_model_related<SingleQModel>(modelF); break;
@@ -455,8 +450,6 @@ int main(int argc, char* argv[]) {
 	if (verbose) printf("Gibbs finished!\n");
 	
 	writeResultsGibbs(M, m, m_trans, gi, gt, ta, alleleS, imdName, pme_c, pme_fpkm, pme_tpm, pve_c, pve_c_genes, pve_c_trans);
-
-	delete mw; // delete the copy
 
 	return 0;
 }

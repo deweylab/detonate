@@ -47,7 +47,6 @@ public:
 		nqpro = new NoiseQProfile();
 		mld = new LenDist();
 
-		mw = NULL;
 		seedLen = 0;
 
 		loglik_mld_noise = 0.0;
@@ -63,7 +62,6 @@ public:
 		needCalcConPrb = true;
 
 		ori = NULL; gld = NULL; rspd = NULL; qd = NULL; qpro = NULL; nqpro = NULL; mld = NULL;
-		mw = NULL;
 
 		loglik_mld_noise = 0.0;
 
@@ -89,15 +87,12 @@ public:
 		if (qpro != NULL) delete qpro;
 		if (nqpro != NULL) delete nqpro;
 		if (mld != NULL) delete mld;
-		if (mw != NULL) delete mw;
 	}
 
 	void estimateFromReads(const char*);
 
 	//if prob is too small, just make it 0
 	double getConPrb(const PairedEndReadQ& read, const PairedEndHit& hit) {
-	  //if (read.isLowQuality()) return 0.0; // No need for RSEM-EVAL
-
 		double prob;
 		int sid = hit.getSid();
 		RefSeq &ref = refs->getRef(sid);
@@ -118,8 +113,6 @@ public:
 		general_assert(insertLen <= totLen, "Fragment " + read.getName() + " has length " + itos(insertLen) + ", but it is aligned to transcript " \
 				+ itos(sid) + ", whose length (" + itos(totLen) + ") is shorter than the fragment's length!");
 
-		if (fpos >= fullLen || ref.getMask(fpos)) return 0.0; // For paired-end model, fpos is the seedPos
-
 		prob = ori->getProb(dir) * gld->getAdjustedProb(insertLen, totLen) *
 		       rspd->getAdjustedProb(fpos, effL, fullLen);
 
@@ -133,16 +126,12 @@ public:
 		prob *= mld->getAdjustedProb(mate2.getReadLength(), hit.getInsertL()) *
 		        qpro->getProb(mate2.getReadSeq(), mate2.getQScore(), ref, m2pos, m2dir);
 
-		if (prob < EPSILON) { prob = 0.0; }
-
-		prob = (mw[sid] < EPSILON ? 0.0 : prob / mw[sid]);
+		if (prob <= EPSILON) { prob = 0.0; }
 
 		return prob;
 	}
 
 	double getNoiseConPrb(const PairedEndReadQ& read) {
-	  //if (read.isLowQuality()) return 0.0; // No need for RSEM-EVAL
-
 		double prob;
 		const SingleReadQ& mate1 = read.getMate1();
 		const SingleReadQ& mate2 = read.getMate2();
@@ -150,9 +139,7 @@ public:
 		prob = mld->getProb(mate1.getReadLength()) * nqpro->getProb(mate1.getReadSeq(), mate1.getQScore());
 		prob *= mld->getProb(mate2.getReadLength()) * nqpro->getProb(mate2.getReadSeq(), mate2.getQScore());
 
-		if (prob < EPSILON) { prob = 0.0; }
-
-		prob = (mw[0] < EPSILON ? 0.0: prob / mw[0]);
+		if (prob <= EPSILON) { prob = 0.0; }
 
 		return prob;
 	}
@@ -163,8 +150,7 @@ public:
 	void init();
 
 	void update(const PairedEndReadQ& read, const PairedEndHit& hit, double frac) {
-	  //if (read.isLowQuality() || frac < EPSILON) return; // No need to call read.isLowQuality() for RSEM-EVAL
-		if (frac < EPSILON) return;
+		if (frac <= EPSILON) return;
 
 		RefSeq& ref = refs->getRef(hit.getSid());
 		const SingleReadQ& mate1 = read.getMate1();
@@ -183,8 +169,7 @@ public:
 	}
 
 	void updateNoise(const PairedEndReadQ& read, double frac) {
-	  //if (read.isLowQuality() || frac < EPSILON) return; // No need to call read.isLowQuality() for RSEM-EVAL
-		if (frac < EPSILON) return;
+		if (frac <= EPSILON) return;
 
 		const SingleReadQ& mate1 = read.getMate1();
 		const SingleReadQ& mate2 = read.getMate2();
@@ -208,12 +193,6 @@ public:
 	void startSimulation(simul*, const std::vector<double>&);
 	bool simulate(READ_INT_TYPE, PairedEndReadQ&, int&);
 	void finishSimulation();
-
-	//Use it after function 'read' or 'estimateFromReads'
-	const double* getMW() { 
-	  assert(mw != NULL);
-	  return mw;
-	}
 
 	int getModelType() const { return model_type; }
  
@@ -239,11 +218,7 @@ private:
 	simul *sampler; // for simulation
 	double *theta_cdf; // for simulation
 
-	double *mw; // for masking
-
 	double loglik_mld_noise;
-
-	void calcMW();
 };
 
 void PairedEndQModel::estimateFromReads(const char* readFN) {
@@ -293,9 +268,6 @@ void PairedEndQModel::estimateFromReads(const char* readFN) {
 
     qd->finish();
     nqpro->calcInitParams();
-
-    mw = new double[M + 1];
-    calcMW();
 }
 
 void PairedEndQModel::init() {
@@ -311,7 +283,6 @@ void PairedEndQModel::finish() {
 	qpro->finish();
 	nqpro->finish();
 	needCalcConPrb = true;
-	calcMW();
 }
 
 void PairedEndQModel::collect(const PairedEndQModel& o) {
@@ -338,15 +309,6 @@ void PairedEndQModel::read(const char* inpF) {
 	qpro->read(fi);
 	nqpro->read(fi);
 
-	if (fscanf(fi, "%d", &val) == 1) {
-		if (M == 0) M = val;
-		if (M == val) {
-			mw = new double[M + 1];
-			for (int i = 0; i <= M; i++) assert(fscanf(fi, "%lf", &mw[i]) == 1);
-		}
-	}
-
-
 	fclose(fi);
 }
 
@@ -364,14 +326,6 @@ void PairedEndQModel::write(const char* outF) {
 	qd->write(fo);   fprintf(fo, "\n");
 	qpro->write(fo); fprintf(fo, "\n");
 	nqpro->write(fo);
-
-	if (mw != NULL) {
-	  fprintf(fo, "\n%d\n", M);
-	  for (int i = 0; i < M; i++) {
-	    fprintf(fo, "%.15g ", mw[i]);
-	  }
-	  fprintf(fo, "%.15g\n", mw[M]);
-	}
 
 	fclose(fo);
 }
@@ -447,43 +401,6 @@ void PairedEndQModel::finishSimulation() {
 	qd->finishSimulation();
 	qpro->finishSimulation();
 	nqpro->finishSimulation();
-}
-
-
-void PairedEndQModel::calcMW() {
-	assert(mld->getMinL() >= seedLen);
-
-	memset(mw, 0, sizeof(double) * (M + 1));
-	mw[0] = 1.0;
-
-	for (int i = 1; i <= M; i++) {
-		RefSeq& ref = refs->getRef(i);
-		int totLen = ref.getTotLen();
-		int fullLen = ref.getFullLen();
-		int end = std::min(fullLen, totLen - gld->getMinL() + 1);
-		double value = 0.0;
-		int minL, maxL;
-		int effL, pfpos;
-
-		//seedPos is fpos here
-		for (int seedPos = 0; seedPos < end; seedPos++)
-			if (ref.getMask(seedPos)) {
-				minL = gld->getMinL();
-				maxL = std::min(gld->getMaxL(), totLen - seedPos);
-				pfpos = seedPos;
-				for (int fragLen = minL; fragLen <= maxL; fragLen++) {
-					effL = std::min(fullLen, totLen - fragLen + 1);
-					value += gld->getAdjustedProb(fragLen, totLen) * rspd->getAdjustedProb(pfpos, effL, fullLen);
-				}
-			}
-    
-		mw[i] = 1.0 - value;
-
-		if (mw[i] < 1e-8) {
-			//      fprintf(stderr, "Warning: %dth reference sequence is masked for almost all positions!\n", i);
-			mw[i] = 0.0;
-		}
-	}
 }
 
 #endif /* PAIREDENDQMODEL_H_ */

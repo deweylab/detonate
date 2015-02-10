@@ -18,7 +18,6 @@
 #include "PairedEndRead.h"
 #include "PairedEndReadQ.h"
 
-#include "Model.h"
 #include "SingleModel.h"
 #include "SingleQModel.h"
 #include "PairedEndModel.h"

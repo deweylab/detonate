@@ -12,7 +12,6 @@
 #include "my_assert.h"
 #include "sampling.h"
 
-#include "Model.h"
 #include "SingleModel.h"
 #include "SingleQModel.h"
 #include "PairedEndModel.h"
@@ -30,7 +29,6 @@ struct Params {
 	int no;
 	FILE *fi;
 	engine_type *engine;
-	const double *mw;
 };
 
 struct CIParams {
@@ -94,7 +92,6 @@ void* sample_theta_from_c(void* arg) {
 
 	Params *params = (Params*)arg;
 	FILE *fi = params->fi;
-	const double *mw = params->mw;
 
 	cvec = new int[M + 1];
 	theta = new double[M + 1];
@@ -121,21 +118,21 @@ void* sample_theta_from_c(void* arg) {
 		for (int i = 0; i < nSpC; i++) {
 			double sum = 0.0;
 			for (int j = 0; j <= M; j++) {
-				theta[j] = ((j == 0 || (cvec[j] > 0 && eel[j] >= EPSILON && mw[j] >= EPSILON)) ? (*rgs[j])() / mw[j] : 0.0);
+				theta[j] = ((j == 0 || (cvec[j] > 0 && eel[j] > EPSILON)) ? (*rgs[j])() : 0.0);
 				sum += theta[j];
 			}
-			assert(sum >= EPSILON);
+			assert(sum > EPSILON);
 			for (int j = 0; j <= M; j++) theta[j] /= sum;
 
 			sum = 0.0;
 			tpm[0] = 0.0;
 			for (int j = 1; j <= M; j++)
-				if (eel[j] >= EPSILON) {
+				if (eel[j] > EPSILON) {
 					tpm[j] = theta[j] / eel[j];
 					sum += tpm[j];
 				}
 				else assert(theta[j] < EPSILON);
-			assert(sum >= EPSILON);
+			assert(sum > EPSILON);
 			l_bar = 0.0; // store mean effective length of the sample
 			for (int j = 1; j <= M; j++) { tpm[j] /= sum; l_bar += tpm[j] * eel[j]; tpm[j] *= 1e6; }
 			buffer->write(l_bar, tpm + 1); // ommit the first element in tpm
@@ -178,7 +175,6 @@ void sample_theta_vectors_from_count_vectors() {
 		sprintf(inpF, "%s%d", cvsF, i);
 		paramsArray[i].fi = fopen(inpF, "r");
 		paramsArray[i].engine = engineFactory::new_engine();
-		paramsArray[i].mw = model.getMW();
 	}
 	engineFactory::finish();
 

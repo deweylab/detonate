@@ -23,7 +23,7 @@ public:
 	ContigLengthDist(double, double, int, int, int);
 	~ContigLengthDist() {}
 	
-	double calcLogPrior(double, int, double&);
+	double calcLogPrior(double, int);
 	double calcLogNorm(double, int);
 	double calcLogF(double, int);
 
@@ -81,19 +81,14 @@ ContigLengthDist::ContigLengthDist(double nb_r, double nb_p, int L, int w, int m
 	}
 }
 
-// tldrf : transcript length distribution related factor
-double ContigLengthDist::calcLogPrior(double lambda, int l, double &tldrf) {
-  //	assert(l >= L);
-	if (l < L) l = L;
+double ContigLengthDist::calcLogPrior(double lambda, int l) {
+	if (l <= L) return 0.0;
 	double p = exp(-lambda);
-
-	tldrf = calcLogNum(p, l) - calcLogDenom(p, l);
-	return tldrf + calcLogF(lambda, l);
+	return calcLogNum(p, l) - calcLogDenom(p, l);
 }
 
 double ContigLengthDist::calcLogNorm(double lambda, int l) {
-	if (l < L) return log1mexp(-lambda); // If l < L, only need to calculate the probability of starting a read
-	return log1mexp(-lambda) + calcLogF(lambda, l);
+	return log1mexp(-lambda);
 }
 
 bool ContigLengthDist::calcLogFSlow(double lambda, int l, double& result) {

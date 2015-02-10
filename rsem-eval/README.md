@@ -74,31 +74,43 @@ to get usage information.
 ### IV. Outputs related to the evaluation score
 
 RSEM-EVAL produces the following three score related files:
-'sample_name.score', 'sample_name.isoforms.results' and
-'sample_name.genes.results'.
+'sample_name.score', 'sample_name.score.isoforms.results' and
+'sample_name.score.genes.results'.
 
 'sample_name.score' stores the evaluation score for the evaluated
-assembly. It contains 14 lines and each line contains a name and a
-value separated by a tab. 
+assembly. It contains 13 lines and each line contains a name and a
+value separated by a tab.
 
-The first 6 lines provide: 'Score', the
-RSEM-EVAL score; 'BIC_penalty', the BIC penalty term;
-'Prior_score_on_contig_lengths', the log score of priors of contig
-lengths; 'Prior_score_on_contig_sequences', the log score of priors of
-contig sequence bases; 'Data_likelihood_in_log_space_without_correction', the RSEM log data
-likelihood calculated with contig-level read generating probabilities
-mentioned in the supplement text of our DETONATE manuscript;
-'Correction_term', the correction term. Score = BIC_penalty +
+The first 6 lines provide: 'Score', the RSEM-EVAL score;
+'BIC_penalty', the BIC penalty term; 'Prior_score_on_contig_lengths (f
+function canceled)', the log score of priors of contig lengths, with f
+function values excluded (f function is defined in equation (4) at
+page 5 of Additional file 1, which is the supplementary methods,
+tables and figures of our DETONATE paper);
+'Prior_score_on_contig_sequences', the log score of priors of contig
+sequence bases; 'Data_likelihood_in_log_space_without_correction', the
+RSEM log data likelihood calculated with contig-level read generating
+probabilities mentioned in section 4 of Additional file 1;
+'Correction_term (f function canceled)', the correction term, with f
+function values excluded. Score = BIC_penalty +
 Prior_score_on_contig_lengths + Prior_score_on_contig_sequences +
-Data_likelihood_in_log_space_without_correction - Correction_term.
+Data_likelihood_in_log_space_without_correction -
+Correction_term. Because both 'Prior_score_on_contig_lengths' and
+'Correction_term' share the same f function values for each contig,
+the f function values can be canceled out. Then
+'Prior_score_on_contig_lengths (f function canceled)' is the sum of
+log $c_{\lambda}(\ell)$ terms in equation (9) at page 5 of Additional
+file 1. 'Correction_term (f function canceled)' is the sum of log $(1
+- p_{\lambda_i})$ terms in equation (23) at page 9 of Additional file
+1. For the correction term, we use $\lambda_i$ instead of $\lambda'_i$
+to make f function canceled out.
 
-The next 8 lines provide statistics that may help users to understand
+The next 7 lines provide statistics that may help users to understand
 the RSEM-EVAL score better. They are: 'Number_of_contigs', the number
-of contigs contained in the assembly; 'Expected_number_of_ali
-gned_reads_given_the_data', the expected number of reads assigned to
-each contig estimated using the contig-level read generating
-probabilities mentioned in the supplement text of our DETONATE
-manuscri pt;
+of contigs contained in the assembly;
+'Expected_number_of_aligned_reads_given_the_data', the expected number
+of reads assigned to each contig estimated using the contig-level read
+generating probabilities mentioned in section 4 of Additional file 1;
 'Number_of_contigs_smaller_than_expected_read/fragment_length', the
 number of contigs whose length is smaller than the expected
 read/fragment length; 'Number_of_contigs_with_no_read_aligned_to', the
@@ -110,32 +122,27 @@ reads that have at least one alignment found by the aligner (Because
 'rsem-calculate-expression' tries to use a very loose criteria to find
 alignments, reads with only low quality alignments may also be counted
 as alignable reads here); 'Number_of_alignments_in_total', the number
-of total alignments found by the aligner;
-'Transcript_length_distribution_related_factors', the term related to
-transcript length distribution in 'Prior_score_on_contig_lengths' (it
-is the summation of log c_{\lambda}(\ell) terms mentioned in
-'Calculation of the contig length distribution' subsection of the
-supplementary text of our DETONATE manuscript.
+of total alignments found by the aligner.
 
 'sample_name.score.isoforms.results' and
 'sample_name.score.genes.results' output "corrected" expression levels
-based on contig-level read generating probabilities mentioned in the
-supplement of the DETONATE manuscript. Unlike
-'sample_name.isoforms.results' and 'sample_name.genes.results', which
-are calculated by treating the contigs as true transcripts,
-calculating 'sample_name.score.isoforms.results' and
+based on contig-level read generating probabilities mentioned in
+section 4 of Additional file 1. Unlike 'sample_name.isoforms.results'
+and 'sample_name.genes.results', which are calculated by treating the
+contigs as true transcripts, calculating
+'sample_name.score.isoforms.results' and
 'sample_name.score.genes.results' involves first estimating expected
 read coverage for each contig and then convert the expected read
 coverage into contig-level read generating probabilities. This
 procedure is aware of that provided sequences are contigs and gives
 better expression estimates for very short contigs. In addtion, the
 'TPM' field is changed to 'CPM' field, which stands for contig per
-million. 
+million.
 
 For 'sample_name.score.isoforms.results', one additional
 column is added. The additional column is named as
 'contig_impact_score' and gives the contig impact score for each
-contig as described in the DETONATE manuscript.
+contig as described in section 5 of Additional file 1.
  
 ## <a name="example"></a> Example
 

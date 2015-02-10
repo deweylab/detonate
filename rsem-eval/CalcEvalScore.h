@@ -34,6 +34,8 @@ public:
 	void generateExpressionFiles(GroupInfo&, Transcripts&, char*);
 
 private:
+	static const double logp_per_base;
+
 	struct Item {
 		int sid;
 		double conprb;
@@ -59,16 +61,16 @@ private:
 
 	std::vector<double> theta, counts, logBayesFactors;
 
-	double noise_lb; // the probability used if for a read the noise probability is not shown in .ofg file because it is too small. This is an ad hoc way. We should consider adding pseudo counts for noise quality score profile. 
-
-	void calcAssemblyPrior(std::vector<double>&, double&, double&, double&, double&);
-	void calcMaximumDataLikelihood(std::vector<double>&, double&);
-	void calcDataLikelihood(std::vector<double>&, std::vector<double>&, double&, double&, int&, int&);
+	void calcAssemblyPrior(std::vector<double>&, double&, double&, double&);
+	void calcMaximumDataLikelihood(double&);
+	void calcDataLikelihood(double&, double&, int&, int&);
 	void calcCorrectionScore(std::vector<double>&, double&);
 
 	std::string scoreF;
 	void loadDataLikelihood(double&, double&, int&, int&, double&);
 };
+
+const double CalcEvalScore::logp_per_base = log(0.25);
 
 CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w, char *statName, char *score_file) : L(L), refs(refs)  {
 	std::ifstream fin;
@@ -112,8 +114,6 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 	fin.close();
 	assert(N2 == 0 && N0 + N1 == N);
 
-	noise_lb = 2.0; // initial value, since all conditional noise probability will <= 1.0
-
 	if (scoreF == "") {
 	  // loading ofgF
 	  char ofgF[STRLEN];
@@ -136,7 +136,6 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 	    double conprb;
 	    
 	    while (strin>>sid>>conprb) {
-	      if (sid == 0 && noise_lb > conprb) noise_lb = conprb;
 	      hits.push_back(Item(sid, conprb));
 	    }
 	    s.push_back(hits.size());
@@ -145,20 +144,15 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 	  fin.close();
 	}
 
-	if (noise_lb > 1.0) noise_lb = 1e-250;
-	noise_lb = log(noise_lb);
-
 	logBayesFactors.assign(M + 1, 0.0);
 }
 
 void CalcEvalScore::writeScoresTo(char *outF) {
 	std::vector<double> lambda;
-
 	double bic_term, prior_contig_lengths, prior_sequence_bases;
 	double data_ll, correction_score;
 	double total_score;
 	double true_data_ll;
-	double tldrfs; // transcript length distribution related factors
 
 	// Sufficient statistics
 	double numAlignedReads;
@@ -167,29 +161,28 @@ void CalcEvalScore::writeScoresTo(char *outF) {
 	lambda.assign(M + 1, 0.0);
 	lambda[0] = N * theta[0];
 	for (int i = 1; i <= M; i++)
-		if (lens[i] >= L) lambda[i] = std::max(1e-8, N * theta[i] / (lens[i] + L + 1));
-	calcAssemblyPrior(lambda, bic_term, prior_contig_lengths, prior_sequence_bases, tldrfs);
+	  lambda[i] = std::max(1e-8, N * theta[i] / (lens[i] + L + 1)); // no matter if lens[i] >= L
+	calcAssemblyPrior(lambda, bic_term, prior_contig_lengths, prior_sequence_bases);
 
 	// calculate true maximum likelihood score
-	if (scoreF == "") calcMaximumDataLikelihood(theta, true_data_ll);
+	if (scoreF == "") calcMaximumDataLikelihood(true_data_ll);
 	
-	// renomalize lambda to get new theta vector
+	// renomalize lambda to get adjusted theta vector
 	double sum = 0.0;
-
 	theta[0] = lambda[0];
 	sum += theta[0];
 	for (int i = 1; i <= M; i++)
-		if (lens[i] >= L) {
-			theta[i] = lambda[i] * (lens[i] - L + 1);
-			sum += theta[i];
-		}
-		else theta[i] = 0.0;
+	  if (theta[i] > EPSILON) {
+	    theta[i] = lambda[i] * std::max(lens[i] - L + 1, 1);
+	    sum += theta[i];
+	  }
+	  else theta[i] = 0.0;
 	for (int i = 0; i <= M; i++) theta[i] /= sum;
 	
-	if (scoreF == "") calcDataLikelihood(theta, counts, data_ll, numAlignedReads, numEmptyContigs, numInvalidContigs);
+	if (scoreF == "") calcDataLikelihood(data_ll, numAlignedReads, numEmptyContigs, numInvalidContigs);
 	else loadDataLikelihood(data_ll, numAlignedReads, numEmptyContigs, numInvalidContigs, true_data_ll);
 
-	calcCorrectionScore(theta, correction_score);
+	calcCorrectionScore(lambda, correction_score);
 
 	total_score = bic_term + prior_contig_lengths + prior_sequence_bases + data_ll - correction_score;
 
@@ -197,46 +190,42 @@ void CalcEvalScore::writeScoresTo(char *outF) {
 
 	fprintf(fo, "Score\t%.2f\n", total_score);
 	fprintf(fo, "BIC_penalty\t%.2f\n", bic_term);
-	fprintf(fo, "Prior_score_on_contig_lengths\t%.2f\n", prior_contig_lengths);
+	fprintf(fo, "Prior_score_on_contig_lengths (f function canceled)\t%.2f\n", prior_contig_lengths);
 	fprintf(fo, "Prior_score_on_contig_sequences\t%.2f\n", prior_sequence_bases);
 	fprintf(fo, "Data_likelihood_in_log_space_without_correction\t%.2f\n", data_ll);
-	fprintf(fo, "Correction_term\t%.2f\n", correction_score);
+	fprintf(fo, "Correction_term (f function canceled)\t%.2f\n", correction_score);
 	fprintf(fo, "Number_of_contigs\t%d\n", M);
 	fprintf(fo, "Expected_number_of_aligned_reads_given_the_data\t%.2f\n", numAlignedReads);
 	fprintf(fo, "Number_of_contigs_smaller_than_expected_read/fragment_length\t%d\n", numInvalidContigs);
 	fprintf(fo, "Number_of_contigs_with_no_read_aligned_to\t%d\n", numEmptyContigs);
 	fprintf(fo, "Maximum_data_likelihood_in_log_space\t%.2f\n", true_data_ll);
-	fprintf(fo, "Number_of_alignable_reads\t%llu\n", (long long unsigned int)N1);
-	fprintf(fo, "Number_of_alignments_in_total\t%llu\n", (long long unsigned int)nHits); 
-	fprintf(fo, "Transcript_length_distribution_related_factors\t%.2f\n", tldrfs);
+	fprintf(fo, "Number_of_alignable_reads\t%llu\n", (unsigned long long)N1);
+	fprintf(fo, "Number_of_alignments_in_total\t%llu\n", (unsigned long long)nHits); 
 	fclose(fo);
 }
 
-void CalcEvalScore::calcAssemblyPrior(std::vector<double>& lambda, double& bic_term, double& prior_contig_lengths, double& prior_sequence_bases, double& tldrfs) {
+void CalcEvalScore::calcAssemblyPrior(std::vector<double>& lambda, double& bic_term, double& prior_contig_lengths, double& prior_sequence_bases) {
 	if (verbose) { printf("Calculating assembly priors.\n"); }
 
 	double log_prior;
-	double tldrf; // transcript length distribution related factor
 
 	bic_term = - 0.5 * (M + 1) * log(1.0 * N); // even if some contigs are less than L, still penalize them
 
 	for (int i = 1; i <= M; i++) logBayesFactors[i] -= 0.5 * log(1.0 * N);
 
 	prior_contig_lengths = 0.0;
-	for (int i = 1; i <= M; i++) 
-	  if (lens[i] >= L) { 
-	    log_prior = cld->calcLogPrior(lambda[i], lens[i], tldrf);
-	    prior_contig_lengths += log_prior;
-	    logBayesFactors[i] += log_prior;
-	    tldrfs += tldrf;
-	  }
+	for (int i = 1; i <= M; i++) {
+	  log_prior = cld->calcLogPrior(lambda[i], lens[i]);
+	  prior_contig_lengths += log_prior;
+	  logBayesFactors[i] += log_prior;
+	}
 
 	prior_sequence_bases = 0.0; // even if some contigs are less than L, still penalize each base of the contig
 	for (int i = 1; i <= M; i++) {
 		std::string seq = refs.getRef(i).getSeq();
 		double psb = 0.0;
 		for (int j = 0; j < lens[i]; j++) psb += (seq[j] != 'N');
-		psb *= log(0.25);
+		psb *= logp_per_base;
 		
 		prior_sequence_bases += psb;
 		logBayesFactors[i] += psb;
@@ -245,9 +234,10 @@ void CalcEvalScore::calcAssemblyPrior(std::vector<double>& lambda, double& bic_t
 	if (verbose) { printf("Assembly priors are calculated!\n"); }
 }
 
-void CalcEvalScore::calcMaximumDataLikelihood(std::vector<double>& theta, double& true_data_ll) {
+void CalcEvalScore::calcMaximumDataLikelihood(double& true_data_ll) {
 	HIT_INT_TYPE fr, to;
 	double sum;
+	READ_INT_TYPE numSkip = 0;
 
 	if (verbose) { printf("Calculating maximum data likelihood in log space.\n"); }
 
@@ -256,17 +246,20 @@ void CalcEvalScore::calcMaximumDataLikelihood(std::vector<double>& theta, double
 		fr = s[i]; to = s[i + 1]; sum = 0.0;
 		for (HIT_INT_TYPE j = fr; j < to; j++) 
 			sum += theta[hits[j].sid] * hits[j].conprb;
-		assert(sum >= EPSILON);
-		true_data_ll += log(sum);
+		true_data_ll += (sum > EPSILON ? log(sum) : LOGZERO);
+		if (sum <= EPSILON) ++numSkip;
 	}
+
+	if (numSkip > 0) { printf("Number of skipped reads at calcMaximumDataLikelihood = %llu.\n", (unsigned long long)numSkip); }
 
 	if (verbose) { printf("Maximum data likelihood is calculated!\n"); }
 }
 
-void CalcEvalScore::calcDataLikelihood(std::vector<double>& theta, std::vector<double>& counts, double& data_ll, double& numAlignedReads, int& numEmptyContigs, int& numInvalidContigs) {
+void CalcEvalScore::calcDataLikelihood(double& data_ll, double& numAlignedReads, int& numEmptyContigs, int& numInvalidContigs) {
 	HIT_INT_TYPE fr, to;
-	double sum, frac;
+	double sum, frac, logp0;
 	std::vector<double> fracs;
+	READ_INT_TYPE numSkip = 0;
 
 	if (verbose) { printf("Calculating data likelihood in log space.\n"); }
 
@@ -281,15 +274,19 @@ void CalcEvalScore::calcDataLikelihood(std::vector<double>& theta, std::vector<d
 			fracs[j - fr] = theta[hits[j].sid] * hits[j].conprb;
 			sum += fracs[j - fr];
 		}
-		assert(sum >= EPSILON);
-		data_ll += log(sum);
 
-		for (HIT_INT_TYPE j = fr; j < to; j++) {
+		data_ll += (sum > EPSILON ? log(sum) : LOGZERO);
+		if (sum <= EPSILON) { ++numSkip; continue; }
+
+		assert(hits[fr].sid == 0);
+		frac = fracs[0] / sum;
+		if (frac > EPSILON) counts[0] += frac;
+		logp0 = (fracs[0] > EPSILON ? log(fracs[0]) : LOGZERO);
+		for (HIT_INT_TYPE j = fr + 1; j < to; j++) {
 			frac = fracs[j - fr] / sum;
-			counts[hits[j].sid] += frac;
-			if (hits[j].sid != 0) {
-			  if (frac >= EPSILON && fracs[j - fr] < EPSILON) printf("Warning: low accurate fraction is detected at alignable read %llu!\n", (long long unsigned int)i);
-			  if (frac >= EPSILON && fracs[j - fr] >= EPSILON) logBayesFactors[hits[j].sid] += frac * (log(fracs[j - fr]) - (hits[fr].sid == 0 ? log(fracs[0]) : noise_lb));
+			if (frac > EPSILON) {
+			  counts[hits[j].sid] += frac;
+			  logBayesFactors[hits[j].sid] += frac * ((fracs[j - fr] > EPSILON ? log(fracs[j - fr]) : LOGZERO) - logp0);
 			}
 		}
 	}
@@ -297,32 +294,27 @@ void CalcEvalScore::calcDataLikelihood(std::vector<double>& theta, std::vector<d
 	numAlignedReads = 0.0;
 	numEmptyContigs = numInvalidContigs = 0;
 	for (int i = 1; i <= M; i++) {
-		assert(theta[i] >= 0 && (lens[i] >= L || theta[i] < EPSILON));
 		numAlignedReads += counts[i];
 		if (lens[i] < L) ++numInvalidContigs;
-		else if (counts[i] < 0.005) ++numEmptyContigs; // since expected counts are rouned to 2 digits after the decimal point
+		if (counts[i] < 0.005) ++numEmptyContigs; // since expected counts are rouned to 2 digits after the decimal point
 	}
+
+	if (numSkip > 0) { printf("Number of skipped reads at calcDataLikelihood = %llu.\n", (unsigned long long)numSkip); }
 
 	if (verbose) { printf("Data likelihood is calculated!\n"); }
 }
 
-void CalcEvalScore::calcCorrectionScore(std::vector<double>& theta, double& correction_score) {
-	std::vector<double> lambda(M + 1, 0.0);
+void CalcEvalScore::calcCorrectionScore(std::vector<double>& lambda, double& correction_score) {
 	double log_norm;
 
 	if (verbose) { printf("Calculating correction score.\n"); }
-
-	lambda[0] = N * theta[0];
-	for (int i = 1; i <= M; i++)
-		if (lens[i] >= L) lambda[i] = std::max(1e-8, N * theta[i] / (lens[i] - L + 1));
-
+	
 	correction_score = 0.0;
-	for (int i = 1; i <= M; i++)
-	  if (lens[i] >= L) {
+	for (int i = 1; i <= M; i++) if (theta[i] > EPSILON) {
 	    log_norm = cld->calcLogNorm(lambda[i], lens[i]);
 	    correction_score += log_norm;
 	    logBayesFactors[i] -= log_norm;
-	  }
+	}
 
 	if (verbose) { printf("Correction score is calculated!\n"); }
 }
@@ -341,13 +333,13 @@ void CalcEvalScore::generateExpressionFiles(GroupInfo& gi, Transcripts& transcri
 		frac[i] = theta[i];
 		denom += frac[i];
 	}
-	general_assert(denom >= EPSILON, "No alignable reads?!");
+	general_assert(denom > EPSILON, "No alignable reads?!");
 	for (int i = 1; i <= M; i++) frac[i] /= denom;
 
 	// calculate FPKM
 	fpkm.assign(M + 1, 0.0);
 	for (int i = 1; i <= M; i++)
-		if (lens[i] >= L) fpkm[i] = frac[i] * 1e9 / (lens[i] - L + 1);
+	  fpkm[i] = frac[i] * 1e9 / std::max(lens[i] - L + 1, 1);
 
 	// calculate TPM
 	tpm.assign(M + 1, 0.0);
@@ -369,7 +361,7 @@ void CalcEvalScore::generateExpressionFiles(GroupInfo& gi, Transcripts& transcri
 			gene_fpkm[i] += fpkm[j];
 		}
 
-		if (gene_tpm[i] < EPSILON) {
+		if (gene_tpm[i] <= EPSILON) {
 			double frac = 1.0 / (e - b);
 			for (int j = b; j < e; j++) {
 				glens[i] += lens[j] * frac;

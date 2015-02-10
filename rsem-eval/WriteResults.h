@@ -15,7 +15,6 @@
 #include "Transcripts.h"
 #include "Refs.h"
 
-#include "Model.h"
 #include "SingleModel.h"
 #include "SingleQModel.h"
 #include "PairedEndModel.h"
@@ -52,25 +51,15 @@ void calcExpectedEffectiveLengths(int M, Refs& refs, ModelType& model, std::vect
 	delete[] clen;
 }
 
-void polishTheta(int M, std::vector<double>& theta, const std::vector<double>& eel, const double* mw) {
+void polishTheta(int M, std::vector<double>& theta, const std::vector<double>& eel) {
 	double sum = 0.0;
 
-	/* The reason that for noise gene, mw value is 1 is :
-	 * currently, all masked positions are for poly(A) sites, which in theory should be filtered out.
-	 * So the theta0 does not containing reads from any masked position
-	 */
-
 	for (int i = 0; i <= M; i++) {
-		// i == 0, mw[i] == 1
-		if (i > 0 && (mw[i] < EPSILON || eel[i] < EPSILON)) {
-			theta[i] = 0.0;
-			continue;
-		}
-		theta[i] = theta[i] / mw[i];
-		sum += theta[i];
+	  if (i > 0 && eel[i] <= EPSILON) theta[i] = 0.0;
+	  sum += theta[i];
 	}
 	// currently is OK, since no transcript should be masked totally, only the poly(A) tail related part will be masked
-	general_assert(sum >= EPSILON, "No effective length is no less than" + ftos(MINEEL, 6) + " !");
+	general_assert(sum > EPSILON, "No effective length is no less than" + ftos(MINEEL, 6) + " !");
 	for (int i = 0; i <= M; i++) theta[i] /= sum;
 }
 
@@ -82,17 +71,17 @@ void calcExpressionValues(int M, const std::vector<double>& theta, const std::ve
 	denom = 0.0;
 	frac.assign(M + 1, 0.0);
 	for (int i = 1; i <= M; i++) 
-	  if (eel[i] >= EPSILON) {
+	  if (eel[i] > EPSILON) {
 	    frac[i] = theta[i];
 	    denom += frac[i];
 	  }
-	general_assert(denom >= EPSILON, "No alignable reads?!");
+	general_assert(denom > EPSILON, "No alignable reads?!");
 	for (int i = 1; i <= M; i++) frac[i] /= denom;
   
 	//calculate FPKM
 	fpkm.assign(M + 1, 0.0);
 	for (int i = 1; i <= M; i++)
-		if (eel[i] >= EPSILON) fpkm[i] = frac[i] * 1e9 / eel[i];
+		if (eel[i] > EPSILON) fpkm[i] = frac[i] * 1e9 / eel[i];
 
 	//calculate TPM
 	tpm.assign(M + 1, 0.0);
@@ -212,7 +201,7 @@ void writeResultsEM(int M, const char* refName, const char* imdName, Transcripts
 	  
 	  gt_pct.assign(m_trans, 0.0);
 	  for (int i = 0; i < m; i++) 
-	    if (gene_tpm[i] >= EPSILON) {
+	    if (gene_tpm[i] > EPSILON) {
 	      int b = gt.spAt(i), e = gt.spAt(i + 1);
 	      for (int j = b; j < e; j++) gt_pct[j] = trans_tpm[j] / gene_tpm[i];
 	    }
@@ -381,7 +370,7 @@ void writeResultsGibbs(int M, int m, int m_trans, GroupInfo& gi, GroupInfo &gt, 
 
 	  gt_pct.assign(m_trans, 0.0);
 	  for (int i = 0; i < m; i++) 
-	    if (gene_tpm[i] >= EPSILON) {
+	    if (gene_tpm[i] > EPSILON) {
 	      int b = gt.spAt(i), e = gt.spAt(i + 1);
 	      for (int j = b; j < e; j++) gt_pct[j] = trans_tpm[j] / gene_tpm[i];
 	    }
@@ -556,7 +545,7 @@ void writeResultsSimulation(int M, char* refName, char* outFN, Transcripts& tran
 
           gt_pct.assign(m_trans, 0.0);
           for (int i = 0; i < m; i++)
-            if (gene_tpm[i] >= EPSILON) {
+            if (gene_tpm[i] > EPSILON) {
               int b = gt.spAt(i), e = gt.spAt(i + 1);
               for (int j = b; j < e; j++) gt_pct[j] = trans_tpm[j] / gene_tpm[i];
             }
