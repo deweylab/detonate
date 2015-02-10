@@ -45,4 +45,10 @@ void expand_data_size(bam1_t *b) {
 	}
 }
 
+uint8_t getMAPQ(double val) {
+	double err = 1.0 - val;
+	if (err <= 1e-10) return 100;
+	return (uint8_t)(-10 * log10(err) + .5); // round it
+}
+
 #endif /* SAM_RSEM_AUX_H_ */

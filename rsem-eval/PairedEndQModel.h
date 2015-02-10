@@ -92,8 +92,8 @@ public:
 	void estimateFromReads(const char*);
 
 	//if prob is too small, just make it 0
-	double getConPrb(const PairedEndReadQ& read, const PairedEndHit& hit) {
-		double prob;
+	double getLogConPrb(const PairedEndReadQ& read, const PairedEndHit& hit) {
+		double log_prob;
 		int sid = hit.getSid();
 		RefSeq &ref = refs->getRef(sid);
 		int dir = hit.getDir();
@@ -113,39 +113,32 @@ public:
 		general_assert(insertLen <= totLen, "Fragment " + read.getName() + " has length " + itos(insertLen) + ", but it is aligned to transcript " \
 				+ itos(sid) + ", whose length (" + itos(totLen) + ") is shorter than the fragment's length!");
 
-		prob = ori->getProb(dir) * gld->getAdjustedProb(insertLen, totLen) *
-		       rspd->getAdjustedProb(fpos, effL, fullLen);
+		log_prob = Log(ori->getProb(dir) * gld->getAdjustedProb(insertLen, totLen) *
+			       rspd->getAdjustedProb(fpos, effL, fullLen));
 
 		const SingleReadQ& mate1 = read.getMate1();
-		prob *= mld->getAdjustedProb(mate1.getReadLength(), insertLen) *
-		        qpro->getProb(mate1.getReadSeq(), mate1.getQScore(), ref, pos, dir);
+		log_prob += Log(mld->getAdjustedProb(mate1.getReadLength(), insertLen)) + qpro->getLogProb(mate1.getReadSeq(), mate1.getQScore(), ref, pos, dir);
 
 		const SingleReadQ& mate2 = read.getMate2();
 		int m2pos = totLen - pos - insertLen;
 		int m2dir = !dir;
-		prob *= mld->getAdjustedProb(mate2.getReadLength(), hit.getInsertL()) *
-		        qpro->getProb(mate2.getReadSeq(), mate2.getQScore(), ref, m2pos, m2dir);
+		log_prob += Log(mld->getAdjustedProb(mate2.getReadLength(), insertLen)) + qpro->getLogProb(mate2.getReadSeq(), mate2.getQScore(), ref, m2pos, m2dir);
 
-		if (prob <= EPSILON) { prob = 0.0; }
-
-		return prob;
+		return log_prob;
 	}
 
-	double getNoiseConPrb(const PairedEndReadQ& read) {
-		double prob;
+	double getNoiseLogConPrb(const PairedEndReadQ& read) {
+		double log_prob;
 		const SingleReadQ& mate1 = read.getMate1();
 		const SingleReadQ& mate2 = read.getMate2();
 
-		prob = mld->getProb(mate1.getReadLength()) * nqpro->getProb(mate1.getReadSeq(), mate1.getQScore());
-		prob *= mld->getProb(mate2.getReadLength()) * nqpro->getProb(mate2.getReadSeq(), mate2.getQScore());
+		log_prob = log(mld->getProb(mate1.getReadLength())) + nqpro->getLogProb(mate1.getReadSeq(), mate1.getQScore());
+		log_prob += log(mld->getProb(mate2.getReadLength())) + nqpro->getLogProb(mate2.getReadSeq(), mate2.getQScore());
 
-		if (prob <= EPSILON) { prob = 0.0; }
-
-		return prob;
+		return log_prob;
 	}
 
 	double getLogP() { return loglik_mld_noise + nqpro->getLogP(); }
-	double getNumMatchingBases() { return qpro->getNumMatchingBases(); }
 
 	void init();
 

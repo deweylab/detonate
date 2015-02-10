@@ -65,8 +65,7 @@ int nThreads;
 
 bool genBamF; // If user wants to generate bam file, true; otherwise, false.
 bool bamSampling; // true if sampling from read posterior distribution when bam file is generated
-bool updateModel, calcExpectedWeights;
-bool genGibbsOut; // generate file for Gibbs sampler
+bool updateModel, calcExpectedWeights, calcLogConPrb;
 
 char refName[STRLEN], outName[STRLEN];
 char imdName[STRLEN], statName[STRLEN];
@@ -78,7 +77,7 @@ char inpSamType;
 char *pt_fn_list;
 char inpSamF[STRLEN], outBamF[STRLEN], fn_list[STRLEN];
 
-char out_for_gibbs_F[STRLEN];
+char conprbF[STRLEN];
 
 vector<double> theta, eel; // eel : expected effective length
 
@@ -89,7 +88,6 @@ Transcripts transcripts;
 
 ModelParams mparams;
 
-bool calcEvalScore; // calculate evaluation score
 int L, w;
 double nb_r, nb_p;
 char scoreF[STRLEN];
@@ -188,35 +186,55 @@ void* E_STEP(void* arg) {
 
 	bool needCalcConPrb = model->getNeedCalcConPrb();
 
+	bool loadReads = needCalcConPrb || updateModel || calcLogConPrb;
+	bool resetConPrb = needCalcConPrb || calcLogConPrb || calcExpectedWeights;
+
 	ReadType read;
 
 	READ_INT_TYPE N = hitv->getN();
-	double sum;
+	double sum, max_value;
 	vector<double> fracs; //to remove this, do calculation twice
 	HIT_INT_TYPE fr, to, id;
 
-	if (needCalcConPrb || updateModel) { reader->reset(); }
+	if (loadReads) { 
+	  reader->reset(); 
+	}
 	if (updateModel) { mhp->init(); }
 
 	memset(countv, 0, sizeof(double) * (M + 1));
 	for (READ_INT_TYPE i = 0; i < N; i++) {
-		if (needCalcConPrb || updateModel) {
+		if (loadReads) {
 			general_assert(reader->next(read), "Can not load a read!");
 		}
 
 		fr = hitv->getSAt(i);
 		to = hitv->getSAt(i + 1);
-		fracs.resize(to - fr + 1);
+
+		if (resetConPrb) { 
+		  if (!calcExpectedWeights) ncpv[i] = model->getNoiseLogConPrb(read);
+		  max_value = ncpv[i];
+		  for (HIT_INT_TYPE j = fr; j < to; j++) {
+		    HitType &hit = hitv->getHitAt(j);
+		    if (!calcExpectedWeights) hit.setConPrb(model->getLogConPrb(read, hit));
+		    if (hit.getConPrb() > max_value) max_value = hit.getConPrb();
+		  }
+
+		  if (calcLogConPrb) continue;
+
+		  ncpv[i] = exp(ncpv[i] - max_value);
+		  for (HIT_INT_TYPE j = fr; j < to; j++) {
+		    HitType &hit = hitv->getHitAt(j);
+		    hit.setConPrb(exp(hit.getConPrb() - max_value));
+		  }
+		}
 
 		sum = 0.0;
-
-		if (needCalcConPrb) { ncpv[i] = model->getNoiseConPrb(read); }
+		fracs.resize(to - fr + 1);
 		fracs[0] = probv[0] * ncpv[i];
 		if (fracs[0] <= EPSILON) fracs[0] = 0.0;
 		sum += fracs[0];
 		for (HIT_INT_TYPE j = fr; j < to; j++) {
 			HitType &hit = hitv->getHitAt(j);
-			if (needCalcConPrb) { hit.setConPrb(model->getConPrb(read, hit)); }
 			id = j - fr + 1;
 			fracs[id] = probv[hit.getSid()] * hit.getConPrb();
 			if (fracs[id] <= EPSILON) fracs[id] = 0.0;
@@ -242,92 +260,6 @@ void* E_STEP(void* arg) {
 			for (HIT_INT_TYPE j = fr; j < to; j++) {
 				HitType &hit = hitv->getHitAt(j);
 				hit.setConPrb(0.0);
-			}
-		}
-	}
-
-	return NULL;
-}
-
-template<class ReadType, class HitType, class ModelType>
-void* calcConProbs(void* arg) {
-	Params *params = (Params*)arg;
-	ModelType *model = (ModelType*)(params->model);
-	ReadReader<ReadType> *reader = (ReadReader<ReadType>*)(params->reader);
-	HitContainer<HitType> *hitv = (HitContainer<HitType>*)(params->hitv);
-	double *ncpv = (double*)(params->ncpv);
-
-	ReadType read;
-	READ_INT_TYPE N = hitv->getN();
-	HIT_INT_TYPE fr, to;
-
-	assert(model->getNeedCalcConPrb());
-	reader->reset();
-
-	for (READ_INT_TYPE i = 0; i < N; i++) {
-		general_assert(reader->next(read), "Can not load a read!");
-
-		fr = hitv->getSAt(i);
-		to = hitv->getSAt(i + 1);
-
-		ncpv[i] = model->getNoiseConPrb(read);
-		for (HIT_INT_TYPE j = fr; j < to; j++) {
-			HitType &hit = hitv->getHitAt(j);
-			hit.setConPrb(model->getConPrb(read, hit));
-		}
-	}
-
-	return NULL;
-}
-
-template<class ReadType, class HitType, class ModelType>
-void* GET_SS_STEP(void* arg) {
-	Params *params = (Params*)arg;
-	ModelType *model = (ModelType*)(params->model);
-	ReadReader<ReadType> *reader = (ReadReader<ReadType>*)(params->reader);
-	HitContainer<HitType> *hitv = (HitContainer<HitType>*)(params->hitv);
-	double *ncpv = (double*)(params->ncpv);
-	ModelType *mhp = (ModelType*)(params->mhp);
-
-	assert(!model->getNeedCalcConPrb());
-
-	ReadType read;
-	READ_INT_TYPE N = hitv->getN();
-	double sum;
-	vector<double> fracs; //to remove this, do calculation twice
-	HIT_INT_TYPE fr, to, id;
-
-	reader->reset();
-	mhp->init();
-
-	for (READ_INT_TYPE i = 0; i < N; i++) {
-		general_assert(reader->next(read), "Can not load a read!");
-
-		fr = hitv->getSAt(i);
-		to = hitv->getSAt(i + 1);
-		fracs.resize(to - fr + 1);
-
-		sum = 0.0;
-
-		fracs[0] = probv[0] * ncpv[i];
-		if (fracs[0] <= EPSILON) fracs[0] = 0.0;
-		sum += fracs[0];
-		for (HIT_INT_TYPE j = fr; j < to; j++) {
-			HitType &hit = hitv->getHitAt(j);
-			id = j - fr + 1;
-			fracs[id] = probv[hit.getSid()] * hit.getConPrb();
-			if (fracs[id] <= EPSILON) fracs[id] = 0.0;
-			sum += fracs[id];
-		}
-
-		if (sum > EPSILON) {
-			fracs[0] /= sum;
-			//mhp->updateNoise(read, fracs[0]);
-			for (HIT_INT_TYPE j = fr; j < to; j++) {
-				HitType &hit = hitv->getHitAt(j);
-				id = j - fr + 1;
-				fracs[id] /= sum;
-				mhp->update(read, hit, fracs[id]);
 			}
 		}
 	}
@@ -389,9 +321,8 @@ void EM() {
 	pthread_attr_t attr;
 	int rc;
 
-
 	//initialize boolean variables
-	updateModel = calcExpectedWeights = false;
+	updateModel = calcExpectedWeights = calcLogConPrb = false;
 
 	theta.clear();
 	theta.resize(M + 1, 0.0);
@@ -471,74 +402,48 @@ void EM() {
 			}
 
 		if (verbose) { cout<< "ROUND = "<< ROUND<< ", SUM = "<< setprecision(15)<< sum<< ", bChange = " << setprecision(6)<< bChange<< ", totNum = " << totNum<< endl; }
-	} while (ROUND < MIN_ROUND || (totNum > 0 && ROUND < MAX_ROUND));
-//	} while (ROUND < 1);
+       	} while (ROUND < MIN_ROUND || (totNum > 0 && ROUND < MAX_ROUND));
 
-	if (totNum > 0) { cout<< "Warning: RSEM reaches "<< MAX_ROUND<< " iterations before meeting the convergence criteria."<< endl; }
+	if (totNum > 0) { cout<< "Warning: RSEM-EVAL reaches "<< MAX_ROUND<< " iterations before meeting the convergence criteria."<< endl; }
 
-	// generate outputs for Gibbs or calculate approximated model evidence score
-	if (genGibbsOut || calcEvalScore) {
-		if (model.getNeedCalcConPrb()) {
-			for (int i = 0; i < nThreads; i++) {
-				rc = pthread_create(&threads[i], &attr, calcConProbs<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
-				pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) for calcConProbs!");
-			}
-			for (int i = 0; i < nThreads; i++) {
-				rc = pthread_join(threads[i], NULL);
-				pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) for calcConProbs!");
-			}
-		}
-		model.setNeedCalcConPrb(false);
-
-		double numMatchingBases = 0.0;
-
-		if (calcEvalScore) {
-			ModelType ss_model(mparams); //master model for sufficient statistics calculation
-
-			for (int i = 0; i <= M; i++) probv[i] = theta[i];
-			
-			for (int i = 0; i < nThreads; i++) {
-				rc = pthread_create(&threads[i], &attr, GET_SS_STEP<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
-				pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) for GET_SS_STEP!");
-			}
-			for (int i = 0; i < nThreads; i++) {
-				rc = pthread_join(threads[i], NULL);
-				pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) for GET_SS_STEP!");
-			}
-
-			ss_model.init();
-			for (int i = 0; i < nThreads; i++) { ss_model.collect(*mhps[i]); }
-			numMatchingBases = ss_model.getNumMatchingBases();
-		}
-
-		sprintf(out_for_gibbs_F, "%s.ofg", statName); // for internal experiments
-		ofstream fout(out_for_gibbs_F);
-		// one difference between RSEM-EVAL and RSEM
-		fout<< M<< " "<< N0<< " "<< N1<< " "<< setprecision(15)<< model.getLogP();
-		if (calcEvalScore) { fout<< " "<< setprecision(15)<< numMatchingBases; }
-		fout<< endl;
-		for (int i = 0; i < nThreads; i++) {
-			READ_INT_TYPE numN = hitvs[i]->getN();
-			for (READ_INT_TYPE j = 0; j < numN; j++) {
-				HIT_INT_TYPE fr = hitvs[i]->getSAt(j);
-				HIT_INT_TYPE to = hitvs[i]->getSAt(j + 1);
-
-				fout<< "0 "<< setprecision(15)<< ncpvs[i][j]<< " "; 
-				for (HIT_INT_TYPE k = fr; k < to; k++) {
-					HitType &hit = hitvs[i]->getHitAt(k);
-					fout<< hit.getSid()<< " "<< setprecision(15)<< hit.getConPrb();
-					if (k < to - 1) fout<< " ";
-				}
-				fout<< endl;
-			}
-		}
-		fout.close();
+	// Calculate Log conditional probabilities used to calculate RSEM-EVAL score.
+	updateModel = false; calcLogConPrb = true;
+	for (int i = 0; i <= M; i++) probv[i] = theta[i];
+	for (int i = 0; i < nThreads; i++) {
+	  rc = pthread_create(&threads[i], &attr, E_STEP<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
+	  pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) for calcConProbs!");
 	}
+	for (int i = 0; i < nThreads; i++) {
+	  rc = pthread_join(threads[i], NULL);
+	  pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) for calcConProbs!");
+	}
+	calcLogConPrb = false;
+	model.setNeedCalcConPrb(false);
+		
+	// Output those log conditional probabilities
+	sprintf(conprbF, "%s.conprb", imdName); // for internal experiments
+	ofstream fout(conprbF);
+	fout<< M<< " "<< N0<< " "<< N1<< " "<< setprecision(15)<< model.getLogP()<< endl;
+	for (int i = 0; i < nThreads; i++) {
+	  READ_INT_TYPE numN = hitvs[i]->getN();
+	  for (READ_INT_TYPE j = 0; j < numN; j++) {
+	    HIT_INT_TYPE fr = hitvs[i]->getSAt(j);
+	    HIT_INT_TYPE to = hitvs[i]->getSAt(j + 1);
+	    
+	    fout<< "0 "<< setprecision(15)<< ncpvs[i][j]<< " "; 
+	    for (HIT_INT_TYPE k = fr; k < to; k++) {
+	      HitType &hit = hitvs[i]->getHitAt(k);
+	      fout<< hit.getSid()<< " "<< setprecision(15)<< hit.getConPrb();
+	      if (k < to - 1) fout<< " ";
+	    }
+	    fout<< endl;
+	  }
+	}
+	fout.close();
 
 	//calculate expected weights and counts using learned parameters
 	//just use the raw theta learned from the data, do not correct for eel or mw
-	updateModel = false; calcExpectedWeights = true;
-	for (int i = 0; i <= M; i++) probv[i] = theta[i];
+	calcExpectedWeights = true;
 	for (int i = 0; i < nThreads; i++) {
 		rc = pthread_create(&threads[i], &attr, E_STEP<ReadType, HitType, ModelType>, (void*)(&fparams[i]));
 		pthread_assert(rc, "pthread_create", "Cannot create thread " + itos(i) + " (numbered from 0) when calculating expected weights!");
@@ -547,7 +452,6 @@ void EM() {
 		rc = pthread_join(threads[i], NULL);
 		pthread_assert(rc, "pthread_join", "Cannot join thread " + itos(i) + " (numbered from 0) when calculating expected weights!");
 	}
-	model.setNeedCalcConPrb(false);
 	for (int i = 1; i < nThreads; i++) {
 		for (int j = 0; j <= M; j++) {
 			countvs[0][j] += countvs[i][j];
@@ -620,21 +524,21 @@ int main(int argc, char* argv[]) {
 	ifstream fin;
 	bool quiet = false;
 
-	if (argc < 6) {
-		printf("Usage : rsem-run-em refName read_type sampleName imdName statName [-p #Threads] [-b samInpType samInpF has_fn_list_? [fn_list]] [-q] [--gibbs-out] [--sampling] [--seed seed] [--calc-evaluation-score nb_r nb_p L w]\n\n");
+	if (argc < 10) {
+		printf("Usage : rsem-eval-run-em refName read_type sampleName imdName statName nb_r nb_p L w [-p #Threads] [-b samInpType samInpF has_fn_list_? [fn_list]] [-q] [--sampling] [--seed seed]\n\n");
 		printf("  refName: reference name\n");
 		printf("  read_type: 0 single read without quality score; 1 single read with quality score; 2 paired-end read without quality score; 3 paired-end read with quality score.\n");
 		printf("  sampleName: sample's name, including the path\n");
 		printf("  sampleToken: sampleName excludes the path\n");
+		printf("  nb_r: parameter of the true transcript length distribution (modeled by a negative binomial distribution)\n");
+		printf("  nb_p: parameter of the true transcript length distribution (modeled by a negative binomial distribution)\n");
+		printf("  L: average read/fragment length (rounded to the nearest integer)\n");
+		printf("  w: minimum overlap required for joining two adjacent reads.\n");
 		printf("  -p: number of threads which user wants to use. (default: 1)\n");
 		printf("  -b: produce bam format output file. (default: off)\n");
 		printf("  -q: set it quiet\n");
-		printf("  --gibbs-out: generate output file use by Gibbs sampler. (default: off)\n");
 		printf("  --sampling: sample each read from its posterior distribution when bam file is generated. (default: off)\n");
 		printf("  --seed uint32: the seed used for the BAM sampling. (default: off)\n");
-		printf("  --calc-evaluation-score nb_r nb_p L w: "
-				"nb_r and nb_p are parameters for the true transcript length distribution, which is modeled by a negative binomial distribution; "
-				"L is the read length and w is the mininum overlap required for joining two contigs.\n");
 		printf("// model parameters should be in imdName.mparams.\n");
 		exit(-1);
 	}
@@ -646,17 +550,18 @@ int main(int argc, char* argv[]) {
 	strcpy(outName, argv[3]);
 	strcpy(imdName, argv[4]);
 	strcpy(statName, argv[5]);
+	nb_r = atof(argv[6]);
+	nb_p = atof(argv[7]);
+	L = atoi(argv[8]);
+	w = atoi(argv[9]);
 
 	nThreads = 1;
-
 	genBamF = false;
 	bamSampling = false;
-	genGibbsOut = false;
-	calcEvalScore = false;
 	pt_fn_list = NULL;
 	hasSeed = false;
 
-	for (int i = 6; i < argc; i++) {
+	for (int i = 10; i < argc; i++) {
 		if (!strcmp(argv[i], "-p")) { nThreads = atoi(argv[i + 1]); }
 		if (!strcmp(argv[i], "-b")) {
 			genBamF = true;
@@ -668,20 +573,12 @@ int main(int argc, char* argv[]) {
 			}
 		}
 		if (!strcmp(argv[i], "-q")) { quiet = true; }
-		if (!strcmp(argv[i], "--gibbs-out")) { genGibbsOut = true; }
 		if (!strcmp(argv[i], "--sampling")) { bamSampling = true; }
 		if (!strcmp(argv[i], "--seed")) {
 		  hasSeed = true;
 		  int len = strlen(argv[i + 1]);
 		  seed = 0;
 		  for (int k = 0; k < len; k++) seed = seed * 10 + (argv[i + 1][k] - '0');
-		}
-		if (!strcmp(argv[i], "--calc-evaluation-score")) {
-			calcEvalScore = true;
-			nb_r = atof(argv[i + 1]);
-			nb_p = atof(argv[i + 2]);
-			L = atoi(argv[i + 3]);
-			w = atoi(argv[i + 4]);
 		}
 	}
 
@@ -736,18 +633,17 @@ int main(int argc, char* argv[]) {
 	default : fprintf(stderr, "Unknown Read Type!\n"); exit(-1);
 	}
 
-	if (calcEvalScore) {
-		CalcEvalScore ces(refs, nb_r, nb_p, L, w, statName);
-		sprintf(scoreF, "%s.score", outName);
-		ces.writeScoresTo(scoreF);
+	//Calculate RSEM-EVAL score
+	CalcEvalScore ces(refs, nb_r, nb_p, L, w, statName, imdName);
+	sprintf(scoreF, "%s.score", outName);
+	ces.writeScoresTo(scoreF);
 		
-		char groupF[STRLEN];
-		GroupInfo gi;
-		sprintf(groupF, "%s.grp", argv[1]);
-		gi.load(groupF);
+	char groupF[STRLEN];
+	GroupInfo gi;
+	sprintf(groupF, "%s.grp", argv[1]);
+	gi.load(groupF);
 
-		ces.generateExpressionFiles(gi, transcripts, scoreF);
-	}
+	ces.generateExpressionFiles(gi, transcripts, scoreF);
 
 	time_t b = time(NULL);
 
@@ -755,4 +651,3 @@ int main(int argc, char* argv[]) {
 
 	return 0;
 }
-

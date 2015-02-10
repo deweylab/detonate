@@ -13,13 +13,12 @@
 class QProfile {
 public:
 	QProfile();
-	QProfile& operator=(const QProfile&);
 
 	void init();
 	void update(const std::string&, const std::string&, const RefSeq&, int, int, double);
 	void finish();
 
-	double getProb(const std::string&, const std::string&, const RefSeq&, int, int);
+	double getLogProb(const std::string&, const std::string&, const RefSeq&, int, int);
 
 	void collect(const QProfile&);
 
@@ -30,13 +29,13 @@ public:
 	std::string simulate(simul*, int, int, int, const std::string&, const RefSeq&);
 	void finishSimulation();
 
-	double getNumMatchingBases();
-
 private:
 	static const int NCODES = 5; // number of possible codes
 	static const int SIZE = 100;
 
 	double p[SIZE][NCODES][NCODES]; // p[q][r][c] = p(c|r,q)
+	
+	double log_probs[SIZE][NCODES][NCODES]; // log_probs[i][j][k] = Log(p[i][j][k])
 
 	//make sure that quality score in [0, 93]
 	int c2q(char c) { assert(c >= 33 && c <= 126); return c - 33; }
@@ -75,12 +74,12 @@ QProfile::QProfile() {
 		for (int k = 0; k < NCODES - 1; k++)
 			p[i][N][k] = (1.0 - probN) / (NCODES - 1);
 	}
-}
 
-QProfile& QProfile::operator=(const QProfile& rv) {
-	if (this == &rv) return *this;
-	memcpy(p, rv.p, sizeof(rv.p));
-	return *this;
+	// Take logs
+	for (int i = 0; i < SIZE; i++)
+	  for (int j = 0; j < NCODES; j++)
+	    for (int k = 0; k < NCODES; k++) 
+	      log_probs[i][j][k] = Log(p[i][j][k]);
 }
 
 void QProfile::init() {
@@ -101,24 +100,31 @@ void QProfile::finish() {
 		for (int j = 0; j < NCODES; j++) {
 			sum = 0.0;
 			for (int k = 0; k < NCODES; k++) sum += p[i][j][k];
-			if (sum < EPSILON) {
+			if (sum <= EPSILON) {
 				for (int k = 0; k < NCODES; k++) p[i][j][k] = 0.0;
 				continue;
 			}
 			for (int k = 0; k < NCODES; k++) p[i][j][k] /= sum;
 		}
 	}
+
+	// Take logs
+	for (int i = 0; i < SIZE; i++)
+	  for (int j = 0; j < NCODES; j++)
+	    for (int k = 0; k < NCODES; k++) 
+	      log_probs[i][j][k] = Log(p[i][j][k]);
+
 }
 
-double QProfile::getProb(const std::string& readseq, const std::string& qual, const RefSeq& refseq, int pos, int dir) {
-	double prob = 1.0;
+double QProfile::getLogProb(const std::string& readseq, const std::string& qual, const RefSeq& refseq, int pos, int dir) {
+	double log_prob = 0.0;
 	int len = readseq.size();
 
 	for (int i = 0; i < len; i++) {
-		prob *= p[c2q(qual[i])][refseq.get_id(i + pos, dir)][get_base_id(readseq[i])];
+		log_prob += log_probs[c2q(qual[i])][refseq.get_id(i + pos, dir)][get_base_id(readseq[i])];
 	}
 
-	return prob;
+	return log_prob;
 }
 
 void QProfile::collect(const QProfile& o) {
@@ -205,15 +211,6 @@ std::string QProfile::simulate(simul* sampler, int len, int pos, int dir, const 
 
 void QProfile::finishSimulation() {
 	delete[] pc;
-}
-
-// only be called after collect, mutually exclusive with finish
-double QProfile::getNumMatchingBases() {
-	double numMatchingBases = 0.0;
-	for (int i = 0; i < SIZE; i++) {
-		for (int j = 0; j < NCODES - 1; j++) numMatchingBases += p[i][j][j];
-	}
-	return numMatchingBases;
 }
 
 #endif /* QPROFILE_H_ */

@@ -26,7 +26,7 @@
 
 class CalcEvalScore {
 public:
-	CalcEvalScore(Refs&, double, double, int, int, char*, char* = NULL);
+	CalcEvalScore(Refs&, double, double, int, int, char*, char*, char* = NULL);
 	~CalcEvalScore() { assert(cld != NULL); delete cld; }
 
 	void writeScoresTo(char*);
@@ -38,18 +38,18 @@ private:
 
 	struct Item {
 		int sid;
-		double conprb;
+		double log_conprb;
 
-		Item(int sid, double conprb) {
+		Item(int sid, double log_conprb) {
 			this->sid = sid;
-			this->conprb = conprb;
+			this->log_conprb = log_conprb;
 		}
 	};
 
 	int M, L;
 	READ_INT_TYPE N, N0, N1, N2;
 	HIT_INT_TYPE nHits;
-	double noiseLogP, numMatchingBases;
+	double noiseLogP;
 
 	Refs& refs;
 	ContigLengthDist *cld;
@@ -72,7 +72,7 @@ private:
 
 const double CalcEvalScore::logp_per_base = log(0.25);
 
-CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w, char *statName, char *score_file) : L(L), refs(refs)  {
+CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w, char *statName, char *imdName, char *score_file) : L(L), refs(refs)  {
 	std::ifstream fin;
 	std::string line;
 	int tmpVal;
@@ -115,17 +115,17 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 	assert(N2 == 0 && N0 + N1 == N);
 
 	if (scoreF == "") {
-	  // loading ofgF
-	  char ofgF[STRLEN];
-	  sprintf(ofgF, "%s.ofg", statName);
-	  fin.open(ofgF);
-	  general_assert(fin.is_open(), "Cannot open " + cstrtos(ofgF) + "!");
+	  // loading conprbF
+	  char conprbF[STRLEN];
+	  sprintf(conprbF, "%s.conprb", imdName);
+	  fin.open(conprbF);
+	  general_assert(fin.is_open(), "Cannot open " + cstrtos(conprbF) + "!");
 
 	  READ_INT_TYPE tmpn0, tmpn1;
-	  fin>> tmpVal>> tmpn0>> tmpn1>> noiseLogP>> numMatchingBases;
+	  fin>> tmpVal>> tmpn0>> tmpn1>> noiseLogP;
 	  assert(N0 == tmpn0 && N1 == tmpn1);
 
-	  general_assert(tmpVal == M, "M in " + cstrtos(ofgF) + " is not consistent with the reference!");
+	  general_assert(tmpVal == M, "M in " + cstrtos(conprbF) + " is not consistent with the reference!");
 	  getline(fin, line);
 	  
 	  s.clear(); hits.clear();
@@ -133,10 +133,10 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 	  while (getline(fin, line)) {
 	    std::istringstream strin(line);
 	    int sid;
-	    double conprb;
+	    double log_conprb;
 	    
-	    while (strin>>sid>>conprb) {
-	      hits.push_back(Item(sid, conprb));
+	    while (strin>>sid>>log_conprb) {
+	      hits.push_back(Item(sid, log_conprb));
 	    }
 	    s.push_back(hits.size());
 	  }
@@ -236,30 +236,30 @@ void CalcEvalScore::calcAssemblyPrior(std::vector<double>& lambda, double& bic_t
 
 void CalcEvalScore::calcMaximumDataLikelihood(double& true_data_ll) {
 	HIT_INT_TYPE fr, to;
-	double sum;
-	READ_INT_TYPE numSkip = 0;
+	double sum, max_value;
 
 	if (verbose) { printf("Calculating maximum data likelihood in log space.\n"); }
 
 	true_data_ll = noiseLogP + (N0 > 0 ? N0 * log(theta[0]) : 0.0);
 	for (READ_INT_TYPE i = 0; i < N1; i++) {
-		fr = s[i]; to = s[i + 1]; sum = 0.0;
+		fr = s[i]; to = s[i + 1];
+		max_value = hits[fr].log_conprb;
+		for (HIT_INT_TYPE j = fr + 1; j < to; j++)
+		  if (max_value < hits[j].log_conprb) max_value = hits[j].log_conprb;
+		sum = 0.0;
 		for (HIT_INT_TYPE j = fr; j < to; j++) 
-			sum += theta[hits[j].sid] * hits[j].conprb;
-		true_data_ll += (sum > EPSILON ? log(sum) : LOGZERO);
-		if (sum <= EPSILON) ++numSkip;
+		  sum += theta[hits[j].sid] * exp(hits[j].log_conprb - max_value);
+		assert(sum > EPSILON);
+		true_data_ll += log(sum) + max_value;
 	}
-
-	if (numSkip > 0) { printf("Number of skipped reads at calcMaximumDataLikelihood = %llu.\n", (unsigned long long)numSkip); }
 
 	if (verbose) { printf("Maximum data likelihood is calculated!\n"); }
 }
 
 void CalcEvalScore::calcDataLikelihood(double& data_ll, double& numAlignedReads, int& numEmptyContigs, int& numInvalidContigs) {
 	HIT_INT_TYPE fr, to;
-	double sum, frac, logp0;
+	double sum, max_value, frac;
 	std::vector<double> fracs;
-	READ_INT_TYPE numSkip = 0;
 
 	if (verbose) { printf("Calculating data likelihood in log space.\n"); }
 
@@ -268,25 +268,29 @@ void CalcEvalScore::calcDataLikelihood(double& data_ll, double& numAlignedReads,
 
 	data_ll = noiseLogP + (N0 > 0 ? N0 * log(theta[0]) : 0.0);
 	for (READ_INT_TYPE i = 0; i < N1; i++) {
-		fr = s[i]; to = s[i + 1]; sum = 0.0;
+		fr = s[i]; to = s[i + 1];
+		max_value = hits[fr].log_conprb;
+		for (HIT_INT_TYPE j = fr + 1; j < to; j++)
+		  if (max_value < hits[j].log_conprb) max_value = hits[j].log_conprb;
+		sum = 0.0;
 		fracs.resize(to - fr);
 		for (HIT_INT_TYPE j = fr; j < to; j++) {
-			fracs[j - fr] = theta[hits[j].sid] * hits[j].conprb;
-			sum += fracs[j - fr];
+		  fracs[j - fr] = theta[hits[j].sid] * exp(hits[j].log_conprb - max_value);
+		  sum += fracs[j - fr];
 		}
-
-		data_ll += (sum > EPSILON ? log(sum) : LOGZERO);
-		if (sum <= EPSILON) { ++numSkip; continue; }
+		assert(sum > EPSILON);
+		data_ll += log(sum) + max_value;
 
 		assert(hits[fr].sid == 0);
 		frac = fracs[0] / sum;
 		if (frac > EPSILON) counts[0] += frac;
-		logp0 = (fracs[0] > EPSILON ? log(fracs[0]) : LOGZERO);
 		for (HIT_INT_TYPE j = fr + 1; j < to; j++) {
 			frac = fracs[j - fr] / sum;
 			if (frac > EPSILON) {
 			  counts[hits[j].sid] += frac;
-			  logBayesFactors[hits[j].sid] += frac * ((fracs[j - fr] > EPSILON ? log(fracs[j - fr]) : LOGZERO) - logp0);
+			  assert(theta[hits[j].sid] > EPSILON);
+			  //slightly different from the supplementary text
+			  logBayesFactors[hits[j].sid] += frac * (log(theta[hits[j].sid]) + hits[j].log_conprb - log(theta[hits[j].sid] + theta[0]) - hits[fr].log_conprb);
 			}
 		}
 	}
@@ -298,8 +302,6 @@ void CalcEvalScore::calcDataLikelihood(double& data_ll, double& numAlignedReads,
 		if (lens[i] < L) ++numInvalidContigs;
 		if (counts[i] < 0.005) ++numEmptyContigs; // since expected counts are rouned to 2 digits after the decimal point
 	}
-
-	if (numSkip > 0) { printf("Number of skipped reads at calcDataLikelihood = %llu.\n", (unsigned long long)numSkip); }
 
 	if (verbose) { printf("Data likelihood is calculated!\n"); }
 }

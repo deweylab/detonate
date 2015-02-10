@@ -3,6 +3,8 @@
 use Getopt::Long;
 use Pod::Usage;
 
+use Scalar::Util qw(looks_like_number);
+
 use FindBin;
 use lib $FindBin::RealBin;
 use rsem_perl_utils qw(runCommand collectResults showVersionInfo nbinom_load_params nbinom_convert_params);
@@ -78,16 +80,6 @@ my $genBamF = 0;  # default is not to generate transcript bam file
 my $sampling = 0;
 my $SortMem = "1G"; # default as 1G per thread
 
-# Gibbs and calculate credibility interval parameters
-my $calcPME = 0;
-my $calcCI = 0;
-my $BURNIN = 200;
-my $NCV = 1000;
-my $SAMPLEGAP = 1;
-my $CONFIDENCE = 0.95;
-my $NSPC = 50;
-my $NMB = 1024; # default
-
 # Auxiliary options
 my $seed = "NULL";
 my $keep_intermediate_files = 0;
@@ -144,14 +136,6 @@ GetOptions("transcript-to-gene-map=s" => \$mappingF,
 	   "p|num-threads=i" => \$nThreads,
 	   "output-bam" => \$genBamF,
 	   "sampling-for-bam" => \$sampling,
-	   "calc-pme" => \$calcPME,
-	   "gibbs-burnin=i" => \$BURNIN,
-	   "gibbs-number-of-samples=i" => \$NCV,
-	   "gibbs-sampling-gap=i", \$SAMPLEGAP,
-	   "calc-ci" => \$calcCI,
-	   "ci-credibility-level=f" => \$CONFIDENCE,
-	   "ci-memory=i" => \$NMB,
-	   "ci-number-of-samples-per-count-vector=i" => \$NSPC,
 	   "samtools-sort-mem=s" => \$SortMem,
 	   "seed=i" => \$seed,
 	   "time" => \$mTime,
@@ -182,23 +166,25 @@ else {
 pod2usage(-msg => "Forward probability should be in [0, 1]!", -exitval => 2, -verbose => 2) if ($probF < 0 || $probF > 1);
 pod2usage(-msg => "Min fragment length should be at least 1!", -exitval => 2, -verbose => 2) if ($minL < 1);
 pod2usage(-msg => "Min fragment length should be smaller or equal to max fragment length!", -exitval => 2, -verbose => 2) if ($minL > $maxL);
-pod2usage(-msg => "The memory allocated for calculating credibility intervals should be at least 1 MB!\n", -exitval => 2, -verbose => 2) if ($NMB < 1);
 pod2usage(-msg => "Number of threads should be at least 1!\n", -exitval => 2, -verbose => 2) if ($nThreads < 1);
 pod2usage(-msg => "Seed length should be at least 5!\n", -exitval => 2, -verbose => 2) if ($L < 5);
 pod2usage(-msg => "--sampling-for-bam cannot be specified if --output-bam is not specified!\n", -exitval => 2, -verbose => 2) if ($sampling && !$genBamF);
 pod2usage(-msg => "The seed for random number generator must be a non-negative 32bit integer!\n", -exitval => 2, -verbose => 2) if (($seed ne "NULL") && ($seed < 0 || $seed > 0xffffffff));
-pod2usage(-msg => "The credibility level should be within (0, 1)!\n", -exitval => 2, -verbose => 2) if ($CONFIDENCE <= 0.0 || $CONFIDENCE >= 1.0);
 
 # Load eval_params
 pod2usage(-msg => "--transcript-length-parameters and --transcript-length-mean, --transcript-length-sd are mutually exclusive!", -exitval => 2, -verbose => 2) if (($params_file ne "") && ($trans_mean > 0 || $trans_sd > 0));
 if ($params_file ne "") { ($trans_mean, $trans_sd) = &nbinom_load_params($params_file); }
 if ($trans_mean == 0 && $trans_sd == 0) { $trans_mean = 1466.44794266103; $trans_sd = 1804.89907493894; } # default values
+
 pod2usage(-msg => "Transcript length mean must be positive!", -exitval => 2, -verbose => 2) if ($trans_mean <= 0);
 pod2usage(-msg => "Transcript length standard deviation must be positive!", -exitval => 2, -verbose => 2) if ($trans_sd <= 0);
 pod2usage(-msg => "Transcript length variance must be larger than transcript length mean!", -exitval => 2, -verbose => 2) if ($trans_mean >= $trans_sd ** 2);
+pod2usage(-msg => "Average read/fragment length L must be positive!", -exitval => 2, -verbose => 2) if (!looks_like_number($ARGV[-1]) || $ARGV[-1] <= 0.0);
+pod2usage(-msg => "Overlap size must be positive!", -exitval => 2, -verbose => 2) if ($w < 0);
+
 @eval_params = ();
 push(@eval_params, &nbinom_convert_params($trans_mean, $trans_sd));
-push(@eval_params, $ARGV[-1]);
+push(@eval_params, sprintf("%.0f", $ARGV[-1]));
 push(@eval_params, $w);
 
 
@@ -413,9 +399,8 @@ if ($seed ne "NULL") {
 }
 
 # Run EM
-$command = "rsem-run-em $refName $read_type $sampleName $imdName $statName -p $nThreads";
 $" = " ";
-$command .= " --calc-evaluation-score @eval_params";
+$command = "rsem-eval-run-em $refName $read_type $sampleName $imdName $statName @eval_params -p $nThreads";
 if ($genBamF) { 
     $command .= " -b $samInpType $inpF";
     if ($fn_list ne "") { $command .= " 1 $fn_list"; }
@@ -423,7 +408,6 @@ if ($genBamF) {
     if ($sampling) { $command .= " --sampling"; }
     if ($seed ne "NULL") { $command .= " --seed $seeds[0]"; }
 }
-if ($calcPME || $calcCI) { $command .= " --gibbs-out"; }
 if ($quiet) { $command .= " -q"; }
 
 &runCommand($command);
@@ -437,38 +421,6 @@ if ($genBamF) {
     &runCommand($command);
 }
 if ($mTime) { $time_end = time(); $time_rsem = $time_end - $time_start; }
-
-# Gibbs or CI
-if ($mTime) { $time_start = time(); }
-if ($calcPME || $calcCI ) {
-    $command = "rsem-run-gibbs $refName $imdName $statName $BURNIN $NCV $SAMPLEGAP";
-    $command .= " -p $nThreads";
-    if ($seed ne "NULL") { $command .= " --seed $seeds[1]"; }
-    if ($quiet) { $command .= " -q"; }
-    &runCommand($command);
-}
-
-if ($calcPME || $calcCI) {
-    system("mv $sampleName.isoforms.results $imdName.isoforms.results.bak1");
-    system("mv $sampleName.genes.results $imdName.genes.results.bak1");
-    &collectResults("isoform", "$imdName.iso_res", "$sampleName.isoforms.results"); # isoform level
-    &collectResults("gene", "$imdName.gene_res", "$sampleName.genes.results"); # gene level
-}
-
-if ($calcCI) {
-    $command = "rsem-calculate-credibility-intervals $refName $imdName $statName $CONFIDENCE $NCV $NSPC $NMB";
-    $command .= " -p $nThreads";
-    if ($seed ne "NULL") { $command .= " --seed $seeds[2]"; }
-    if ($quiet) { $command .= " -q"; }
-    &runCommand($command);
-
-    system("mv $sampleName.isoforms.results $imdName.isoforms.results.bak2");
-    system("mv $sampleName.genes.results $imdName.genes.results.bak2");
-    &collectResults("isoform", "$imdName.iso_res", "$sampleName.isoforms.results"); # isoform level
-    &collectResults("gene", "$imdName.gene_res", "$sampleName.genes.results"); # gene level
-}
-
-if ($mTime) { $time_end = time(); $time_ci = $time_end - $time_start; }
 
 if (!$keep_intermediate_files) {
     &runCommand("rm -rf $temp_dir", "Fail to delete the temporary folder!");
@@ -521,7 +473,7 @@ The name of the sample analyzed. All output files are prefixed by this name (e.g
 
 =item B<L>
 
-For single-end data, L represents the average read length. For paired-end data, L represents the average fragment length.
+For single-end data, L represents the average read length. For paired-end data, L represents the average fragment length. It should be a positive integer (real value will be rounded to the nearest integer).
 
 =back
 
@@ -584,14 +536,6 @@ When RSEM-EVAL generates a BAM file, instead of outputing all alignments a read 
 =item B<--seed> <uint32>
 
 Set the seed for the random number generators used in calculating posterior mean estimates and credibility intervals. The seed must be a non-negative 32 bit interger. (Default: off)
-
-=item B<--calc-pme>
-
-Run RSEM-EVAL's collapsed Gibbs sampler to calculate posterior mean estimates. (Default: off) 
-
-=item B<--calc-ci>
-
-Calculate 95% credibility intervals and posterior mean estimates. The credibility level can be changed by setting '--ci-credibility-level'. (Default: off)
 
 =item B<-q/--quiet>
 
@@ -677,11 +621,11 @@ Probability of generating a read from the forward strand of a transcript. Set to
 
 =item B<--fragment-length-min> <int>
 
-Minimum read/fragment length allowed. This is also the value for the Bowtie/Bowtie2 -I option. (Default: 1)
+Minimum read(SE)/fragment(PE) length allowed. This is also the value for the Bowtie/Bowtie2 -I option. (Default: 1)
 
 =item B<--fragment-length-max> <int>
 
-Maximum read/fragment length allowed. This is also the value for the Bowtie/Bowtie 2 -X option. (Default: 1000)
+Maximum read(SE)/fragment(PE) length allowed. This is also the value for the Bowtie/Bowtie 2 -X option. (Default: 1000)
 
 =item B<--estimate-rspd>
 
@@ -690,30 +634,6 @@ Set this option if you want to estimate the read start position distribution (RS
 =item B<--num-rspd-bins> <int>
 
 Number of bins in the RSPD. Only relevant when '--estimate-rspd' is specified.  Use of the default setting is recommended. (Default: 20)
-
-=item B<--gibbs-burnin> <int>
-
-The number of burn-in rounds for RSEM-EVAL's Gibbs sampler. Each round passes over the entire data set once. If RSEM-EVAL can use multiple threads, multiple Gibbs samplers will start at the same time and all samplers share the same burn-in number. (Default: 200)
-
-=item B<--gibbs-number-of-samples> <int>
-
-The total number of count vectors RSEM-EVAL will collect from its Gibbs samplers. (Default: 1000)
-
-=item B<--gibbs-sampling-gap> <int>
-
-The number of rounds between two succinct count vectors RSEM-EVAL collects. If the count vector after round N is collected, the count vector after round N + <int> will also be collected. (Default: 1) 
-
-=item B<--ci-credibility-level> <double>
-
-The credibility level for credibility intervals. (Default: 0.95)
-
-=item B<--ci-memory> <int>
-
-Maximum size (in memory, MB) of the auxiliary buffer used for computing credibility intervals (CI). Set it larger for a faster CI calculation. However, leaving 2 GB memory free for other usage is recommended. (Default: 1024)
-
-=item B<--ci-number-of-samples-per-count-vector> <int>
-
-The number of read generating probability vectors sampled per sampled count vector. The crebility intervals are calculated by first sampling P(C | D) and then sampling P(Theta | C) for each sampled count vector. This option controls how many Theta vectors are sampled per sampled count vector. (Default: 50)
 
 =item B<--samtools-sort-mem> <string>
 
@@ -742,10 +662,6 @@ The SAM/BAM format RSEM-EVAL uses is v1.4. However, it is compatible with old SA
 Please note that some of the default values for the Bowtie parameters are not the same as those defined for Bowtie itself.
 
 The temporary directory and all intermediate files will be removed when RSEM-EVAL finishes unless '--keep-intermediate-files' is specified.
-
-With the '--calc-pme' option, posterior mean estimates will be calculated in addition to maximum likelihood estimates.
-
-With the '--calc-ci' option, 95% credibility intervals and posterior mean estimates will be calculated in addition to maximum likelihood estimates.
 
 =head1 OUTPUT
 
@@ -826,11 +742,9 @@ File containing isoform level expression estimates. The first line
 contains column names separated by the tab character. The format of
 each line in the rest of this file is:
 
-transcript_id gene_id length effective_length expected_count TPM FPKM IsoPct [posterior_mean_count posterior_standard_deviation_of_count pme_TPM pme_FPKM IsoPct_from_pme_TPM TPM_ci_lower_bound TPM_ci_upper_bound FPKM_ci_lower_bound FPKM_ci_upper_bound]
+transcript_id gene_id length effective_length expected_count TPM FPKM IsoPct
 
-Fields are separated by the tab character. Fields within "[]" are
-optional. They will not be presented if neither '--calc-pme' nor
-'--calc-ci' is set.
+Fields are separated by the tab character.
 
 'transcript_id' is the transcript name of this transcript. 'gene_id'
 is the gene name of the gene which this transcript belongs to (denote
@@ -872,28 +786,15 @@ transcript's abandunce over its parent gene's abandunce. If its parent
 gene has only one isoform or the gene information is not provided,
 this field will be set to 100.
 
-'posterior_mean_count', 'pme_TPM', 'pme_FPKM' are posterior mean
-estimates calculated by RSEM-EVAL's Gibbs
-sampler. 'posterior_standard_deviation_of_count' is the posterior
-standard deviation of counts. 'IsoPct_from_pme_TPM' is the isoform
-percentage calculated from 'pme_TPM' values.
-
-'TPM_ci_lower_bound', 'TPM_ci_upper_bound', 'FPKM_ci_lower_bound' and
-'FPKM_ci_upper_bound' are lower(l) and upper(u) bounds of 95%
-credibility intervals for TPM and FPKM values. The bounds are
-inclusive (i.e. [l, u]).
-
 =item B<sample_name.genes.results>
 
 File containing gene level expression estimates. The first line
 contains column names separated by the tab character. The format of
 each line in the rest of this file is:
 
-gene_id transcript_id(s) length effective_length expected_count TPM FPKM [posterior_mean_count posterior_standard_deviation_of_count pme_TPM pme_FPKM TPM_ci_lower_bound TPM_ci_upper_bound FPKM_ci_lower_bound FPKM_ci_upper_bound]
+gene_id transcript_id(s) length effective_length expected_count TPM FPKM
 
-Fields are separated by the tab character. Fields within "[]" are
-optional. They will not be presented if neither '--calc-pme' nor
-'--calc-ci' is set.
+Fields are separated by the tab character.
 
 'transcript_id(s)' is a comma-separated list of transcript_ids
 belonging to this gene. If no gene information is provided, 'gene_id'

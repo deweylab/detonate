@@ -20,7 +20,7 @@ Table of Contents
 
 ## <a name="introduction"></a> Introduction
 
-RSEM-EVAL is built off of RSEM. It is a reference-free de novo transcriptome assembly evaluator. This document will only cover the RSEM-EVAL only features. For the shared feature with RSEM, please refer to 'README_RSEM.md'.
+RSEM-EVAL is built off of RSEM. It is a reference-free de novo transcriptome assembly evaluator.
 
 ## <a name="compilation"></a> Compilation & Installation
 

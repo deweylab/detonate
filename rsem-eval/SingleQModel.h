@@ -96,8 +96,8 @@ public:
 	void estimateFromReads(const char*);
 
 	//if prob is too small, just make it 0
-	double getConPrb(const SingleReadQ& read, const SingleHit& hit) const {
-		double prob;
+	double getLogConPrb(const SingleReadQ& read, const SingleHit& hit) const {
+		double log_prob;
 		int sid = hit.getSid();
 		RefSeq &ref = refs->getRef(sid);
 		int fullLen = ref.getFullLen();
@@ -134,23 +134,19 @@ public:
 			value = gld->getAdjustedProb(readLen, totLen) * rspd->getAdjustedProb(fpos, effL, fullLen);
 		}
 
-		prob = ori->getProb(dir) * value * qpro->getProb(read.getReadSeq(), read.getQScore(), ref, pos, dir);
+		log_prob = Log(ori->getProb(dir) * value) + qpro->getLogProb(read.getReadSeq(), read.getQScore(), ref, pos, dir);
 
-		if (prob <= EPSILON) { prob = 0.0; }
-
-		return prob;
+		return log_prob;
 	}
 
-	double getNoiseConPrb(const SingleReadQ& read) {
-		double prob = mld != NULL ? mld->getProb(read.getReadLength()) : gld->getProb(read.getReadLength());
-		prob *= nqpro->getProb(read.getReadSeq(), read.getQScore());
-		if (prob <= EPSILON) { prob = 0.0; }
+	double getNoiseLogConPrb(const SingleReadQ& read) {
+		double log_prob = Log(mld != NULL ? mld->getProb(read.getReadLength()) : gld->getProb(read.getReadLength()));
+		log_prob += nqpro->getLogProb(read.getReadSeq(), read.getQScore());
 
-		return prob;
+		return log_prob;
 	}
 
 	double getLogP() { return loglik_mld_noise + nqpro->getLogP(); }
-	double getNumMatchingBases() { return qpro->getNumMatchingBases(); }
 
 	void init();
 

@@ -16,8 +16,11 @@ typedef uint64_t HIT_INT_TYPE;
 typedef uint64_t READ_INT_TYPE;
 
 const int STRLEN = 10005 ;
-const double EPSILON = 1e-305; // 10^{-305} 
-const double LOGZERO = log(EPSILON); // log(0)
+const double EPSILON = 1e-300; // 10^{-300} 
+const double LOGZERO = -1000.0; // log(0)
+
+inline double Log(double value) { return (value > EPSILON ? log(value) : LOGZERO); }
+
 const double MINEEL = 1.0;
 const double ORIVALVE = 0.1;
 const int RANGE = 201;

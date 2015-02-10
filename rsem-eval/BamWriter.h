@@ -13,7 +13,6 @@
 #include "sam/bam.h"
 #include "sam/sam.h"
 #include "sam_rsem_aux.h"
-#include "sam_rsem_cvt.h"
 
 #include "utils.h"
 

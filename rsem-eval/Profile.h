@@ -15,15 +15,14 @@ public:
 	Profile(int = 1000);
 	~Profile() {
 		delete[] p;
+		if (log_probs != NULL) delete[] log_probs;
 	}
-
-	Profile& operator=(const Profile&);
 
 	void init();
 	void update(const std::string&, const RefSeq&, int, int, double);
 	void finish();
 
-	double getProb(const std::string&, const RefSeq&, int, int);
+	double getLogProb(const std::string&, const RefSeq&, int, int);
 
 	void collect(const Profile&);
 
@@ -34,14 +33,14 @@ public:
 	std::string simulate(simul*, int, int, int, const RefSeq&);
 	void finishSimulation();
 
-	double getNumMatchingBases();
-
 private:
 	static const int NCODES = 5;
 
 	int proLen; // profile length
 	int size; // # of items in p;
 	double (*p)[NCODES][NCODES]; //profile matrices
+
+	double (*log_probs)[NCODES][NCODES]; // log of profile matrices
 
 	double (*pc)[NCODES][NCODES]; // for simulation
 };
@@ -51,6 +50,7 @@ Profile::Profile(int maxL) {
 	size = proLen * NCODES * NCODES;
 	p = new double[proLen][NCODES][NCODES];
 	memset(p, 0, sizeof(double) * size);
+	log_probs = new double[proLen][NCODES][NCODES];
 
 	//set initial parameters
 	int N = NCODES - 1;
@@ -71,18 +71,12 @@ Profile::Profile(int maxL) {
 		for (int k = 0; k < NCODES - 1; k++)
 				p[i][N][k] = (1.0 - probN) / (NCODES - 1);
 	}
-}
 
-Profile& Profile::operator=(const Profile& rv) {
-	if (this == &rv) return *this;
-	if (proLen != rv.proLen) {
-		delete[] p;
-		proLen = rv.proLen;
-		size = rv.size;
-		p = new double[rv.proLen][NCODES][NCODES];
-	}
-	memcpy(p, rv.p, sizeof(double) * rv.size);
-	return *this;
+	// Take logs
+	for (int i = 0; i < proLen; i++)
+	  for (int j = 0; j < NCODES; j++)
+	    for (int k = 0; k < NCODES; k++)
+	      log_probs[i][j][k] = Log(p[i][j][k]);
 }
 
 void Profile::init() {
@@ -103,25 +97,30 @@ void Profile::finish() {
 		for (int j = 0; j < NCODES; j++) {
 			sum = 0.0;
 			for (int k = 0; k < NCODES; k++) sum += p[i][j][k];
-			if (sum < EPSILON) {
+			if (sum <= EPSILON) {
 				for (int k = 0; k < NCODES; k++) p[i][j][k] = 0.0;
 				continue;
 			}
 			for (int k = 0; k < NCODES; k++) p[i][j][k] /= sum;
 		}
 	}
+
+	// Take logs
+	for (int i = 0; i < proLen; i++)
+	  for (int j = 0; j < NCODES; j++)
+	    for (int k = 0; k < NCODES; k++)
+	      log_probs[i][j][k] = Log(p[i][j][k]);
 }
 
-double Profile::getProb(const std::string& readseq, const RefSeq& refseq, int pos, int dir) {
-	double prob = 1.0;
+double Profile::getLogProb(const std::string& readseq, const RefSeq& refseq, int pos, int dir) {
+	double log_prob = 0.0;
 	int len = readseq.size();
 
 	for (int i = 0; i < len; i++) {
-		prob *= p[i][refseq.get_id(i + pos, dir)][get_base_id(readseq[i])];
-
+		log_prob += log_probs[i][refseq.get_id(i + pos, dir)][get_base_id(readseq[i])];
 	}
 
-	return prob;
+	return log_prob;
 }
 
 void Profile::collect(const Profile& o) {
@@ -137,6 +136,9 @@ void Profile::read(FILE *fi) {
 	assert(tmp_ncodes == NCODES);
 	if (tmp_prolen != proLen) {
 		delete[] p;
+		delete[] log_probs;
+		log_probs = NULL;
+
 		proLen = tmp_prolen;
 		size = proLen * NCODES * NCODES;
 		p = new double[proLen][NCODES][NCODES];
@@ -216,15 +218,6 @@ std::string Profile::simulate(simul* sampler, int len, int pos, int dir, const R
 
 void Profile::finishSimulation() {
 	delete[] pc;
-}
-
-// only be called after collect, mutually exclusive with finish
-double Profile::getNumMatchingBases() {
-	double numMatchingBases = 0.0;
-	for (int i = 0; i < proLen; i++) {
-		for (int j = 0; j < NCODES - 1; j++) numMatchingBases += p[i][j][j];
-	}
-	return numMatchingBases;
 }
 
 #endif /* PROFILE_H_ */

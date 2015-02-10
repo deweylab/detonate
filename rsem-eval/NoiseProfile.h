@@ -17,9 +17,8 @@ public:
 		logp = 0.0;
 		memset(c, 0, sizeof(c));
 		memset(p, 0, sizeof(p));
+		memset(log_probs, 0, sizeof(log_probs));
 	}
-
-	NoiseProfile& operator=(const NoiseProfile&);
 
 	void init();
 	void updateC(const std::string&);
@@ -27,7 +26,8 @@ public:
 	void finish();
 	void calcInitParams();
 
-	double getProb(const std::string&);
+	double getLogProb(const std::string&);
+
 	double getLogP() { return logp; }
 
 	void collect(const NoiseProfile&);
@@ -41,21 +41,16 @@ public:
 
 private:
 	static const int NCODES = 5;
+	static const double prior[NCODES];
 
 	double logp;
 	double c[NCODES]; // counts in N0;
 	double p[NCODES];
+	
+	double log_probs[NCODES]; // log_probs[i] = log(p[i])
 
 	double *pc; // for simulation
 };
-
-NoiseProfile& NoiseProfile::operator=(const NoiseProfile& rv) {
-	if (this == &rv) return *this;
-	logp = rv.logp;
-	memcpy(c, rv.c, sizeof(rv.c));
-	memcpy(p, rv.p, sizeof(rv.p));
-	return *this;
-}
 
 void NoiseProfile::init() {
 	memset(p, 0, sizeof(p));
@@ -80,11 +75,22 @@ void NoiseProfile::finish() {
 
 	logp = 0.0;
 	sum = 0.0;
-	for (int i = 0; i < NCODES; i++) sum += (p[i] + c[i]);
-	if (sum <= EPSILON) return;
 	for (int i = 0; i < NCODES; i++) {
-		p[i] = (p[i] + c[i]) / sum;
-		if (c[i] > EPSILON) { logp += c[i] * log(p[i]); }
+	  p[i] += c[i];
+	  sum += p[i];
+	}
+	if (sum > EPSILON) {
+	  for (int i = 0; i < NCODES; i++) {
+	    p[i] /= sum;
+	    log_probs[i] = Log(p[i]);
+	    if (c[i] > EPSILON) { logp += c[i] * log_probs[i]; }
+	  }
+	}
+	else {
+	  for (int i = 0; i < NCODES; i++) {
+	    p[i] = 0.0;
+	    log_probs[i] = LOGZERO; 
+	  }
 	}
 }
 
@@ -93,22 +99,26 @@ void NoiseProfile::calcInitParams() {
 
 	logp = 0.0;
 	sum = 0.0;
-	for (int i = 0; i < NCODES; i++) sum += (1.0 + c[i]);
 	for (int i = 0; i < NCODES; i++) {
-		p[i] = (1.0 + c[i]) / sum;
-		if (c[i] > EPSILON) { logp += c[i] * log(p[i]); }
+	  p[i] = c[i] + 1.0; // 1.0 pseudo count
+	  sum += p[i];
+	}
+	for (int i = 0; i < NCODES; i++) {
+		p[i] /= sum;
+		log_probs[i] = Log(p[i]);
+		if (c[i] > EPSILON) { logp += c[i] * log_probs[i]; }
 	}
 }
 
-double NoiseProfile::getProb(const std::string& readseq) {
-	double prob = 1.0;
+double NoiseProfile::getLogProb(const std::string& readseq) {
+	double log_prob = 0.0;
 	int len = readseq.size();
 
 	for (int i = 0; i < len; i++) {
-		prob *= p[get_base_id(readseq[i])];
+		log_prob += log_probs[get_base_id(readseq[i])];
 	}
 
-	return prob;
+	return log_prob;
 }
 
 void NoiseProfile::collect(const NoiseProfile& o) {

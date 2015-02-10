@@ -17,9 +17,8 @@ public:
 		logp = 0.0;
 		memset(c, 0, sizeof(c));
 		memset(p, 0, sizeof(p));
+		memset(log_probs, 0, sizeof(log_probs));
 	}
-
-	NoiseQProfile& operator=(const NoiseQProfile&);
 
 	void init();
 	void updateC(const std::string&, const std::string&);
@@ -27,7 +26,7 @@ public:
 	void finish();
 	void calcInitParams();
 
-	double getProb(const std::string&, const std::string&);
+	double getLogProb(const std::string&, const std::string&);
 	double getLogP() { return logp; }
 
 	void collect(const NoiseQProfile&);
@@ -42,23 +41,17 @@ public:
 private:
 	static const int NCODES = 5; // number of possible codes
 	static const int SIZE = 100;
+	static const double prior[NCODES]; // prior for each base
 
 	double logp; //log prob;
 	double c[SIZE][NCODES]; //counts in N0;
 	double p[SIZE][NCODES]; //p[q][c] = p(c|q)
+	double log_probs[SIZE][NCODES]; // log_probs[q]c[] = log(p(c|q))
 
 	int c2q(char c) { assert(c >= 33 && c <= 126); return c - 33; }
 
 	double (*pc)[NCODES]; // for simulation
 };
-
-NoiseQProfile& NoiseQProfile::operator=(const NoiseQProfile& rv) {
-	if (this == &rv) return *this;
-	logp = rv.logp;
-	memcpy(c, rv.c, sizeof(rv.c));
-	memcpy(p, rv.p, sizeof(rv.p));
-	return *this;
-}
 
 void NoiseQProfile::init() {
 	memset(p, 0, sizeof(p));
@@ -81,44 +74,56 @@ void NoiseQProfile::update(const std::string& readseq, const std::string& qual, 
 void NoiseQProfile::finish() {
 	double sum;
 
-	//If N0 is 0, p(c|q) = 0 for all c, q
 	logp = 0.0;
 	for (int i = 0; i < SIZE; i++) {
 		sum = 0.0;
-		for (int j = 0; j < NCODES; j++) sum += (p[i][j] + c[i][j]);
-		if (sum <= EPSILON) continue;
-		//if (isZero(sum)) continue;
 		for (int j = 0; j < NCODES; j++) {
-			p[i][j] = (p[i][j] + c[i][j]) /sum;
-			if (c[i][j] > EPSILON) { logp += c[i][j] * log(p[i][j]); }
+		  p[i][j] += c[i][j];
+		  sum += p[i][j];
+		}
+		if (sum > EPSILON) {
+		  for (int j = 0; j < NCODES; j++) {
+		    p[i][j] /= sum;
+		    log_probs[i][j] = Log(p[i][j]);
+		    if (c[i][j] > EPSILON) { logp += c[i][j] * log_probs[i][j]; }
+		  }
+		}
+		else {
+		  for (int j = 0; j < NCODES; j++) {
+		    p[i][j] = 0.0;
+		    log_probs[i][j] = LOGZERO; 
+		  }
 		}
 	}
 }
 
-//make init parameters not zero
 void NoiseQProfile::calcInitParams() {
 	double sum;
 
 	logp = 0.0;
 	for (int i = 0; i < SIZE; i++) {
 		sum = 0.0;
-		for (int j = 0; j < NCODES; j++) sum += (1.0 + c[i][j]); // 1.0 pseudo count
 		for (int j = 0; j < NCODES; j++) {
-			p[i][j] = (c[i][j] + 1.0) / sum;
-			if (c[i][j] > EPSILON) { logp += c[i][j] * log(p[i][j]); }
+		  p[i][j] = c[i][j] + 1.0; // 1.0 pseudo-count
+		  sum += p[i][j];
+		}
+		for (int j = 0; j < NCODES; j++) {
+		  p[i][j] /= sum;
+		  log_probs[i][j] = Log(p[i][j]);
+		  if (c[i][j] > EPSILON) { logp += c[i][j] * log_probs[i][j]; }
 		}
 	}
 }
 
-double NoiseQProfile::getProb(const std::string& readseq, const std::string& qual) {
-	double prob = 1.0;
+double NoiseQProfile::getLogProb(const std::string& readseq, const std::string& qual) {
+	double log_prob = 0.0;
 	int len = readseq.size();
 
 	for (int i = 0; i < len; i++) {
-		prob *= p[c2q(qual[i])][get_base_id(readseq[i])];
+		log_prob += log_probs[c2q(qual[i])][get_base_id(readseq[i])];
 	}
 
-	return prob;
+	return log_prob;
 }
 
 void NoiseQProfile::collect(const NoiseQProfile& o) {
