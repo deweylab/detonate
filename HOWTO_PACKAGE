@@ -1,9 +1,4 @@
-First, make sure that config.sh looks correct, and that
-
-  - $ref_eval_upstream_dir/$ref_eval_pkg.tar.gz and
-  - $rsem_eval_upstream_dir/$rsem_eval_pkg.tar.gz
-
-both exist and are up to date.
+First, make sure that config.sh looks correct.
 
 Second, run:
 
