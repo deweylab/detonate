@@ -91,16 +91,16 @@ tables and figures of our DETONATE paper);
 sequence bases; 'Data_likelihood_in_log_space_without_correction', the
 RSEM log data likelihood calculated with contig-level read generating
 probabilities mentioned in section 4 of Additional file 1;
-'Correction_term (f function canceled)', the correction term, with f
+'Correction_term_(f_function_canceled)', the correction term, with f
 function values excluded. Score = BIC_penalty +
 Prior_score_on_contig_lengths + Prior_score_on_contig_sequences +
 Data_likelihood_in_log_space_without_correction -
 Correction_term. Because both 'Prior_score_on_contig_lengths' and
 'Correction_term' share the same f function values for each contig,
 the f function values can be canceled out. Then
-'Prior_score_on_contig_lengths (f function canceled)' is the sum of
+'Prior_score_on_contig_lengths_(f_function_canceled)' is the sum of
 log $c_{\lambda}(\ell)$ terms in equation (9) at page 5 of Additional
-file 1. 'Correction_term (f function canceled)' is the sum of log $(1
+file 1. 'Correction_term_(f_function_canceled)' is the sum of log $(1
 - p_{\lambda_i})$ terms in equation (23) at page 9 of Additional file
 1. For the correction term, we use $\lambda_i$ instead of $\lambda'_i$
 to make f function canceled out.

@@ -190,10 +190,10 @@ void CalcEvalScore::writeScoresTo(char *outF) {
 
 	fprintf(fo, "Score\t%.2f\n", total_score);
 	fprintf(fo, "BIC_penalty\t%.2f\n", bic_term);
-	fprintf(fo, "Prior_score_on_contig_lengths (f function canceled)\t%.2f\n", prior_contig_lengths);
+	fprintf(fo, "Prior_score_on_contig_lengths_(f_function_canceled)\t%.2f\n", prior_contig_lengths);
 	fprintf(fo, "Prior_score_on_contig_sequences\t%.2f\n", prior_sequence_bases);
 	fprintf(fo, "Data_likelihood_in_log_space_without_correction\t%.2f\n", data_ll);
-	fprintf(fo, "Correction_term (f function canceled)\t%.2f\n", correction_score);
+	fprintf(fo, "Correction_term_(f_function_canceled)\t%.2f\n", correction_score);
 	fprintf(fo, "Number_of_contigs\t%d\n", M);
 	fprintf(fo, "Expected_number_of_aligned_reads_given_the_data\t%.2f\n", numAlignedReads);
 	fprintf(fo, "Number_of_contigs_smaller_than_expected_read/fragment_length\t%d\n", numInvalidContigs);
