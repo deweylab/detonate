@@ -105,6 +105,11 @@ file 1. 'Correction_term_(f_function_canceled)' is the sum of log $(1
 1. For the correction term, we use $\lambda_i$ instead of $\lambda'_i$
 to make f function canceled out.
 
+NOTE: Higher RSEM-EVAL scores are better than lower scores. This is 
+true despite the fact that the scores are always negative.  For 
+example, a score of -80000 is better than a score of -200000, since
+-80000 > -200000.
+
 The next 7 lines provide statistics that may help users to understand
 the RSEM-EVAL score better. They are: 'Number_of_contigs', the number
 of contigs contained in the assembly;
