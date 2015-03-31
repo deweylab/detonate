@@ -9,7 +9,7 @@ rsem-extract-reference-transcripts
 rsem-get-unique
 rsem-parse-alignments
 rsem-preref
-rsem-run-em
+rsem-eval-run-em
 rsem-run-gibbs
 rsem-simulate-reads
 rsem-synthesis-reference-transcripts
