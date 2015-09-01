@@ -405,6 +405,21 @@ themselves are given under ``Score definitions'' below.</p>
         </dd>
 
   <dt>
+  --hash-table-numeric-type arg
+  </dt>
+
+        <dd>
+        <p>The numeric type to use to store values in the hash table, either
+        ``double'' or ``float''. This is only relevant for KC and kmer scores.
+        Using single-precision floating point numbers (``float'') requires less
+        memory than using double-precision (``double''), but may also result in
+        more numerical error. Note that we use double-precision numbers
+        throughout our calculations even if single-precision numbers are stored
+        in the table, so the additional error should be minimal. Default:
+        ``double''.</p>
+        </dd>
+
+  <dt>
   --hash-table-fudge-factor arg
   </dt>
 

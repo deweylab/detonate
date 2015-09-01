@@ -55,6 +55,7 @@ boost::program_options::options_description describe_options()
     ("max-frac-indel", po::value<double>())
     ("min-segment-len", po::value<size_t>())
     ("hash-table-type", po::value<std::string>())
+    ("hash-table-numeric-type", po::value<std::string>())
     ("hash-table-fudge-factor", po::value<double>())
     ("trace", po::value<std::string>())
   ;
@@ -236,6 +237,20 @@ void parse_options(opts& o, boost::program_options::variables_map& vm)
   } else {
     if (vm.count("hash-table-type"))
       throw po::error("--hash-table-type is not needed except for kmer and kc scores.");
+  }
+
+  // Parse hash-table-numeric-type.
+  if (o.kc || o.kmer || o.paper) {
+    if (vm.count("hash-table-numeric-type")) {
+      o.hash_table_numeric_type = vm["hash-table-numeric-type"].as<std::string>();
+      if (o.hash_table_numeric_type != "float" && o.hash_table_numeric_type != "double")
+        throw po::error("Invalid value for --hash-table-numeric-type: " + o.hash_table_numeric_type);
+    } else {
+      o.hash_table_numeric_type = "double";
+    }
+  } else {
+    if (vm.count("hash-table-numeric-type"))
+      throw po::error("--hash-table-numeric-type is not needed except for kmer and kc scores.");
   }
 
   // Parse hash-table-fudge-factor.

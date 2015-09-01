@@ -37,18 +37,22 @@
 namespace re {
 namespace kc {
 
+template<typename Number>
 struct kmer_info
 {
   bool is_present_in_A;
-  double weight_in_B;
+  Number weight_in_B;
   kmer_info()
   : is_present_in_A(false),
     weight_in_B(0.0)
   {}
 };
 
-typedef google::sparse_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> sparse_kmer_map;
-typedef google::dense_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> dense_kmer_map;
+typedef google::sparse_hash_map<kmer_key, kmer_info<double>, kmer_key_hash, kmer_key_equal_to> sparse_double_kmer_map;
+typedef google::sparse_hash_map<kmer_key, kmer_info<float>, kmer_key_hash, kmer_key_equal_to> sparse_float_kmer_map;
+typedef google::dense_hash_map<kmer_key, kmer_info<double>, kmer_key_hash, kmer_key_equal_to> dense_double_kmer_map;
+typedef google::dense_hash_map<kmer_key, kmer_info<float>, kmer_key_hash, kmer_key_equal_to> dense_float_kmer_map;
+
 
 template<typename Ht>
 struct empty_key_initializer
@@ -58,12 +62,24 @@ struct empty_key_initializer
 };
 
 template<>
-struct empty_key_initializer<dense_kmer_map>
+struct empty_key_initializer<dense_double_kmer_map>
 {
   std::string empty_string;
   const char *empty_key;
+  empty_key_initializer(dense_double_kmer_map& ht, size_t kmerlen)
+  : empty_string(kmerlen, ' '),
+    empty_key(empty_string.c_str())
+  {
+    ht.set_empty_key(empty_key);
+  }
+};
 
-  empty_key_initializer(dense_kmer_map& ht, size_t kmerlen)
+template<>
+struct empty_key_initializer<dense_float_kmer_map>
+{
+  std::string empty_string;
+  const char *empty_key;
+  empty_key_initializer(dense_float_kmer_map& ht, size_t kmerlen)
   : empty_string(kmerlen, ' '),
     empty_key(empty_string.c_str())
   {
@@ -158,10 +174,10 @@ size_t estimate_hashtable_size(
 template<typename Ht>
 double compute_kmer_recall(const Ht& ht)
 {
-  typedef std::pair<const kmer_key, kmer_info> X;
+  typedef typename Ht::value_type X;
   double numer = 0.0, denom = 0.0;
   BOOST_FOREACH(const X& x, ht) {
-    const kmer_info& i = x.second;
+    const typename Ht::mapped_type& i = x.second;
     if (i.is_present_in_A > 0)
       numer += i.weight_in_B;
     denom += i.weight_in_B;
@@ -215,10 +231,14 @@ void main(
     const expr& tau_B)
 {
   if (o.kc || o.paper) {
-    if (o.hash_table_type == "sparse")
-      main_1<sparse_kmer_map>(o, A, B, tau_B);
-    else if (o.hash_table_type == "dense")
-      main_1<dense_kmer_map>(o, A, B, tau_B);
+    if (o.hash_table_type == "sparse" && o.hash_table_numeric_type == "double")
+      main_1<sparse_double_kmer_map>(o, A, B, tau_B);
+    else if (o.hash_table_type == "sparse" && o.hash_table_numeric_type == "float")
+      main_1<sparse_float_kmer_map>(o, A, B, tau_B);
+    else if (o.hash_table_type == "dense" && o.hash_table_numeric_type == "double")
+      main_1<dense_double_kmer_map>(o, A, B, tau_B);
+    else if (o.hash_table_type == "dense" && o.hash_table_numeric_type == "float")
+      main_1<dense_float_kmer_map>(o, A, B, tau_B);
     else
       throw std::runtime_error("Unknown hash map type.");
   }

@@ -34,22 +34,25 @@
 namespace re {
 namespace kmer {
 
+template<typename Number>
 struct kmer_info
 {
-  double weights[2]; // sometimes normalized, sometimes not
+  Number weights[2]; // sometimes normalized, sometimes not
   kmer_info()
   {
     weights[0] = 0;
     weights[1] = 0;
   }
-  double& weight_in_A() { return weights[0]; }
-  double& weight_in_B() { return weights[1]; }
-  const double& weight_in_A() const { return weights[0]; }
-  const double& weight_in_B() const { return weights[1]; }
+  Number& weight_in_A() { return weights[0]; }
+  Number& weight_in_B() { return weights[1]; }
+  const Number& weight_in_A() const { return weights[0]; }
+  const Number& weight_in_B() const { return weights[1]; }
 };
 
-typedef google::sparse_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> sparse_kmer_map;
-typedef google::dense_hash_map<kmer_key, kmer_info, kmer_key_hash, kmer_key_equal_to> dense_kmer_map;
+typedef google::sparse_hash_map<kmer_key, kmer_info<double>, kmer_key_hash, kmer_key_equal_to> sparse_double_kmer_map;
+typedef google::sparse_hash_map<kmer_key, kmer_info<float>, kmer_key_hash, kmer_key_equal_to> sparse_float_kmer_map;
+typedef google::dense_hash_map<kmer_key, kmer_info<double>, kmer_key_hash, kmer_key_equal_to> dense_double_kmer_map;
+typedef google::dense_hash_map<kmer_key, kmer_info<float>, kmer_key_hash, kmer_key_equal_to> dense_float_kmer_map;
 
 template<typename Ht>
 struct empty_key_initializer
@@ -59,12 +62,24 @@ struct empty_key_initializer
 };
 
 template<>
-struct empty_key_initializer<dense_kmer_map>
+struct empty_key_initializer<dense_double_kmer_map>
 {
   std::string empty_string;
   const char *empty_key;
+  empty_key_initializer(dense_double_kmer_map& ht, size_t kmerlen)
+  : empty_string(kmerlen, ' '),
+    empty_key(empty_string.c_str())
+  {
+    ht.set_empty_key(empty_key);
+  }
+};
 
-  empty_key_initializer(dense_kmer_map& ht, size_t kmerlen)
+template<>
+struct empty_key_initializer<dense_float_kmer_map>
+{
+  std::string empty_string;
+  const char *empty_key;
+  empty_key_initializer(dense_float_kmer_map& ht, size_t kmerlen)
   : empty_string(kmerlen, ' '),
     empty_key(empty_string.c_str())
   {
@@ -110,7 +125,7 @@ void count_kmers(
 template<typename Ht>
 void normalize_kmer_distributions(Ht& ht)
 {
-  typedef std::pair<kmer_key const, kmer_info> X;
+  typedef typename Ht::value_type X;
   double denom_A = 0.0;
   double denom_B = 0.0;
 
@@ -148,7 +163,7 @@ void compute_stats(
     const Ht& ht,
     const std::string& prefix)
 {
-  typedef std::pair<kmer_key, kmer_info> X;
+  typedef typename Ht::value_type X;
   double KL_A_to_M = 0.0;
   double KL_B_to_M = 0.0;
   double hellinger = 0.0;
@@ -240,10 +255,14 @@ void main(
 {
   if (o.kmer) {
 
-    if (o.hash_table_type == "sparse")
-      main_1<sparse_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
-    else if (o.hash_table_type == "dense")
-      main_1<dense_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    if (o.hash_table_type == "sparse" && o.hash_table_numeric_type == "double")
+      main_1<sparse_double_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    else if (o.hash_table_type == "sparse" && o.hash_table_numeric_type == "float")
+      main_1<sparse_float_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    else if (o.hash_table_type == "dense" && o.hash_table_numeric_type == "double")
+      main_1<dense_double_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
+    else if (o.hash_table_type == "dense" && o.hash_table_numeric_type == "float")
+      main_1<dense_float_kmer_map>(o, A, B, tau_A, tau_B, unif_A, unif_B);
     else
       throw std::runtime_error("Unknown hash map type.");
 

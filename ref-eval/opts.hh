@@ -72,6 +72,7 @@ struct opts
 
   // Hash table
   std::string hash_table_type;
+  std::string hash_table_numeric_type;
   double hash_table_fudge_factor;
 
   // Trace output
@@ -130,6 +131,7 @@ struct opts
 
     // Hash table
     hash_table_type(""),
+    hash_table_numeric_type(""),
     hash_table_fudge_factor(-1.0),
 
     // Trace output
