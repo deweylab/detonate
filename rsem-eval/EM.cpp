@@ -61,6 +61,7 @@ struct Params {
 int read_type;
 int M; // M contigs
 READ_INT_TYPE N0, N1, N2, N_tot;
+HIT_INT_TYPE nHits;
 int nThreads;
 
 bool genBamF; // If user wants to generate bam file, true; otherwise, false.
@@ -98,7 +99,6 @@ seedType seed;
 template<class ReadType, class HitType, class ModelType>
 void init(ReadReader<ReadType> **&readers, HitContainer<HitType> **&hitvs, double **&ncpvs, ModelType **&mhps) {
 	READ_INT_TYPE nReads;
-	HIT_INT_TYPE nHits;
 	int rt; // read type
 
 	READ_INT_TYPE nrLeft, curnr; // nrLeft : number of reads left, curnr: current number of reads
@@ -423,7 +423,7 @@ void EM() {
 	// Output those log conditional probabilities
 	sprintf(conprbF, "%s.conprb", imdName); // for internal experiments
 	ofstream fout(conprbF);
-	fout<< M<< " "<< N0<< " "<< N1<< " "<< setprecision(15)<< model.getLogP()<< endl;
+	fout<< M<< " "<< N0<< " "<< N1<< " "<< nHits<< " "<< setprecision(15)<< model.getLogP()<< endl;
 	for (int i = 0; i < nThreads; i++) {
 	  READ_INT_TYPE numN = hitvs[i]->getN();
 	  for (READ_INT_TYPE j = 0; j < numN; j++) {

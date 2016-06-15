@@ -40,10 +40,7 @@ private:
 		int sid;
 		double log_conprb;
 
-		Item(int sid, double log_conprb) {
-			this->sid = sid;
-			this->log_conprb = log_conprb;
-		}
+		Item() : sid(0), log_conprb(0.0) {}
 	};
 
 	int M, L;
@@ -116,32 +113,38 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 
 	if (scoreF == "") {
 	  // loading conprbF
-	  char conprbF[STRLEN];
-	  sprintf(conprbF, "%s.conprb", imdName);
-	  fin.open(conprbF);
-	  general_assert(fin.is_open(), "Cannot open " + cstrtos(conprbF) + "!");
+		char conprbF[STRLEN];
+		sprintf(conprbF, "%s.conprb", imdName);
+		fin.open(conprbF);
+		general_assert(fin.is_open(), "Cannot open " + cstrtos(conprbF) + "!");
 
-	  READ_INT_TYPE tmpn0, tmpn1;
-	  fin>> tmpVal>> tmpn0>> tmpn1>> noiseLogP;
-	  assert(N0 == tmpn0 && N1 == tmpn1);
+		READ_INT_TYPE tmpn0, tmpn1;
+		HIT_INT_TYPE tmpnhits;
+		fin>> tmpVal>> tmpn0>> tmpn1>> tmpnhits>> noiseLogP;
+		assert(N0 == tmpn0 && N1 == tmpn1 && nHits == tmpnhits);
 
-	  general_assert(tmpVal == M, "M in " + cstrtos(conprbF) + " is not consistent with the reference!");
-	  getline(fin, line);
-	  
-	  s.clear(); hits.clear();
-	  s.push_back(0);
-	  while (getline(fin, line)) {
-	    std::istringstream strin(line);
-	    int sid;
-	    double log_conprb;
-	    
-	    while (strin>>sid>>log_conprb) {
-	      hits.push_back(Item(sid, log_conprb));
-	    }
-	    s.push_back(hits.size());
-	  }
-	  assert(N1 == s.size() - 1);
-	  fin.close();
+		general_assert(tmpVal == M, "M in " + cstrtos(conprbF) + " is not consistent with the reference!");
+		getline(fin, line);
+
+		READ_INT_TYPE i = 0; // point to current location of s
+		HIT_INT_TYPE j = 0; // point to current location of hits
+
+		s.assign(N1 + 1, 0);
+		hits.assign(nHits, Item());
+
+		while (getline(fin, line)) {
+			std::istringstream strin(line);
+			int sid;
+			double log_conprb;
+
+			while (strin>> sid>> log_conprb) {
+				hits[j].sid = sid;
+				hits[j++].log_conprb = log_conprb;
+			}
+			s[++i] = j;
+		}
+		assert(i == N1 && j == nHits);
+		fin.close();
 	}
 
 	logBayesFactors.assign(M + 1, 0.0);
