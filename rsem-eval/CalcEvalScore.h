@@ -130,7 +130,7 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 		HIT_INT_TYPE j = 0; // point to current location of hits
 
 		s.assign(N1 + 1, 0);
-		hits.assign(nHits, Item());
+		hits.assign(nHits + N1, Item());
 
 		while (getline(fin, line)) {
 			std::istringstream strin(line);
@@ -143,7 +143,7 @@ CalcEvalScore::CalcEvalScore(Refs& refs, double nb_r, double nb_p, int L, int w,
 			}
 			s[++i] = j;
 		}
-		assert(i == N1 && j == nHits);
+		assert(i == N1 && j == nHits + N1);
 		fin.close();
 	}
 

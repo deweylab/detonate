@@ -635,9 +635,12 @@ int main(int argc, char* argv[]) {
 
 	//Calculate RSEM-EVAL score
 	CalcEvalScore ces(refs, nb_r, nb_p, L, w, statName, imdName);
+	printf("ces is created.\n");
+
 	sprintf(scoreF, "%s.score", outName);
 	ces.writeScoresTo(scoreF);
-		
+	printf("score is written.\n");
+
 	char groupF[STRLEN];
 	GroupInfo gi;
 	sprintf(groupF, "%s.grp", argv[1]);
