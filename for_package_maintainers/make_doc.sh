@@ -16,20 +16,20 @@ fi
 
 mkdir -p $pkg/html
 python3 $pkg/ref-eval/make_doc.py \
-  --template index.template.html \
+  --template for_package_maintainers/index.template.html \
   --html     $pkg/html/index.html \
   --text     $pkg/README \
   --cxx      /dev/null
 
 python3 $pkg/ref-eval/make_doc.py \
-  --template vignette.template.html \
+  --template for_package_maintainers/vignette.template.html \
   --html     $pkg/html/vignette.html \
   --text     $pkg/VIGNETTE \
   --cxx      /dev/null
 
 pushd $pkg/ref-eval; make doc; popd
-cp $pkg/ref-eval/ref-eval.html $pkg/html/
-cp $pkg/ref-eval/ref-eval-estimate-true-assembly.html $pkg/html/
+mv $pkg/ref-eval/ref-eval.html $pkg/html/
+mv $pkg/ref-eval/ref-eval-estimate-true-assembly.html $pkg/html/
 
 cat > rsem-eval.template.html <<-EOF
 <?xml version="1.0"?>
@@ -40,7 +40,7 @@ cat > rsem-eval.template.html <<-EOF
 <body>
 <h1>RSEM-EVAL: A novel reference-free transcriptome assembly evaluation measure</h1>
 EOF
-perl Markdown_1.0.1/Markdown.pl < $pkg/rsem-eval/README.md | \
+perl for_package_maintainers/Markdown_1.0.1/Markdown.pl < $pkg/rsem-eval/README.md | \
   awk '/h2.*Introduction/ { f=1 } f' >> rsem-eval.template.html
 cat >> rsem-eval.template.html <<-EOF
 </body>
@@ -51,3 +51,4 @@ python3 $pkg/ref-eval/make_doc.py \
   --html     $pkg/html/rsem-eval.html \
   --text     /dev/null \
   --cxx      /dev/null
+rm -f rsem-eval.template.html

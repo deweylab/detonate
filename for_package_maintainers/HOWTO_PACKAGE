@@ -1,0 +1,21 @@
+- Make sure the documentation is in sync, by running
+
+  $ bash for_package_maintainers/make_doc.sh
+
+  This should actually be done every time the documentation is changed, before
+  checking it into git.
+
+- Make sure all changes (including those from above) are checked in.
+
+- Tag the release:
+  $ git tag -a 1.11 -m "DETONATE version 1.11"
+
+- Make the archive:
+  $ git archive --format=tar.gz --prefix=detonate-1.11/ HEAD > detonate-1.11.tar.gz
+
+- Update the website (be careful here!):
+  $ scp detonate-1.11.tar.gz html/* mammoth-1.biostat.wisc.edu:/u/deweylab/web/detonate/
+
+- Push the changes:
+  $ git push
+  $ git push --tags

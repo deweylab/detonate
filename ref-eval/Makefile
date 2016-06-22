@@ -58,7 +58,7 @@ ifeq (${NEED_CMAKE}, yes)
   wd := $(shell pwd)
   export CMAKE_BIN = ${wd}/cmake/install/bin/cmake
 else
-  export CMAKE_BIN = cmakeeee
+  export CMAKE_BIN = cmake
 endif
 
 .PHONY: all

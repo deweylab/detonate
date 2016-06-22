@@ -50,7 +50,7 @@ $ blat -minIdentity=80 B.fa A.fa A_to_B.psl
 $ blat -minIdentity=80 A.fa B.fa B_to_A.psl
 </pre>
 
-<p>If you want to compute weighted variants of scores, use <a href="http://deweylab.biostat.wisc.edu/rsem/">RSEM</a> (or <a href="http://deweylab.biostat.wisc.edu/detonate/rsem-eval.html">RSEM-EVAL</a>)
+<p>If you want to compute weighted variants of scores, use <a href="http://deweylab.biostat.wisc.edu/rsem/">RSEM</a>
 to compute the expression of the assembly and reference relative to the given
 reads. Let's assume that the reads are in <tt>reads.fq</tt>.</p>
 
@@ -637,7 +637,7 @@ the reference, and compute the nucleotide recall.</p>
       and resolved wrt $b$.</li>
 </ul>
 
-<p>A couple of examples of the above are as follows. The comments in <a href="https://github.com/nfillmore/ref-eval/blob/master/test_re_matched.cpp">test_re_matched.cpp</a>
+<p>A couple of examples of the above are as follows. The comments in <a href="https://github.com/deweylab/detonate/blob/master/ref-eval/test_re_matched.cpp">test_re_matched.cpp</a>
 contain even more examples.</p>
 
 <p>As a first example, consider alignments of an assembly $A = \{a_0, a_1,
