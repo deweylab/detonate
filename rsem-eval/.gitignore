@@ -1,6 +1,7 @@
 *.o
 *.a
 *~
+finished
 rsem-bam2readdepth
 rsem-bam2wig
 rsem-build-read-index
