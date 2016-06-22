@@ -54,6 +54,13 @@ INC = $(BOOST_INC) $(LEMON_INC) $(CITY_INC) $(SAM_INC) $(SH_INC) $(DL_INC)
 LIB = $(BOOST_LIB) $(LEMON_LIB) $(CITY_LIB) $(SAM_LIB)
 TEST_LIB = boost/stage/lib/libboost_unit_test_framework.a
 
+ifeq (${NEED_CMAKE}, yes)
+  wd := $(shell pwd)
+  export CMAKE_BIN = ${wd}/cmake/install/bin/cmake
+else
+  export CMAKE_BIN = cmakeeee
+endif
+
 .PHONY: all
 all: ref-eval ref-eval-estimate-true-assembly
 
@@ -70,12 +77,36 @@ boost/finished:
 	cd boost && $(MAKE)
 
 cmake/bin/cmake:
+ifeq (${NEED_CMAKE}, yes)
 	@echo 
 	@echo -------------------
 	@echo - Building CMake. -
 	@echo -------------------
 	@echo 
 	cd cmake && $(MAKE)
+else
+	@echo 
+	@echo ----------------------
+	@echo - Looking for CMake. -
+	@echo ----------------------
+	@echo 
+ifeq ($(shell which $(CMAKE_BIN)),)
+	@echo "error: The CMake executable, $(CMAKE_BIN), does not exist."
+	@echo
+	@echo "Two options:"
+	@echo
+	@echo "1. Ask us to compile a local version of CMake and use that, by"
+	@echo "   running 'NEED_CMAKE=yes make'."
+	@echo
+	@echo "2. Install CMake yourself (or ask your system administrator to do"
+	@echo "   so), make sure that 'cmake' is in the PATH, and then try"
+	@echo "   installing DETONATE again by re-running 'make'."
+	@echo
+	@exit 1
+else
+	@echo "The CMake executable, $(CMAKE_BIN), exists."
+endif
+endif
 
 lemon/finished: cmake/bin/cmake
 	@echo 
