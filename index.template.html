@@ -48,18 +48,26 @@ href="http://genomebiology.com/2014/15/12/553">link</a></p>
 
 <h2>Downloading</h2>
 
-<p>The current version of DETONATE (1.10) is available here:</p>
+<p>The current version of DETONATE (1.11) is available here:</p>
 
 <ul>
-<li><a href="detonate-1.10.tar.gz">detonate-1.10.tar.gz</a></li>
+<li><a href="detonate-1.11.tar.gz">detonate-1.11.tar.gz</a></li>
+</ul>
+
+<p>As a convenience, we also provide a precompiled version, for Linux. This
+precompiled version may or may not work for you; if it doesn't, please try to
+compile the version above, instead.</p>
+
+<ul>
+<li><a href="detonate-1.11-precompiled.tar.gz">detonate-1.11-precompiled.tar.gz</a></li>
 </ul>
 
 
 <h2>Building/installation</h2>
 
 <p>To build RSEM-EVAL and REF-EVAL, simply type ``make'' in the top-level
-<tt>detonate-1.10</tt> directory, after you've upacked the tarball (<tt>tar
-xvf detonate-1.10.tar.gz</tt>). If you have trouble with any of this, please
+<tt>detonate-1.11</tt> directory, after you've upacked the tarball (<tt>tar
+xvf detonate-1.11.tar.gz</tt>). If you have trouble with any of this, please
 <a href="https://groups.google.com/d/forum/detonate-users">contact us</a>.</p>
 
 
@@ -123,7 +131,17 @@ href="http://deweylab.biostat.wisc.edu/detonate/AxoJuveBlastema_RSEM-EVAL-1.4_Tr
 
 <h2>Changelog</h2>
 
-<p>In <a href="detonate-1.10.tar.gz">DETONATE 1.10</a> (the current version),
+<p>In <a href="detonate-1.11.tar.gz">DETONATE 1.11</a> (the current version),
+released on Jun 22, 2016, the following changes were made:</p>
+
+<ul>
+<li>Reduced memory usage in RSEM-EVAL.</li>
+<li>Changed build process to use the systemwide version of CMake, unless
+DETONATE is compiled with "NEED_CMAKE=yes make".</li>
+<li>Restored missing "examples" directory in released version.</li>
+</ul>
+
+<p>In <a href="detonate-1.10.tar.gz">DETONATE 1.10</a>,
 released on Sep 1, 2015, the following changes were made:</p>
 
 <ul>
